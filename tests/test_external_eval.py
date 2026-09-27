@@ -7,7 +7,7 @@ from jevany.external_eval import load_completed, run_requests
 from scripts.build_external_eval import (
     PUBLIC_CONTEXT, SHORT_CONTEXT, build, jevbench_record, request_key, validate_file,
 )
-from scripts.replay_external_context import replay_entry
+from scripts.replay_external_context import load_encoder, replay_entry
 from scripts.report_external_eval import (
     jevbench_reference, reference_reports, score_panel, typesafe_metrics, write_tables,
 )
@@ -114,6 +114,34 @@ def test_context_replay_rejection_has_no_reused_prediction_or_latency():
     result = replay_entry(old, new, {"status": "ok", "wall_latency_ms": 4}, overlong)
     assert result["status"] == "rejected"
     assert "prediction" not in result and "wall_latency_ms" not in result
+
+
+def test_replay_checks_pinned_head_when_recipe_has_no_weight_hash(tmp_path, monkeypatch):
+    import shutil
+    import torch
+
+    model = {"id": "fixture", "backend": "jevany", "checkpoint": "owner/model@release-sha"}
+    head = tmp_path / "fixture/head.pt"
+    head.parent.mkdir()
+    torch.save({"base": "fixture-base", "base_revision": "base-sha"}, head)
+    published = tmp_path / "published.pt"
+    shutil.copyfile(head, published)
+    downloads = []
+
+    def download(repository, filename, revision):
+        downloads.append((repository, filename, revision))
+        return published
+
+    monkeypatch.setattr("huggingface_hub.hf_hub_download", download)
+    monkeypatch.setattr("jevany.model.load_preprocessor", lambda *_, **__: object())
+    weights = {"checkpoint": model["checkpoint"], "base": "fixture-base",
+               "resolved_base_revision": "base-sha"}
+    _, proof = load_encoder(model, tmp_path, weights)
+    assert downloads == [("owner/model", "head.pt", "release-sha")]
+    assert proof["base_revision"] == "base-sha"
+    head.write_bytes(b"wrong metadata")
+    with pytest.raises(ValueError, match="metadata checksum"):
+        load_encoder(model, tmp_path, weights)
 
 
 def test_resume_only_repairs_torn_final_line(tmp_path):

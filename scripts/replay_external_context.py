@@ -48,8 +48,18 @@ def load_encoder(model: dict, metadata: Path, weights: dict):
     native = importlib.import_module(f"{backend}.model")
     checkpoint = importlib.import_module(f"{backend}.checkpoint")
     head = metadata / model["id"] / "head.pt"
-    spec = next(item for item in model["weights"] if item["name"] == "head.pt")
-    if digest(head) != spec["lfs"]["sha256"]:
+    spec = next((item for item in model.get("weights", []) if item["name"] == "head.pt"), None)
+    if spec:
+        expected_sha256 = spec["lfs"]["sha256"]
+    else:
+        from huggingface_hub import hf_hub_download
+
+        repository, separator, pinned_revision = model["checkpoint"].partition("@")
+        if not separator or not pinned_revision:
+            raise ValueError("context replay requires a pinned checkpoint revision")
+        published = hf_hub_download(repository, "head.pt", revision=pinned_revision)
+        expected_sha256 = digest(published)
+    if digest(head) != expected_sha256:
         raise ValueError(f"{model['id']}: checkpoint metadata checksum mismatch")
     meta = checkpoint.Meta.from_dict(torch.load(head, map_location="cpu", weights_only=True))
     if weights["checkpoint"] != model["checkpoint"] or weights["base"] != meta.base:
