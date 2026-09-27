@@ -5,7 +5,7 @@ import pytest
 
 from jevany.external_eval import load_completed, run_requests
 from scripts.build_external_eval import PUBLIC_CONTEXT, jevbench_record, request_key, validate_file
-from scripts.report_external_eval import score_panel, typesafe_metrics
+from scripts.report_external_eval import jevbench_reference, reference_reports, score_panel, typesafe_metrics
 
 
 def task(kind="noul", expected="yes"):
@@ -120,3 +120,31 @@ def test_typesafe_weights_cases_equally_and_penalizes_missing():
     assert result["evaluated"]["equal_case_modal_agreement"] == 1
     assert result["all_rows"]["equal_case_modal_agreement"] == .5
     assert result["all_rows"]["equal_case_total_variation"] == .5
+
+
+def test_published_reference_alias_requires_identical_data_and_context(tmp_path):
+    source = tmp_path / "kev/runs/jev-fixture"
+    source.mkdir(parents=True)
+    (source / "report.json").write_text(json.dumps({"suite_sha256": "manifest"}))
+    panel = {"id": "kev/original/development", "upstream_manifest_sha256": "manifest",
+             "upstream_sha256": "data", "context": PUBLIC_CONTEXT}
+    alias = {**panel, "id": "kev/alias/development", "upstream_manifest_sha256": "other"}
+    changed = {**alias, "id": "kev/changed/development", "upstream_sha256": "different"}
+    reference = reference_reports(tmp_path, [panel, alias, changed])[0]
+    assert reference["matching_panels"] == [panel["id"], alias["id"]]
+    assert reference["provenance"] == "published_by_Kev_not_rerun"
+
+
+def test_jevbench_reference_uses_only_exact_public_ids(tmp_path):
+    source = tmp_path / "jevbench/results/v1.2"
+    source.mkdir(parents=True)
+    (source / "jevbench-v1.2-per-task.json").write_text(json.dumps({
+        "systems": {"jev-1.13.0": {"display": "Jev 1.13.0", "public_tasks": {"item": ["c", .3]}}},
+    }))
+    records = {"jevbench/easy": [jevbench_record(task())]}
+    reference = jevbench_reference(tmp_path, records)
+    assert reference["panels"]["jevbench/easy"]["accuracy"] == 1
+    assert "brier" not in reference["panels"]["jevbench/easy"]
+    records["jevbench/easy"][0]["_meta"]["id"] = "unknown"
+    with pytest.raises(ValueError, match="missing"):
+        jevbench_reference(tmp_path, records)

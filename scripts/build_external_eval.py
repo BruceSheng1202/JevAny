@@ -39,6 +39,7 @@ def download_sources(recipe, destination):
                 relative = member.name.split("/", 1)[-1]
                 if not (relative.startswith(("evals/", "datasets/", "kev/", "jevbench/",
                                              "runs/jev-", "scripts/compare_typesafe"))
+                        or relative == "results/v1.2/jevbench-v1.2-per-task.json"
                         or relative in ("README.md", "LICENSE", "pyproject.toml")):
                     continue
                 if not relative.endswith((".json", ".jsonl", ".py", ".md", ".toml")) and relative != "LICENSE":

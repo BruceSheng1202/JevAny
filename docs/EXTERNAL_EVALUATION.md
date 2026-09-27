@@ -87,9 +87,17 @@ question-weighted accuracy.
 
 Published official Jev results are copied from Kev's committed reports with
 their source paths, hashes, API model identity, and measurement dates. They are
-marked `published_by_Kev_not_rerun`; matching requires an original manifest hash.
-The API alias may not expose a provider revision. Unmatched results remain
-references, rather than being assigned to a different panel.
+marked `published_by_Kev_not_rerun`. Matching normally requires an original
+manifest hash; historical aliases require identical partition bytes and context.
+Scienthoon's converted rows instead verify every question ID, ordered option
+list, and label, with this weaker match recorded explicitly. The API alias may
+not expose a provider revision. Unmatched results remain references, rather
+than being assigned to a different panel.
+
+JevBench also publishes Jev 1.13.0's per-item public outcomes. Those provide a
+separate public-tier accuracy reference, marked `published_by_JevBench_not_rerun`.
+They contain no probability distributions, so no calibration metrics are
+invented from them.
 
 Latency is local model time on the recorded hardware; cloud price and the
 JevBench speed/cost composite are not inferred. Existing JevAny multimodal and

@@ -8,7 +8,8 @@ import sys
 
 import numpy as np
 
-from jevany.benchmark import prediction_rows, summarize
+from jevany.benchmark import labels, prediction_rows, summarize
+from jevany.data import load_records
 from jevany.metrics import grouped_metrics, metrics
 from jevany.suite import digest, read_json, read_jsonl, write_json
 
@@ -142,13 +143,66 @@ def reference_reports(sources, panels):
         report = read_json(path)
         matches = [p for p in by_manifest[report.get("suite_sha256")]
                    if p.endswith("/development") or p.endswith("/records")]
+        basis = "original manifest SHA256" if matches else "unmatched original manifest"
+        evidence = {}
+        if matches:
+            identities = {(p["upstream_sha256"], json.dumps(p["context"], sort_keys=True))
+                          for p in panels if p["id"] in matches}
+            matches = [p["id"] for p in panels
+                       if (p["upstream_sha256"], json.dumps(p["context"], sort_keys=True)) in identities]
+            basis = "original manifest SHA256; aliases require identical partition SHA256 and context"
+        elif report.get("suite") and (path.parent / "rows.json").exists():
+            # scienthoon published converted predictions, without a suite hash.
+            # Verify all question identities and labels; retain this weaker match
+            # explicitly rather than claiming a request-text checksum.
+            candidates = [p for p in panels
+                          if p.get("upstream_path") == report["suite"] + "/development.jsonl"]
+            rows_path = path.parent / "rows.json"
+            rows = read_json(rows_path)
+            actual = {(r["id"], r["question"]): (r["keys"], r["label"]) for r in rows}
+            for panel in candidates:
+                records = load_records(root / panel["upstream_path"])
+                expected = {(r["_meta"]["id"], qid): labels(q)
+                            for r in records for qid, q in r["questions"].items()}
+                if len(actual) == len(rows) and expected == actual:
+                    matches.append(panel["id"])
+                    basis = "source panel path and complete published row IDs, ordered options, labels; no request-text hash"
+                    evidence = {"published_rows_sha256": digest(rows_path)}
         references.append({
             "provenance": "published_by_Kev_not_rerun", "source_path": path.relative_to(root).as_posix(),
             "source_sha256": digest(path), "matching_panels": matches,
-            "match_basis": "original manifest SHA256" if matches else "unmatched original manifest",
+            "match_basis": basis, **evidence,
             "report": report,
         })
     return references
+
+
+def jevbench_reference(sources, panel_records):
+    """Recover public-tier Jev accuracy from upstream's published per-item outcomes."""
+    path = Path(sources) / "jevbench/results/v1.2/jevbench-v1.2-per-task.json"
+    if not path.exists():
+        return None
+    source = read_json(path)
+    model = source["systems"]["jev-1.13.0"]
+    outcomes = model["public_tasks"]
+    result = {
+        "provenance": "published_by_JevBench_not_rerun", "model": model["display"],
+        "source_path": path.relative_to(Path(sources) / "jevbench").as_posix(),
+        "source_sha256": digest(path),
+        "match_basis": "public task IDs at the pinned source revision",
+        "note": "accuracy only; no probabilities published, so calibration is unavailable",
+        "panels": {},
+    }
+    for ident, records in panel_records.items():
+        if not ident.startswith("jevbench/"):
+            continue
+        ids = [r["_meta"]["id"] for r in records]
+        if any(key not in outcomes for key in ids):
+            raise ValueError(f"official Jev public outcomes missing from {ident}")
+        correct = sum(outcomes[key][0] == "c" for key in ids)
+        result["panels"][ident] = {"questions": len(ids), "correct": correct,
+                                   "accuracy": correct / len(ids)}
+    return result
 
 
 def collect_predictions(directory, model, suite_hash):
@@ -187,6 +241,7 @@ def report(suite, sources, runs, destination):
         if digest(path) != panel["sha256"]:
             raise ValueError(f"panel checksum mismatch: {path}")
         panel_records[panel["id"]] = read_jsonl(path)
+    result["official_jev_jevbench"] = jevbench_reference(sources, panel_records)
     for model in manifest["models"]:
         predictions, provenance = collect_predictions(runs, model, result["suite_manifest_sha256"])
         model_reports = {}
