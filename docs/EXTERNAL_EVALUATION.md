@@ -64,6 +64,10 @@ python scripts/report_external_eval.py \
   --runs runs/external-eval --out runs/external-report
 ```
 
+The output includes detailed JSON reports, `scores.csv` with one row per
+model/panel and explicit metric names, and a wide `accuracy.csv`. Incomplete
+panels have empty accuracy cells in both tables.
+
 ## What the scores mean
 
 Requests contain no labels or reference distributions. Identical ordered

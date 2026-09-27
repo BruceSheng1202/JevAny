@@ -2,6 +2,7 @@
 """Score saved predictions, retaining native JevBench and TypeSafe protocols."""
 import argparse
 from collections import defaultdict
+import csv
 import json
 from pathlib import Path
 import sys
@@ -223,6 +224,46 @@ def collect_predictions(directory, model, suite_hash):
     return merged, runs
 
 
+def write_tables(result, destination):
+    """Export every model/panel with an explicit metric and completeness column."""
+    rows = []
+    for model_id, model in result["models"].items():
+        for panel_id, panel in model["panels"].items():
+            answered = panel["answered_clean"] or {}
+            accuracy, metric = panel["all_requested_accuracy"], "clean knowable question accuracy"
+            if "jevbench" in panel:
+                accuracy, metric = panel["jevbench"]["accuracy"], "JevBench native public accuracy"
+            elif "typesafe" in panel:
+                accuracy = panel["typesafe"]["all_rows"]["equal_case_modal_agreement"]
+                metric = "TypeSafe equal-case modal agreement"
+            rows.append({
+                "model": model_id, "panel": panel_id, "complete": panel["complete"],
+                "metric": metric, "accuracy": accuracy if panel["complete"] else None,
+                "requested_records": panel["requested_records"],
+                "evaluated_records": panel["evaluated_records"],
+                "rejected_records": len(panel["rejected_records"]),
+                "missing_records": len(panel["missing_records"]),
+                "answered_clean_questions": answered.get("n"),
+                "answered_nll": answered.get("nll"), "answered_brier": answered.get("brier"),
+                "answered_ece": answered.get("ece"),
+                "answered_coverage_at_5pct_error": answered.get("coverage_at_5pct_error"),
+                "measurement": "local inference",
+            })
+    if not rows:
+        return
+    with (Path(destination) / "scores.csv").open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    panel_ids = [panel["id"] for panel in result["panels"]]
+    with (Path(destination) / "accuracy.csv").open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(["model", *panel_ids])
+        by_pair = {(row["model"], row["panel"]): row for row in rows}
+        for model in result["models"]:
+            writer.writerow([model, *[by_pair[model, p]["accuracy"] for p in panel_ids]])
+
+
 def report(suite, sources, runs, destination):
     suite, destination = Path(suite), Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
@@ -260,6 +301,7 @@ def report(suite, sources, runs, destination):
     result["complete"] = all(
         p["complete"] for m in result["models"].values() for p in m["panels"].values())
     write_json(destination / "comparison.json", result)
+    write_tables(result, destination)
     return result
 
 

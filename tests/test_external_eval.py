@@ -5,7 +5,9 @@ import pytest
 
 from jevany.external_eval import load_completed, run_requests
 from scripts.build_external_eval import PUBLIC_CONTEXT, jevbench_record, request_key, validate_file
-from scripts.report_external_eval import jevbench_reference, reference_reports, score_panel, typesafe_metrics
+from scripts.report_external_eval import (
+    jevbench_reference, reference_reports, score_panel, typesafe_metrics, write_tables,
+)
 
 
 def task(kind="noul", expected="yes"):
@@ -148,3 +150,22 @@ def test_jevbench_reference_uses_only_exact_public_ids(tmp_path):
     records["jevbench/easy"][0]["_meta"]["id"] = "unknown"
     with pytest.raises(ValueError, match="missing"):
         jevbench_reference(tmp_path, records)
+
+
+def test_table_uses_native_metric_and_leaves_incomplete_accuracy_blank(tmp_path):
+    import csv
+
+    record = jevbench_record(task())
+    record["_eval_key"] = "a"
+    incomplete, _ = score_panel([record], {})
+    native = {**incomplete, "complete": True, "missing_records": [],
+              "jevbench": {"accuracy": .75}}
+    result = {"panels": [{"id": "p"}], "models": {
+        "missing": {"panels": {"p": incomplete}}, "native": {"panels": {"p": native}},
+    }}
+    write_tables(result, tmp_path)
+    with (tmp_path / "scores.csv").open() as stream:
+        rows = list(csv.DictReader(stream))
+    assert rows[0]["accuracy"] == ""
+    assert rows[1]["accuracy"] == "0.75"
+    assert rows[1]["metric"] == "JevBench native public accuracy"
