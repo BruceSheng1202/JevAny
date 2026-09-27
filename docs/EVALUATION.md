@@ -1,5 +1,11 @@
 # Evaluation
 
+The [JevBench and Kev comparison](EXTERNAL_EVALUATION.md) evaluates both released
+JevAny checkpoints and all 14 distinct released Kev checkpoints across 67 public
+panels. It includes complete result tables, published official Jev references,
+and the private partitions that remain unavailable. The earlier release,
+multimodal, and interactive measurements are retained below.
+
 SFT is the default checkpoint. RLCR improved development NLL by 0.005 and did not improve transfer accuracy.
 
 The [v0.2 release record](../results/release-v0.2.json) reports results on 1,004 development questions and 1,046 transfer questions. NLL (negative log-likelihood) penalizes low probability on the correct answer; lower is better.

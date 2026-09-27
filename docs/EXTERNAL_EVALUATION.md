@@ -18,6 +18,87 @@ counts, hashes, and mirror revisions remain in `manifest.json` under
 231 public decisions do not include its sealed items. Public scores are not its
 full leaderboard composite.
 
+## Results — September 27, 2026
+
+The completed public matrix contains 16 checkpoints × 67 panels. Each model
+attempted all 22,219 unique requests, representing 56,677 original panel
+records. Identical requests are reused across historical panels; these counts
+are not a count of independent test examples.
+Fourteen partitions across eleven private Kev suites remain unavailable.
+
+Download the [full accuracy matrix](../results/decision-evaluation-v1/accuracy.csv),
+[metrics and latency table](../results/decision-evaluation-v1/scores.csv),
+[detailed JSON](../results/decision-evaluation-v1/comparison.json.gz), and
+[provenance and unavailable partitions](../results/decision-evaluation-v1/manifest.json).
+Empty accuracy cells on unknowable panels mean confidence-only evaluation.
+Published references have empty cells where no matching result is available.
+
+JevBench public accuracy uses all 48 easy, 72 original, and 111 hard items:
+
+| Checkpoint | Easy | Original | Hard |
+|---|---:|---:|---:|
+| JevAny-27B-SFT | 100.00% | 98.61% | 70.27% |
+| JevAny-27B-RLCR | 100.00% | 97.22% | 69.37% |
+| Kev-0.5B | 95.83% | 48.61% | 30.63% |
+| Kev-0.6B | 100.00% | 72.22% | 36.04% |
+| Kev-0.8B | 100.00% | 80.56% | 36.94% |
+| Kev-0.8B / night2-du-release | 100.00% | 73.61% | 33.33% |
+| Kev-0.8B / v7-base | 100.00% | 72.22% | 32.43% |
+| Kev-27B | 100.00% | 100.00% | 72.07% |
+| Kev-4B | 100.00% | 93.06% | 54.05% |
+| Kev-4B / night2-du-release | 100.00% | 90.28% | 48.65% |
+| Kev-4B / qwen3 | 100.00% | 88.89% | 37.84% |
+| Kev-4B / r8-documents-release | 100.00% | 93.06% | 45.05% |
+| Kev-4B / v7-base | 100.00% | 90.28% | 46.85% |
+| Kev-8B | 100.00% | 93.06% | 45.05% |
+| Kev-9B | 100.00% | 90.28% | 55.86% |
+| Kev-9B / v7-base | 100.00% | 90.28% | 55.86% |
+| Jev 1.13.0 / published reference | 100.00% | 98.61% | 72.97% |
+
+These are public-tier results, not JevBench's sealed leaderboard composite.
+The official Jev row is copied from JevBench's published per-item outcomes;
+it was not rerun through an API. Kev's published Jev reports are retained
+separately in [the reference archive](../results/decision-evaluation-v1/official-jev-references.json).
+
+Selected external panels for the current main checkpoints are below.
+MMLU-Pro here is the separate 1,000-question ekzhang panel. Transfer-v9
+contains its own 200-question MMLU-Pro slice. TypeSafe uses equal-case agreement;
+its total-variation distance is included in the full metrics table.
+Kev's published Jev MMLU-Pro 1,000 result remains an unpaired reference
+because its source hash does not match the public sample.
+
+| Checkpoint | MMLU-Pro 1,000 | WANLI-v2 | SemIf | scienthoon | TypeSafe agreement |
+|---|---:|---:|---:|---:|---:|
+| JevAny-27B-SFT | 66.80% | 74.25% | 94.44% | 72.85% | 76.79% |
+| JevAny-27B-RLCR | 66.30% | 74.15% | 94.44% | 72.85% | 77.63% |
+| Kev-0.8B | 23.30% | 60.18% | 72.22% | 53.38% | 54.61% |
+| Kev-4B | 52.40% | 69.26% | 89.58% | 72.28% | 71.85% |
+| Kev-9B | 50.70% | 73.95% | 90.97% | 75.49% | 72.79% |
+| Kev-27B | 63.10% | 74.55% | 97.22% | 79.73% | 79.01% |
+
+All-request scores count context rejections and out-of-memory failures as
+wrong. Under this run's math-attention configuration and 80GB GPU limit,
+each JevAny checkpoint ran out of memory on seven longstate-v2 records.
+Their JevBench, transfer-v9, and MMLU-Pro panels had no out-of-memory failures.
+Per-panel rejection counts and error details remain in the reports.
+The worker used Transformers 5.17.0, PEFT 0.21.0, and Accelerate 1.15.0;
+each run records its Python, PyTorch, checkpoint, precision, and GPU details.
+
+This rerun gives both JevAny checkpoints 82.12% on transfer-v9's 1,046 clean,
+knowable questions, compared with the earlier release's 82.41% for SFT and
+82.31% for RLCR. Adapter and head hashes match that release, and the old
+and current text encoders produced identical encodings on all 1,264 current
+transfer records. The original per-item outputs and runtime records were
+unavailable for this comparison, so the small aggregate differences have
+no established cause. The earlier release measurements remain separate.
+
+The first GPU queue gave ekzhang MMLU-Pro a larger context than the native
+Kev protocol. The final results apply 384/1,024/2,048-token limits using
+the verified context replay described below. Original GPU predictions
+are reused only when the complete native encoding is identical; each
+changed request retains its parent key and proof. Timing for reused
+predictions is the original GPU timing.
+
 ## Reproduce
 
 Use Python 3.12 and the local inference dependencies:
