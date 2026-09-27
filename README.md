@@ -172,6 +172,12 @@ jevany demo
 
 These GIFs show accelerated replays of JevAny-27B-SFT controlling the environments. Each replay preserves the model's actual choices and original option probabilities.
 
+### [Robot peg insertion](examples/README.md#robot-peg-insertion)
+
+Use a Franka gripper to grasp, align and insert a peg, checked by PyBullet contact physics.
+
+![Robot browser replay showing the Franka arm inserting a peg, recorded model probabilities and physical success checks](docs/demos/playground-arm.gif)
+
 ### [Doom corridor · 3D](examples/README.md#doom-corridor-3d)
 
 Start in the final room, kill the enemies on the left and right, then move forward through the cleared room. Uses ViZDoom and the included Freedoom assets.
@@ -183,12 +189,6 @@ Start in the final room, kill the enemies on the left and right, then move forwa
 Gather wood, craft tools and mine stone while managing health and supplies.
 
 ![Crafter browser replay showing resource gathering, crafting actions and progress through four goal milestones](docs/demos/playground-crafter.gif)
-
-### [Robot peg insertion](examples/README.md#robot-peg-insertion)
-
-Use a Franka gripper to grasp, align and insert a peg, checked by PyBullet contact physics.
-
-![Robot browser replay showing the Franka arm inserting a peg, recorded model probabilities and physical success checks](docs/demos/playground-arm.gif)
 
 ### Live control
 

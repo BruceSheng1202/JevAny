@@ -172,6 +172,12 @@ jevany demo
 
 以下动图是 JevAny-27B-SFT 操作环境的加速回放，保留了模型的实际选择和原始选项概率。
 
+### [机械臂插孔](examples/README.md#robot-peg-insertion)
+
+控制 Franka 夹爪抓取、对准并插入工件，由 PyBullet 接触物理验证结果。
+
+![机械臂浏览器回放：Franka 插孔动作、模型原始选项概率和物理成功检查](docs/demos/playground-arm.gif)
+
 ### [Doom 走廊 · 3D](examples/README.md#doom-corridor-3d)
 
 从最后一个房间开始，击杀左右两名敌人，再继续前进。使用 ViZDoom 和随包提供的 Freedoom 资源。
@@ -183,12 +189,6 @@ jevany demo
 采集木材、制作工具、开采石头，同时管理生命值和物资。
 
 ![Crafter 浏览器回放：资源采集、制作工具和四项目标的完成进度](docs/demos/playground-crafter.gif)
-
-### [机械臂插孔](examples/README.md#robot-peg-insertion)
-
-控制 Franka 夹爪抓取、对准并插入工件，由 PyBullet 接触物理验证结果。
-
-![机械臂浏览器回放：Franka 插孔动作、模型原始选项概率和物理成功检查](docs/demos/playground-arm.gif)
 
 ### 实时控制
 

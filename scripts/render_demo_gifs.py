@@ -16,15 +16,15 @@ from urllib.request import urlopen
 from PIL import Image
 from playwright.sync_api import sync_playwright
 
-CASES = ("doom", "crafter", "arm")
+CASES = ("arm", "doom", "crafter")
 SIZE = (1120, 900)
 FRAME_MS = 40
 SPEED = 1.5
-FORMAT = "JevAny Playground v1; 1120x900; 25fps; 1.5x"
+FORMAT = "JevAny Playground v1; 1120x900; 25fps"
 
 
 def timeline(replay):
-    """Retain each environment's frame timing and inter-decision pause."""
+    """Accelerate recorded motion; advance untimed steps at the output fps."""
     entries, starts, elapsed = [], [], 0.
     steps = replay["steps"]
     entries.append((0, steps[0]["frames"][-1]))
@@ -32,11 +32,11 @@ def timeline(replay):
     elapsed += FRAME_MS
     for index, step in enumerate(steps[1:], 1):
         if index > 1:
-            elapsed += step.get("step_pause_ms", 950) / SPEED
+            elapsed += step.get("step_pause_ms", 0) / SPEED
         for frame in step["frames"]:
             entries.append((index, frame))
             starts.append(elapsed)
-            elapsed += step.get("frame_duration_ms", 65) / SPEED
+            elapsed += step.get("frame_duration_ms", FRAME_MS * SPEED) / SPEED
     samples = []
     for time_ms in range(0, math.ceil(elapsed), FRAME_MS):
         entry = entries[bisect_right(starts, time_ms) - 1]
