@@ -78,6 +78,16 @@ requests with identical context limits share inference, while each original
 panel keeps its own labels, membership, and denominator. Option permutations
 remain distinct. Context limits come from each Kev manifest; JevBench uses the
 8,192-token state/row and 16,384-token packed context. Inputs are not truncated.
+The external ekzhang MMLU-Pro panel has no context manifest and follows
+`kev.benchmark --data`: 384 state, 1,024 row, and 2,048 packed tokens.
+
+For existing runs made with larger context limits,
+`scripts/replay_external_context.py` can apply narrower limits using the pinned
+native text encoder. It reuses an accepted prediction only after comparing the
+entire encoding and verifying its length against the recorded GPU input.
+New context rejections carry no prediction or GPU latency. Parent run hashes,
+encoder provenance, and per-request encoding proofs remain in the corrected
+run; the original files are preserved.
 
 `all_requested_accuracy` counts rejected or missing knowable questions as wrong.
 `answered_clean` reports accuracy, NLL, Brier, ECE, selective coverage, and ordinal

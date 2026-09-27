@@ -4,7 +4,10 @@ import json
 import pytest
 
 from jevany.external_eval import load_completed, run_requests
-from scripts.build_external_eval import PUBLIC_CONTEXT, jevbench_record, request_key, validate_file
+from scripts.build_external_eval import (
+    PUBLIC_CONTEXT, SHORT_CONTEXT, build, jevbench_record, request_key, validate_file,
+)
+from scripts.replay_external_context import replay_entry
 from scripts.report_external_eval import (
     jevbench_reference, reference_reports, score_panel, typesafe_metrics, write_tables,
 )
@@ -46,6 +49,71 @@ def test_invalid_source_does_not_pass_freeze(tmp_path):
     path.write_text("{}\n")
     with pytest.raises(ValueError, match="checksum"):
         validate_file(path, {"sha256": "wrong", "records": 1})
+
+
+def test_record_only_mmlu_uses_native_default_context(tmp_path):
+    from jevany.suite import digest, write_json, write_jsonl
+
+    sources = tmp_path / "sources"
+    record = jevbench_record(task())
+    for filename, manifest in (
+        ("external/ekzhang-mmlupro-v1/records.jsonl", "external/ekzhang-mmlupro-v1/sample.json"),
+        ("diagnostics/binding-v1.jsonl", "diagnostics/binding-v1.manifest.json"),
+    ):
+        path = sources / "kev/evals" / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_jsonl(path, [record])
+        write_json(sources / "kev/evals" / manifest, {"sha256": digest(path), "records": 1})
+    night = sources / "kev/evals/night2"
+    night.mkdir()
+    write_json(night / "manifest.json", {"files": {}})
+    public = sources / "jevbench/datasets/public"
+    public.mkdir(parents=True)
+    splits = []
+    for name in ("easy", "original", "hard"):
+        path = public / f"{name}.jsonl"
+        write_jsonl(path, [task()])
+        splits.append({"name": name, "sha256": digest(path), "n": 1})
+    write_json(public.parent / "manifest.json", {"splits": splits})
+    suite = build({"models": [], "sources": {}}, sources, tmp_path / "suite")
+    mmlu = next(panel for panel in suite["panels"] if "mmlupro" in panel["id"])
+    assert mmlu["context"] == SHORT_CONTEXT
+    assert all(panel["context"] == PUBLIC_CONTEXT for panel in suite["panels"]
+               if panel["source"] == "jevbench")
+
+
+def test_context_replay_requires_identical_encoding_and_order():
+    request = {"state": "x", "questions": {"q": {
+        "type": "choice", "criteria": {"a": "A", "b": "B"}}}}
+    old = {"key": "old", "request": request, "context": PUBLIC_CONTEXT}
+    new = {**old, "key": "new", "context": SHORT_CONTEXT}
+    source = {"key": "old", "status": "ok", "wall_latency_ms": 4,
+              "prediction": {"input_tokens": 2, "latency_ms": 3}}
+    encoded = {"ids": [1, 2], "pos": [0, 1]}
+    result = replay_entry(old, new, source, lambda *_: encoded)
+    assert result["key"] == "new" and source["key"] == "old"
+    assert result["prediction"] == source["prediction"]
+    assert result["context_replay"]["result"] == "identical_full_encoding"
+    with pytest.raises(ValueError, match="encodings differ"):
+        replay_entry(old, new, source, lambda _, context: {
+            **encoded, "pos": [0, int(context == PUBLIC_CONTEXT)]})
+    permuted = {**request, "questions": {"q": {
+        "type": "choice", "criteria": {"b": "B", "a": "A"}}}}
+    with pytest.raises(ValueError, match="ordered API request"):
+        replay_entry(old, {**new, "request": permuted}, source, lambda *_: encoded)
+    with pytest.raises(ValueError, match="narrower"):
+        replay_entry(new, old, source, lambda *_: encoded)
+
+
+def test_context_replay_rejection_has_no_reused_prediction_or_latency():
+    def overlong(*_):
+        raise ValueError("state exceeds 384 tokens")
+
+    old = {"key": "old", "request": {}, "context": PUBLIC_CONTEXT}
+    new = {**old, "key": "new", "context": SHORT_CONTEXT}
+    result = replay_entry(old, new, {"status": "ok", "wall_latency_ms": 4}, overlong)
+    assert result["status"] == "rejected"
+    assert "prediction" not in result and "wall_latency_ms" not in result
 
 
 def test_resume_only_repairs_torn_final_line(tmp_path):

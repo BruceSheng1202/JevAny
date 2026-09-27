@@ -156,7 +156,7 @@ def build(recipe, sources, destination, allow_test=False):
 
     extra = (
         ("external/ekzhang-mmlupro-v1/records.jsonl", "external/ekzhang-mmlupro-v1/sample.json",
-         PUBLIC_CONTEXT, "external test"),
+         SHORT_CONTEXT, "external test"),
         ("diagnostics/binding-v1.jsonl", "diagnostics/binding-v1.manifest.json",
          SHORT_CONTEXT, "evaluation diagnostic"),
     )
