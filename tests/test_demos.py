@@ -186,6 +186,24 @@ def test_packaged_replays_are_complete_and_preserve_controller_provenance():
                     assert priority["choice"] == max(priority["probabilities"], key=priority["probabilities"].get)
 
 
+def test_fast_gif_playback_preserves_short_decisions_and_their_final_frames():
+    pytest.importorskip("PIL.Image")
+    from scripts.render_demo_gifs import timeline
+
+    replay = {"case": "arm", "steps": [
+        {"frames": ["initial"]},
+        {"frames": ["a", "b", "c"]},
+        {"frames": ["d"]},
+        {"frames": ["e", "f"]},
+    ]}
+    assert timeline(replay) == [
+        [(0, "initial"), 20],
+        [(1, "c"), 30],
+        [(2, "d"), 20],
+        [(3, "f"), 20],
+    ]
+
+
 def test_playground_gifs_share_format_and_match_the_packaged_replays():
     Image = pytest.importorskip("PIL.Image")
     directory = ROOT.parents[1] / "docs" / "demos"

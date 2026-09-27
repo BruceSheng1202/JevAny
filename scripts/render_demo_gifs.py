@@ -7,6 +7,7 @@ decisions; it does not run inference or change any actions.
 import argparse
 from bisect import bisect_right
 import io
+from itertools import groupby
 import json
 import math
 from pathlib import Path
@@ -14,13 +15,12 @@ from tempfile import TemporaryDirectory
 from urllib.request import urlopen
 
 from PIL import Image
-from playwright.sync_api import sync_playwright
 
 CASES = ("arm", "doom", "crafter")
 SIZE = (1120, 900)
 FRAME_MS = 40
 SPEED = 1.5
-PLAYBACK_RATE = {"arm": 2.0, "doom": 1.0, "crafter": 0.5}
+PLAYBACK_RATE = {"arm": 4.0, "doom": 1.0, "crafter": 0.5}
 FORMAT = "JevAny Playground v1; 1120x900"
 
 
@@ -46,8 +46,22 @@ def timeline(replay):
         else:
             samples.append([entry, FRAME_MS])
     samples[0][1] = samples[-1][1] = FRAME_MS
-    return [(entry, int(duration / PLAYBACK_RATE[replay["case"]]))
-            for entry, duration in samples]
+    result = []
+    # Browsers stretch 10 ms GIF delays; combine motion frames within each decision.
+    for _, decision in groupby(samples, key=lambda sample: sample[0][0]):
+        frames, elapsed = [], 0
+        for entry, duration in decision:
+            elapsed += int(duration / PLAYBACK_RATE[replay["case"]])
+            if elapsed >= 20:
+                frames.append([entry, elapsed])
+                elapsed = 0
+        if elapsed:
+            if frames:
+                frames[-1] = [entry, frames[-1][1] + elapsed]
+            else:
+                frames.append([entry, 20])
+        result.extend(frames)
+    return result
 
 
 def capture(page, case, replay, out):
@@ -101,6 +115,8 @@ def capture(page, case, replay, out):
 
 
 def main():
+    from playwright.sync_api import sync_playwright
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:8090")
     parser.add_argument("--out", type=Path, default=Path("docs/demos"))

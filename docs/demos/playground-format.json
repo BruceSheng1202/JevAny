@@ -7,8 +7,8 @@
         1120,
         900
       ],
-      "duration_ms": 7260,
-      "samples": 363,
+      "duration_ms": 3640,
+      "samples": 173,
       "decisions": 48,
       "decision_steps": [
         1,
@@ -68,7 +68,7 @@
         "width": 1248,
         "height": 1003
       },
-      "bytes": 5545522
+      "bytes": 3402936
     },
     {
       "case": "doom",
