@@ -110,11 +110,14 @@ def test_unknown_evidence_is_not_scored_for_accuracy():
     assert scored["unknowable_confidence"]["fraction_p_max_ge_0_9"] == 1
 
 
-def test_typesafe_weights_cases_equally_and_penalizes_missing():
+def test_typesafe_weights_cases_equally_and_penalizes_missing(tmp_path):
+    import csv
+
     records, rows = [], []
     for ident, group in (("a", "case1"), ("b", "case1"), ("c", "case2")):
         record = jevbench_record({**task(), "id": ident, "group": group})
         record["_meta"]["target"] = {"false": 0.0, "true": 1.0}
+        record["_eval_key"] = ident
         records.append(record)
         if ident != "c":
             rows.append({"id": ident, "keys": ["false", "true"], "p": [0.0, 1.0]})
@@ -122,6 +125,20 @@ def test_typesafe_weights_cases_equally_and_penalizes_missing():
     assert result["evaluated"]["equal_case_modal_agreement"] == 1
     assert result["all_rows"]["equal_case_modal_agreement"] == .5
     assert result["all_rows"]["equal_case_total_variation"] == .5
+    predictions = {ident: {"status": "ok", "prediction": {
+        "probabilities": {"decision": {"false": 0.0, "true": 1.0}}}}
+        for ident in ("a", "b")}
+    predictions["c"] = {"status": "rejected", "error": "context"}
+    panel, _ = score_panel(records, predictions)
+    panel["typesafe"] = result
+    assert panel["all_requested_accuracy"] == pytest.approx(2 / 3)
+    write_tables({"panels": [{"id": "typesafe"}], "models": {
+        "local": {"panels": {"typesafe": panel}}}}, tmp_path)
+    with (tmp_path / "scores.csv").open() as stream:
+        row = next(csv.DictReader(stream))
+    assert row["accuracy"] == row["typesafe_all_rows_equal_case_tvd"] == "0.5"
+    assert row["typesafe_answered_equal_case_agreement"] == "1.0"
+    assert row["typesafe_answered_equal_case_tvd"] == "0.0"
 
 
 def test_published_reference_alias_requires_identical_data_and_context(tmp_path):

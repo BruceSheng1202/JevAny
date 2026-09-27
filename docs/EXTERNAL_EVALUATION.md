@@ -89,8 +89,8 @@ the shipped temperature are available.
 JevBench also uses its pinned native scorer, including its probability-sum
 tolerance, lexicographic tie rule, ordinal metrics, and family summaries.
 TypeSafe reports equal-case modal agreement and total-variation distance to the
-reference distribution. These metrics should not be replaced by ordinary
-question-weighted accuracy.
+reference distribution, with both all-row and answered-row values in `scores.csv`.
+These metrics should not be replaced by ordinary question-weighted accuracy.
 
 Published official Jev results are copied from Kev's committed reports with
 their source paths, hashes, API model identity, and measurement dates. They are

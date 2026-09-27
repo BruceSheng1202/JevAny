@@ -247,6 +247,7 @@ def write_tables(result, destination):
     for model_id, model in result["models"].items():
         for panel_id, panel in model["panels"].items():
             answered = panel["answered_clean"] or {}
+            typesafe = panel.get("typesafe", {})
             accuracy, metric = panel["all_requested_accuracy"], "clean knowable question accuracy"
             if "jevbench" in panel:
                 accuracy, metric = panel["jevbench"]["accuracy"], "JevBench native public accuracy"
@@ -264,6 +265,13 @@ def write_tables(result, destination):
                 "answered_nll": answered.get("nll"), "answered_brier": answered.get("brier"),
                 "answered_ece": answered.get("ece"),
                 "answered_coverage_at_5pct_error": answered.get("coverage_at_5pct_error"),
+                "typesafe_all_rows_equal_case_tvd": (
+                    typesafe.get("all_rows", {}).get("equal_case_total_variation")
+                    if panel["complete"] else None),
+                "typesafe_answered_equal_case_agreement": (
+                    typesafe.get("evaluated", {}).get("equal_case_modal_agreement")),
+                "typesafe_answered_equal_case_tvd": (
+                    typesafe.get("evaluated", {}).get("equal_case_total_variation")),
                 "model_latency_median_ms": panel.get("latency_ms", {}).get("model", {}).get("median"),
                 "model_latency_p95_ms": panel.get("latency_ms", {}).get("model", {}).get("p95"),
                 "measurement": "local inference", "reference_source": None,
@@ -275,6 +283,7 @@ def write_tables(result, destination):
         report = reference["report"]
         clean = report.get("clean", {})
         coverage = report.get("coverage", {})
+        typesafe = reference.get("typesafe", {})
         for panel_id in reference["matching_panels"]:
             accuracy, metric = clean.get("acc"), "published clean question accuracy"
             template = next(iter(result["models"].values()))["panels"][panel_id]
@@ -295,6 +304,12 @@ def write_tables(result, destination):
                 "answered_nll": clean.get("nll"), "answered_brier": clean.get("brier"),
                 "answered_ece": clean.get("ece"),
                 "answered_coverage_at_5pct_error": clean.get("coverage_at_5pct_error"),
+                "typesafe_all_rows_equal_case_tvd": (
+                    typesafe.get("all_rows", {}).get("equal_case_total_variation")),
+                "typesafe_answered_equal_case_agreement": (
+                    typesafe.get("evaluated", {}).get("equal_case_modal_agreement")),
+                "typesafe_answered_equal_case_tvd": (
+                    typesafe.get("evaluated", {}).get("equal_case_total_variation")),
                 "measurement": reference["provenance"],
                 "reference_source": reference["source_path"],
             })
