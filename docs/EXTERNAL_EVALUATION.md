@@ -66,7 +66,10 @@ python scripts/report_external_eval.py \
 
 The output includes detailed JSON reports, `scores.csv` with one row per
 model/panel and explicit metric names, and a wide `accuracy.csv`. Incomplete
-panels have empty accuracy cells in both tables.
+panels have empty accuracy cells in both tables. Published official Jev
+baselines have separate model IDs and a source column. Local model latency is
+reported separately from the predictor's wall time; hosted reference latencies
+are not copied into local timing columns.
 
 ## What the scores mean
 

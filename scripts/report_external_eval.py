@@ -53,6 +53,16 @@ def score_panel(records, predictions):
             "training_diagnostics": "not an independent generalization score",
         },
     }
+    attempted = [predictions[r["_eval_key"]] for r in records if r["_eval_key"] in predictions]
+    def latency(values):
+        return {"n": len(values), "median": float(np.median(values)) if values else None,
+                "p95": float(np.quantile(values, .95)) if values else None}
+    report["latency_ms"] = {
+        "model": latency([e["prediction"]["latency_ms"] for e in attempted
+                          if "latency_ms" in e.get("prediction", {})]),
+        "predictor_wall": latency([e["wall_latency_ms"] for e in attempted if "wall_latency_ms" in e]),
+        "reuse": "identical requests reuse the original measured latency",
+    }
     if clean and all("inference_temperature" in r for r in clean):
         temperatures = {r["inference_temperature"] for r in clean}
         if len(temperatures) == 1:
@@ -169,12 +179,19 @@ def reference_reports(sources, panels):
                     matches.append(panel["id"])
                     basis = "source panel path and complete published row IDs, ordered options, labels; no request-text hash"
                     evidence = {"published_rows_sha256": digest(rows_path)}
-        references.append({
+        reference = {
             "provenance": "published_by_Kev_not_rerun", "source_path": path.relative_to(root).as_posix(),
             "source_sha256": digest(path), "matching_panels": matches,
             "match_basis": basis, **evidence,
             "report": report,
-        })
+        }
+        comparison = path.parent / "comparison.json"
+        if comparison.exists():
+            compared = read_json(comparison)["runs"].get(path.parent.relative_to(root).as_posix())
+            if compared is not None:
+                reference["typesafe"] = compared
+                reference["comparison_sha256"] = digest(comparison)
+        references.append(reference)
     return references
 
 
@@ -247,10 +264,49 @@ def write_tables(result, destination):
                 "answered_nll": answered.get("nll"), "answered_brier": answered.get("brier"),
                 "answered_ece": answered.get("ece"),
                 "answered_coverage_at_5pct_error": answered.get("coverage_at_5pct_error"),
-                "measurement": "local inference",
+                "model_latency_median_ms": panel.get("latency_ms", {}).get("model", {}).get("median"),
+                "model_latency_p95_ms": panel.get("latency_ms", {}).get("model", {}).get("p95"),
+                "measurement": "local inference", "reference_source": None,
             })
     if not rows:
         return
+    empty = dict.fromkeys(rows[0])
+    for reference in result.get("official_jev", []):
+        report = reference["report"]
+        clean = report.get("clean", {})
+        coverage = report.get("coverage", {})
+        for panel_id in reference["matching_panels"]:
+            accuracy, metric = clean.get("acc"), "published clean question accuracy"
+            template = next(iter(result["models"].values()))["panels"][panel_id]
+            expected = template["requested_clean_knowable_questions"]
+            if expected and clean.get("n") is not None:
+                accuracy = clean["acc"] * clean["n"] / expected
+                metric = "clean knowable question accuracy; published rejections count wrong"
+            if "typesafe" in reference:
+                accuracy = reference["typesafe"]["all_rows"]["equal_case_modal_agreement"]
+                metric = "TypeSafe equal-case modal agreement"
+            rows.append({
+                **empty, "model": "jev-gateway-published-by-kev", "panel": panel_id,
+                "complete": True, "metric": metric, "accuracy": accuracy,
+                "requested_records": coverage.get("requested_records"),
+                "evaluated_records": coverage.get("evaluated_records"),
+                "rejected_records": coverage.get("rejected_records"),
+                "answered_clean_questions": clean.get("n"),
+                "answered_nll": clean.get("nll"), "answered_brier": clean.get("brier"),
+                "answered_ece": clean.get("ece"),
+                "answered_coverage_at_5pct_error": clean.get("coverage_at_5pct_error"),
+                "measurement": reference["provenance"],
+                "reference_source": reference["source_path"],
+            })
+    reference = result.get("official_jev_jevbench")
+    if reference:
+        for panel_id, panel in reference["panels"].items():
+            rows.append({
+                **empty, "model": "jev-1.13.0-published-by-jevbench", "panel": panel_id,
+                "complete": True, "metric": "JevBench native public accuracy",
+                "accuracy": panel["accuracy"], "requested_records": panel["questions"],
+                "measurement": reference["provenance"], "reference_source": reference["source_path"],
+            })
     with (Path(destination) / "scores.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader()
@@ -260,8 +316,8 @@ def write_tables(result, destination):
         writer = csv.writer(stream)
         writer.writerow(["model", *panel_ids])
         by_pair = {(row["model"], row["panel"]): row for row in rows}
-        for model in result["models"]:
-            writer.writerow([model, *[by_pair[model, p]["accuracy"] for p in panel_ids]])
+        for model in dict.fromkeys(row["model"] for row in rows):
+            writer.writerow([model, *[by_pair.get((model, p), {}).get("accuracy") for p in panel_ids]])
 
 
 def report(suite, sources, runs, destination):

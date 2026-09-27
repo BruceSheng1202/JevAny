@@ -169,3 +169,49 @@ def test_table_uses_native_metric_and_leaves_incomplete_accuracy_blank(tmp_path)
     assert rows[0]["accuracy"] == ""
     assert rows[1]["accuracy"] == "0.75"
     assert rows[1]["metric"] == "JevBench native public accuracy"
+
+
+def test_table_labels_published_baselines_and_does_not_invent_calibration(tmp_path):
+    import csv
+
+    record = jevbench_record(task())
+    record["_eval_key"] = "a"
+    incomplete, _ = score_panel([record], {})
+    result = {
+        "panels": [{"id": "jevbench/easy"}],
+        "models": {"local": {"panels": {"jevbench/easy": incomplete}}},
+        "official_jev_jevbench": {
+            "provenance": "published_by_JevBench_not_rerun", "source_path": "source.json",
+            "panels": {"jevbench/easy": {"questions": 48, "accuracy": 1.0}},
+        },
+    }
+    write_tables(result, tmp_path)
+    with (tmp_path / "scores.csv").open() as stream:
+        rows = list(csv.DictReader(stream))
+    assert rows[1]["measurement"] == "published_by_JevBench_not_rerun"
+    assert rows[1]["answered_brier"] == rows[1]["model_latency_median_ms"] == ""
+    with (tmp_path / "accuracy.csv").open() as stream:
+        matrix = list(csv.reader(stream))
+    assert matrix[-1] == ["jev-1.13.0-published-by-jevbench", "1.0"]
+
+
+def test_published_rejection_uses_the_same_accuracy_denominator(tmp_path):
+    import csv
+
+    records = [jevbench_record({**task(), "id": ident}) for ident in ("a", "b")]
+    for record in records:
+        record["_eval_key"] = record["_meta"]["id"]
+    incomplete, _ = score_panel(records, {})
+    result = {
+        "panels": [{"id": "p"}], "models": {"local": {"panels": {"p": incomplete}}},
+        "official_jev": [{
+            "report": {"clean": {"n": 1, "acc": 1.0},
+                       "coverage": {"requested_records": 2, "evaluated_records": 1, "rejected_records": 1}},
+            "matching_panels": ["p"], "provenance": "published_by_Kev_not_rerun",
+            "source_path": "reference.json",
+        }],
+    }
+    write_tables(result, tmp_path)
+    with (tmp_path / "scores.csv").open() as stream:
+        rows = list(csv.DictReader(stream))
+    assert rows[1]["accuracy"] == "0.5"
