@@ -20,11 +20,12 @@ CASES = ("arm", "doom", "crafter")
 SIZE = (1120, 900)
 FRAME_MS = 40
 SPEED = 1.5
-FORMAT = "JevAny Playground v1; 1120x900; 25fps"
+PLAYBACK_RATE = {"arm": 2.0, "doom": 1.0, "crafter": 0.5}
+FORMAT = "JevAny Playground v1; 1120x900"
 
 
 def timeline(replay):
-    """Accelerate recorded motion; advance untimed steps at the output fps."""
+    """Select replay frames before applying each case's playback rate."""
     entries, starts, elapsed = [], [], 0.
     steps = replay["steps"]
     entries.append((0, steps[0]["frames"][-1]))
@@ -45,7 +46,8 @@ def timeline(replay):
         else:
             samples.append([entry, FRAME_MS])
     samples[0][1] = samples[-1][1] = FRAME_MS
-    return samples
+    return [(entry, int(duration / PLAYBACK_RATE[replay["case"]]))
+            for entry, duration in samples]
 
 
 def capture(page, case, replay, out):
@@ -57,11 +59,12 @@ def capture(page, case, replay, out):
     width = math.ceil(heading["width"] + 32)
     clip = {"x": math.floor(heading["x"] - 16), "y": math.floor(heading["y"] - 16),
             "width": width, "height": round(width * SIZE[1] / SIZE[0])}
-    frames, durations = [], []
+    frames, durations, shown_steps = [], [], []
     previous_step = None
     for (step, uri), duration in timeline(replay):
         if step != previous_step:
             page.evaluate("""async step => {index = step; await show(replay.steps[step]);}""", step)
+            shown_steps.append(step)
             workspace = page.locator(".workspace").bounding_box()
             assert workspace["y"] + workspace["height"] <= clip["y"] + clip["height"], (
                 case, step, "Playground content exceeds the shared crop")
@@ -76,6 +79,8 @@ def capture(page, case, replay, out):
         durations.append(duration)
     assert page.locator("#error").inner_text() == ""
     assert page.locator("#feedback-label").inner_text() == "GOAL COMPLETED"
+    assert shown_steps == list(range(len(replay["steps"]))), (
+        case, "Every decision must appear in the GIF", shown_steps)
 
     # One palette for the whole episode prevents frame-to-frame colour flicker.
     swatches = Image.new("RGB", (6 * 280, 4 * 225))
@@ -90,6 +95,7 @@ def capture(page, case, replay, out):
                    comment=(FORMAT + "; actual browser replay; " + replay["note"]).encode())
     return {"case": case, "size": list(SIZE), "duration_ms": sum(durations),
             "samples": len(frames), "decisions": len(replay["steps"]) - 1,
+            "decision_steps": shown_steps[1:],
             "controller": replay["controller"], "success": replay["steps"][-1]["success"],
             "clip": clip, "bytes": target.stat().st_size}
 

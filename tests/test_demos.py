@@ -197,8 +197,8 @@ def test_playground_gifs_share_format_and_match_the_packaged_replays():
     for case, record in records.items():
         replay = json.loads((ROOT / "recordings" / case / "replay.json").read_text())
         assert record["decisions"] == len(replay["steps"]) - 1
+        assert record["decision_steps"] == list(range(1, len(replay["steps"])))
         assert record["success"] == replay["steps"][-1]["success"]
-        assert record["duration_ms"] == record["samples"] * 40
         with Image.open(directory / f"playground-{case}.gif") as image:
             assert image.size == tuple(record["size"])
             assert image.is_animated and image.info["loop"] == 0
@@ -207,8 +207,7 @@ def test_playground_gifs_share_format_and_match_the_packaged_replays():
             for frame in range(image.n_frames):
                 image.seek(frame)
                 durations.append(image.info["duration"])
-            # The GIF encoder may merge consecutive identical 40 ms frames.
-            assert all(duration in (40, 80) for duration in durations)
+            assert all(duration >= 20 and duration % 10 == 0 for duration in durations)
             assert sum(durations) == record["duration_ms"]
 
 
