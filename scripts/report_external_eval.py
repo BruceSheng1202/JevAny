@@ -323,12 +323,12 @@ def write_tables(result, destination):
                 "measurement": reference["provenance"], "reference_source": reference["source_path"],
             })
     with (Path(destination) / "scores.csv").open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     panel_ids = [panel["id"] for panel in result["panels"]]
     with (Path(destination) / "accuracy.csv").open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.writer(stream)
+        writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(["model", *panel_ids])
         by_pair = {(row["model"], row["panel"]): row for row in rows}
         for model in dict.fromkeys(row["model"] for row in rows):
