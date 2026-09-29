@@ -15,16 +15,18 @@
   <strong>English</strong> | <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-Train and serve Jev-style decision models with JevAny: fine-tune an open language model or use our pretrained checkpoint. The shared [Python and HTTP APIs](docs/API.md) follow the Jev format, taking a state, question, and candidate answers and returning a choice with per-option probabilities.
+<p align="center">
+  <strong>One decision API. Five open LoRA checkpoints. Any bounded choice.</strong><br>
+  Turn state, questions, and candidate answers into calibrated choices—without generating answer text.
+</p>
 
 <p align="center">
   <img src="docs/hero.png" alt="JevAny workflow: train a Jev model with multi-modal data and RLCR/SFT, then deploy through a unified API with test environments and practical examples" width="100%">
 </p>
 
-| Start here | What JevAny provides |
-|---|---|
-| **[Training](#training)** | Training data and shared SFT/RLCR infrastructure |
-| **[Inference & Serving](#inference--serving)** | Pretrained models, a shared API, test environments, and application examples |
+| 🤗 [Models](#pretrained-models) | 📊 [Results](#evaluation) | ⚡ [Serve](#inference--serving) | 🛠️ [Train](#training) |
+|---|---|---|---|
+| Gemma, Qwen, Muse | Transfer + JevBench | Python + HTTP | SFT + RLCR |
 
 ## Demos
 
@@ -55,53 +57,6 @@ Choose the dependencies for your use case:
 | Run a released model with native media support | `python -m pip install -e '.[serve,multimodal]'` |
 
 The client-only installation does not install PyTorch. For image/video training, use `.[train,multimodal]`. Run the commands below from the repository root; model-specific hardware requirements are listed under [Pretrained Models](#pretrained-models).
-
-## Training
-
-### Training Data
-
-Training uses the same `state` and `questions` as inference, with a `label` added to each question.
-The current model family was trained on 1,772,725 text records containing 2,180,242
-labelled decisions. Public disclosure is intentionally limited to aggregate size
-and broad categories: preference, agent/tool decisions, reasoning,
-classification, and safety. The detailed mixture and
-source-level composition are not released.
-
-| Data | What is available | Start here |
-|---|---|---|
-| Included starter | Small synthetic dataset for learning the workflow | `jevany data init --out data/starter` |
-| Public-source builders | Text, image and video decision data | [Data-building guide](docs/TRAINING.md#data-beyond-the-starter) |
-| Your own data | Labelled requests in the shared JSONL format | [Format and examples](docs/DATA.md) |
-
-Prepare and validate the starter before training:
-
-```bash
-jevany data init --out data/starter
-jevany data validate data/starter/train.jsonl
-```
-
-### SFT
-
-Supervised fine-tuning fits a Jev model to labelled decisions. Run the starter recipe on a CUDA GPU:
-
-```bash
-jevany train --config recipes/sft.toml --dry-run
-jevany train --config recipes/sft.toml
-```
-
-The checkpoint is saved to `runs/my-jev`. To use your own data, add `--data data/my-domain.jsonl --out runs/domain-jev`. To adapt a released Jev model, use [`recipes/finetune.toml`](recipes/finetune.toml).
-
-### RLCR
-
-Reinforcement Learning with Calibration Rewards continues SFT with a reward based on both correctness and confidence. After completing the SFT recipe above, run:
-
-```bash
-jevany train --config recipes/rlcr.toml
-```
-
-This recipe continues training from `runs/my-jev` and saves to `runs/my-jev-rlcr`. RLCR is under active development; see the [training objective](docs/ALGORITHM.md#rlcr).
-
-See the [training guide](docs/TRAINING.md#backbone-support) for supported backbones, image and video capabilities, and local GPU setup.
 
 ## Pretrained Models
 
@@ -261,6 +216,40 @@ same local protocol produced them. No unavailable sealed-test scores are mixed i
 
 [Machine-readable release results](results/model-family-v2.json) ·
 [Evaluation protocols and historical results](docs/EVALUATION.md).
+
+## Training
+
+The current family was trained on **1,772,725 text records / 2,180,242 labelled
+decisions** spanning preference, agent/tool decisions, reasoning, classification,
+and safety. Detailed mixture and source-level composition are not released.
+
+Prepare the included starter data:
+
+```bash
+jevany data init --out data/starter
+jevany data validate data/starter/train.jsonl
+```
+
+### SFT
+
+```bash
+jevany train --config recipes/sft.toml --dry-run
+jevany train --config recipes/sft.toml
+```
+
+Use your own JSONL with `--data`, or continue a released model with
+[`recipes/finetune.toml`](recipes/finetune.toml).
+
+### RLCR
+
+Continue an SFT checkpoint with correctness-and-calibration rewards:
+
+```bash
+jevany train --config recipes/rlcr.toml
+```
+
+[Training guide](docs/TRAINING.md) · [Data format](docs/DATA.md) ·
+[RLCR objective](docs/ALGORITHM.md#rlcr)
 
 ## Supported Model Families
 

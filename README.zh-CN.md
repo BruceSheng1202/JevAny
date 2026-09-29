@@ -15,16 +15,18 @@
   <a href="README.md">English</a> | <strong>简体中文</strong>
 </p>
 
-JevAny 用于训练和部署 Jev 风格的决策模型：你可以微调开源语言模型，也可以使用预训练 checkpoint。两者共用兼容 Jev 格式的 [Python 和 HTTP API](docs/API.md)，输入状态、问题与候选答案，即可获得选择及各选项的概率。
+<p align="center">
+  <strong>一个决策 API，五个开放 LoRA 模型，覆盖任意有限选项决策。</strong><br>
+  输入状态、问题与候选答案，直接返回校准后的选择概率，无需生成答案文本。
+</p>
 
 <p align="center">
   <img src="docs/hero.png" alt="JevAny 训练与部署流程：多模态数据、RLCR/SFT 训练、统一 API、测试环境与应用示例" width="100%">
 </p>
 
-| 从这里开始 | JevAny 提供什么 |
-|---|---|
-| **[训练](#训练)** | 训练数据和统一的 SFT/RLCR 训练框架 |
-| **[推理与部署](#推理与部署)** | 预训练模型、统一 API、测试环境与应用示例 |
+| 🤗 [模型](#预训练模型) | 📊 [结果](#评测) | ⚡ [部署](#推理与部署) | 🛠️ [训练](#训练) |
+|---|---|---|---|
+| Gemma、Qwen、Muse | Transfer + JevBench | Python + HTTP | SFT + RLCR |
 
 ## 演示
 
@@ -55,51 +57,6 @@ source .venv/bin/activate
 | 运行支持原生媒体输入的已发布模型 | `python -m pip install -e '.[serve,multimodal]'` |
 
 只安装客户端不会引入 PyTorch。训练图片/视频模型时，使用 `.[train,multimodal]`。以下命令均在仓库根目录运行；具体模型的硬件要求见[预训练模型](#预训练模型)。
-
-## 训练
-
-### 训练数据
-
-训练数据沿用推理时的 `state` 和 `questions`，并为每个问题增加 `label`。
-当前模型系列使用 1,772,725 条文本记录、共 2,180,242 个有标签决策训练。
-公开信息仅包含总规模与大类：偏好、Agent/工具决策、推理、分类和安全；
-不公开数据混合比例和具体来源明细。
-
-| 数据 | 提供的内容 | 使用入口 |
-|---|---|---|
-| 随包入门数据 | 用于熟悉训练流程的小型合成数据集 | `jevany data init --out data/starter` |
-| 公开数据构建器 | 文本、图片和视频决策数据 | [数据构建指南](docs/TRAINING.md#data-beyond-the-starter) |
-| 自己的数据 | 按统一 JSONL 格式添加标签的请求 | [格式与示例](docs/DATA.md) |
-
-训练前先准备并校验入门数据：
-
-```bash
-jevany data init --out data/starter
-jevany data validate data/starter/train.jsonl
-```
-
-### SFT
-
-监督微调让 Jev 模型学习带标签的决策。在 CUDA GPU 上运行入门 recipe：
-
-```bash
-jevany train --config recipes/sft.toml --dry-run
-jevany train --config recipes/sft.toml
-```
-
-Checkpoint 保存到 `runs/my-jev`。使用自己的数据时，添加 `--data data/my-domain.jsonl --out runs/domain-jev`。微调已发布的 Jev 模型可使用 [`recipes/finetune.toml`](recipes/finetune.toml)。
-
-### RLCR
-
-RLCR（Reinforcement Learning with Calibration Rewards）在 SFT 后继续训练，奖励同时考虑答案是否正确及其置信度。完成上面的 SFT recipe 后，运行：
-
-```bash
-jevany train --config recipes/rlcr.toml
-```
-
-该 recipe 从 `runs/my-jev` 继续训练，保存到 `runs/my-jev-rlcr`。RLCR 仍在开发完善中，详见[训练目标](docs/ALGORITHM.md#rlcr)。
-
-支持的基座、图片和视频能力，以及本地 GPU 用法见[训练指南](docs/TRAINING.md#backbone-support)。
 
 ## 预训练模型
 
@@ -252,6 +209,40 @@ Direct-token 4B 在已发布 4B 模型中取得更高的 JevBench 准确率，Po
 
 [本次发布的机器可读结果](results/model-family-v2.json) ·
 [评测协议与历史结果](docs/EVALUATION.md)。
+
+## 训练
+
+当前模型系列使用 **1,772,725 条文本记录 / 2,180,242 个有标签决策**训练，
+覆盖偏好、Agent/工具决策、推理、分类和安全。数据混合比例和具体来源明细
+不公开。
+
+准备随包提供的入门数据：
+
+```bash
+jevany data init --out data/starter
+jevany data validate data/starter/train.jsonl
+```
+
+### SFT
+
+```bash
+jevany train --config recipes/sft.toml --dry-run
+jevany train --config recipes/sft.toml
+```
+
+通过 `--data` 使用自己的 JSONL，或用 [`recipes/finetune.toml`](recipes/finetune.toml)
+继续微调已发布模型。
+
+### RLCR
+
+在 SFT checkpoint 上继续进行兼顾正确率与校准的奖励训练：
+
+```bash
+jevany train --config recipes/rlcr.toml
+```
+
+[训练指南](docs/TRAINING.md) · [数据格式](docs/DATA.md) ·
+[RLCR 目标](docs/ALGORITHM.md#rlcr)
 
 ## Supported Model Families
 
