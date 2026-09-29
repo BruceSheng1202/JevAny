@@ -74,17 +74,18 @@ source .venv/bin/activate
 
 ### Pointer 与 direct-token
 
-两种方式都只做一次 backbone prefill，不生成答案文本，因此同等输入下推理
-速度应基本相当。Pointer 使用一个小型可学习 head 对决策标记和选项表示打分；
-它支持超过 255 个选项，实际边界由上下文窗口决定。Direct-token 不使用专用
-决策 head，而是给每个选项加上 255 个固定单 token 标签之一，再通过基座原始
-LM head 打分。已发布 direct-token 模型在 4B JevBench 上效果更好，但训练时
-使用 full-vocabulary cross-entropy，因此训练更慢，并且最多支持 255 个选项。
+- **Pointer：**用轻量可学习 head 比较决策标记与选项表示；训练更高效，支持
+  超过 255 个选项，实际边界由上下文窗口决定。
+- **Direct-token：**用基座 LM head 对 255 个固定单 token 标签打分；4B
+  JevBench 更高，但 full-vocabulary 训练更慢，最多支持 255 个选项。
+- **推理：**两者都只做一次 backbone prefill、无需生成答案文本，同等输入下
+  延迟应基本相当。
 
 ### 发布计划
 
-当前版本发布下列五个 LoRA checkpoint。Full-parameter SFT、进一步优化的
-post-training，以及超参优化版本计划后续发布，不包含在本次版本中。
+- **当前：**五个已验证的 LoRA checkpoint。
+- **下一步：**Full-parameter SFT。
+- **后续：**改进的 post-training 与超参优化版本。
 
 ## 推理与部署
 
@@ -182,30 +183,63 @@ jevany demo --base-url http://127.0.0.1:8008 --text-only
 
 ## 评测
 
-统一报告两个固定协议的准确率：Transfer-v9 的 1,046 个 clean、knowable
-决策，以及 JevBench 全部 231 个公开 development 项。所有本地评测均完整
-覆盖，没有拒绝或截断样本。JevBench public 是开发集诊断结果，不是
-Benchmark Heaven 的 sealed 官方分数。
+统一报告两个固定协议：Transfer-v9 的 1,046 个 clean、knowable 决策，以及
+JevBench 全部 231 个公开 development 项。每次评测均完整覆盖全部样本。
+JevBench public 是开发集诊断结果，不是 sealed 榜单分数。
 
-| 发布模型 | Readout | Transfer-v9 | JevBench 准确率 | NLL ↓ | Brier ↓ | ECE ↓ |
+| 模型 | 类型 | Transfer-v9 | JevBench | JB NLL ↓ | JB Brier ↓ | JB ECE ↓ |
 |---|---|---:|---:|---:|---:|---:|
+| Kev-4B | 参考模型 | 74.19% | 75.32% | — | — | — |
+| Jev 1.13.0 | 参考模型 | 85.37% | 86.58% | — | — | — |
+| Laya (`55cf4c4`) | 参考模型 | 52.29% | 58.01% | — | — | — |
+| **JevAny Releases** |  |  |  |  |  |  |
 | Gemma 4B LoRA | Pointer | 70.84% | 77.49% | 0.536 | 0.309 | 0.043 |
-| Qwen3.5 4B LoRA | Pointer | **78.68%** | 80.09% | 0.455 | 0.259 | 0.037 |
-| Qwen3.5 4B Direct-Token LoRA | Direct-token | 78.20% | **80.95%** | 0.433 | 0.256 | 0.051 |
-| Qwen3.8 27B LoRA | Pointer | **85.76%** | **90.48%** | **0.270** | **0.145** | 0.036 |
+| Qwen3.5 4B LoRA | Pointer | 78.68% | 80.09% | 0.455 | 0.259 | 0.037 |
+| Qwen3.5 4B Direct-Token LoRA | Direct-token | 78.20% | 80.95% | 0.433 | 0.256 | 0.051 |
 | Muse Glimmer 30B LoRA | Pointer | 83.46% | 87.45% | 0.316 | 0.174 | **0.027** |
+| **Qwen3.8 27B LoRA** | **Pointer** | **85.76%** | **90.48%** | **0.270** | **0.145** | 0.036 |
 
-同一组公开协议下的参考模型结果如下：
+### Transfer-v9 分项
 
-| 参考模型 | Transfer-v9 | JevBench public | 来源 |
-|---|---:|---:|---|
-| Kev-4B | 74.19% | 75.32% | 本地公开 checkpoint 评测 |
-| Jev 1.13.0 | 85.37% | 86.58% | 本地 API 评测 / 已发布 JevBench 参考值 |
-| Laya (`55cf4c4`) | 52.29% | 58.01% | 本地固定 revision 评测 |
+| 数据集 / 鲁棒性切片 | n | Gemma 4B | Qwen 4B P | Qwen 4B DT | Muse 30B | Qwen 27B |
+|---|---:|---:|---:|---:|---:|---:|
+| Emotion | 80 | 75.00% | 86.25% | 85.00% | 81.25% | 90.00% |
+| PAWS | 80 | 80.00% | 75.00% | 77.50% | 77.50% | 86.25% |
+| QNLI | 80 | 91.25% | 93.75% | 95.00% | 92.50% | 95.00% |
+| TweetEval offensive | 80 | 80.00% | 81.25% | 81.25% | 83.75% | 83.75% |
+| MMLU | 80 | 65.00% | 77.50% | 75.00% | 83.75% | 86.25% |
+| MMLU-Pro | 200 | 38.50% | 58.50% | 52.50% | 61.00% | 68.00% |
+| SciQ | 80 | 97.50% | 97.50% | 98.75% | 98.75% | 97.50% |
+| Buried instruction（Emotion/PAWS/QNLI/TweetEval） | 80 | 70.00% | 77.50% | 78.75% | 82.50% | 78.75% |
+| Compositional holdouts（AND/OR/conditional） | 96 | 67.71% | 87.50% | 86.46% | 95.83% | 90.62% |
+| Contrastive policy（authorization/deadline） | 80 | 77.50% | 76.25% | 83.75% | 98.75% | 97.50% |
+| Knowable controls（11 类 policy 任务） | 110 | 81.82% | 81.82% | 81.82% | 90.91% | 92.73% |
+| **总计** | **1,046** | **70.84%** | **78.68%** | **78.20%** | **83.46%** | **85.76%** |
 
 Direct-token 4B 在已发布 4B 模型中取得更高的 JevBench 准确率，Pointer
 4B 则在 Transfer-v9 上略高。参考模型之间只比较准确率；校准指标仅列出由
 同一本地协议得到的发布模型结果，不混用不可用的 sealed 测试分数。
+Kev 与 Laya 来自本地公开 checkpoint 评测（Laya 固定到 `55cf4c4`）；Jev
+采用本地 API 的 Transfer-v9 结果与其公开发布的 JevBench 结果。
+
+### Ablation 摘要
+
+- **Pointer 结构：**比较 linear、MLP 和 zero-initialized residual head；
+  residual 在受控实验中取得更好的 development NLL 与校准表现。
+- **表示 readout：**比较 decision token、query mean、option mean 和 combined；
+  query-mean 在早期筛选中领先，完整模型系列最终采用 decision-marker / option-close。
+- **Loss：**比较 cross-entropy、纯 InfoNCE 和混合目标；CE 在 loss sweep 中
+  Transfer 准确率最高，小权重 contrastive 项主要改善校准。本次发布使用 CE。
+- **Readout family：**4B direct-token 的 JevBench 更高（80.95% vs 80.09%），
+  pointer 的 Transfer-v9 略高（78.68% vs 78.20%）。
+
+### 可复现性
+
+五次 Transfer-v9 运行均覆盖 1,264/1,264 个请求，headline 使用固定的 1,046
+个 clean、knowable 样本。JevBench 固定为 `jevbench-public-v1.4.2.2`，共 231
+项；完整 suite hash 与未舍入 headline 指标记录在机器可读结果中。发布前已核对 release
+manifest、checkpoint 自带 reload report，并完成 GPU loader/reconstruction
+logits 等价测试。
 
 [本次发布的机器可读结果](results/model-family-v2.json) ·
 [评测协议与历史结果](docs/EVALUATION.md)。
@@ -213,8 +247,7 @@ Direct-token 4B 在已发布 4B 模型中取得更高的 JevBench 准确率，Po
 ## 训练
 
 当前模型系列使用 **1,772,725 条文本记录 / 2,180,242 个有标签决策**训练，
-覆盖偏好、Agent/工具决策、推理、分类和安全。数据混合比例和具体来源明细
-不公开。
+覆盖偏好、Agent/工具决策、推理、分类和安全。
 
 准备随包提供的入门数据：
 

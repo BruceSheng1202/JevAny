@@ -75,21 +75,20 @@ in bytes for BF16 weights, plus runtime memory. See the
 
 ### Pointer vs direct-token
 
-Both variants perform one backbone prefill and return a probability distribution
-without generating answer text, so inference speed should be similar on comparable
-inputs. Pointer learns a compact head over the decision marker and option
-representations; it supports more than 255 choices, bounded in practice by the
-context window. Direct-token has no specialized decision head: it prefixes each
-option with one of 255 fixed, single-token labels and scores those labels with the
-base LM head. The released direct-token model has the better 4B JevBench result,
-but its full-vocabulary cross-entropy makes training slower and it is limited to
-255 choices.
+- **Pointer:** a compact learned head scores the decision marker against option
+  representations. It trains efficiently and supports more than 255 choices,
+  subject to the context window.
+- **Direct-token:** the base LM head scores 255 fixed single-token option labels.
+  It leads the released 4B models on JevBench, but full-vocabulary training is
+  slower and requests are limited to 255 choices.
+- **Inference:** both use one backbone prefill and no answer generation, so
+  latency should be similar for comparable inputs.
 
 ### Release roadmap
 
-The five LoRA checkpoints are the current release. Full-parameter SFT, improved
-post-training, and hyperparameter-optimized variants are planned as later
-releases; they are not included in this version.
+- **Now:** five verified LoRA checkpoints.
+- **Next:** full-parameter SFT.
+- **Later:** improved post-training and hyperparameter-optimized variants.
 
 ## Inference & Serving
 
@@ -187,32 +186,67 @@ Live model runs currently use text state. Robot control uses the separate `.[rob
 
 ## Evaluation
 
-Accuracy is reported on two fixed protocols: Transfer-v9's 1,046 clean,
-knowable decisions and all 231 public JevBench development items. Every local
-run had complete coverage with no rejected or truncated records. JevBench public
-accuracy is a development-set diagnostic, not the official sealed Benchmark
-Heaven score.
+Accuracy uses two fixed protocols: Transfer-v9's 1,046 clean, knowable decisions
+and all 231 public JevBench development items. Every run covered every item.
+JevBench public is a development diagnostic, not the sealed leaderboard score.
 
-| Released model | Readout | Transfer-v9 | JevBench Acc. | NLL ↓ | Brier ↓ | ECE ↓ |
+| Model | Type | Transfer-v9 | JevBench | JB NLL ↓ | JB Brier ↓ | JB ECE ↓ |
 |---|---|---:|---:|---:|---:|---:|
+| Kev-4B | Reference | 74.19% | 75.32% | — | — | — |
+| Jev 1.13.0 | Reference | 85.37% | 86.58% | — | — | — |
+| Laya (`55cf4c4`) | Reference | 52.29% | 58.01% | — | — | — |
+| **JevAny releases** |  |  |  |  |  |  |
 | Gemma 4B LoRA | Pointer | 70.84% | 77.49% | 0.536 | 0.309 | 0.043 |
-| Qwen3.5 4B LoRA | Pointer | **78.68%** | 80.09% | 0.455 | 0.259 | 0.037 |
-| Qwen3.5 4B Direct-Token LoRA | Direct-token | 78.20% | **80.95%** | 0.433 | 0.256 | 0.051 |
-| Qwen3.8 27B LoRA | Pointer | **85.76%** | **90.48%** | **0.270** | **0.145** | 0.036 |
+| Qwen3.5 4B LoRA | Pointer | 78.68% | 80.09% | 0.455 | 0.259 | 0.037 |
+| Qwen3.5 4B Direct-Token LoRA | Direct-token | 78.20% | 80.95% | 0.433 | 0.256 | 0.051 |
 | Muse Glimmer 30B LoRA | Pointer | 83.46% | 87.45% | 0.316 | 0.174 | **0.027** |
+| **Qwen3.8 27B LoRA** | **Pointer** | **85.76%** | **90.48%** | **0.270** | **0.145** | 0.036 |
 
-For context, the same two public protocols give:
+### Transfer-v9 breakdown
 
-| Reference model | Transfer-v9 | JevBench public | Provenance |
-|---|---:|---:|---|
-| Kev-4B | 74.19% | 75.32% | Local public-checkpoint runs |
-| Jev 1.13.0 | 85.37% | 86.58% | Local API run / published JevBench reference |
-| Laya (`55cf4c4`) | 52.29% | 58.01% | Local pinned-revision runs |
+| Dataset / robustness slice | n | Gemma 4B | Qwen 4B P | Qwen 4B DT | Muse 30B | Qwen 27B |
+|---|---:|---:|---:|---:|---:|---:|
+| Emotion | 80 | 75.00% | 86.25% | 85.00% | 81.25% | 90.00% |
+| PAWS | 80 | 80.00% | 75.00% | 77.50% | 77.50% | 86.25% |
+| QNLI | 80 | 91.25% | 93.75% | 95.00% | 92.50% | 95.00% |
+| TweetEval offensive | 80 | 80.00% | 81.25% | 81.25% | 83.75% | 83.75% |
+| MMLU | 80 | 65.00% | 77.50% | 75.00% | 83.75% | 86.25% |
+| MMLU-Pro | 200 | 38.50% | 58.50% | 52.50% | 61.00% | 68.00% |
+| SciQ | 80 | 97.50% | 97.50% | 98.75% | 98.75% | 97.50% |
+| Buried instruction (Emotion/PAWS/QNLI/TweetEval) | 80 | 70.00% | 77.50% | 78.75% | 82.50% | 78.75% |
+| Compositional holdouts (AND/OR/conditional) | 96 | 67.71% | 87.50% | 86.46% | 95.83% | 90.62% |
+| Contrastive policy (authorization/deadline) | 80 | 77.50% | 76.25% | 83.75% | 98.75% | 97.50% |
+| Knowable controls (11 policy tasks) | 110 | 81.82% | 81.82% | 81.82% | 90.91% | 92.73% |
+| **Overall** | **1,046** | **70.84%** | **78.68%** | **78.20%** | **83.46%** | **85.76%** |
 
 The direct-token 4B model leads the released 4B models on JevBench, while the
 pointer 4B model is slightly better on Transfer-v9. Reference comparisons use
 accuracy only; calibration metrics are reported for released models where the
 same local protocol produced them. No unavailable sealed-test scores are mixed in.
+Kev and Laya use local public-checkpoint runs (Laya pinned to `55cf4c4`); Jev
+uses a local API Transfer-v9 run and its published JevBench result.
+
+### What we ablated
+
+- **Pointer structure:** linear, MLP, and zero-initialized residual heads; the
+  residual head won the controlled screen on development NLL and calibration.
+- **Representation readout:** decision-token, query-mean, option-mean, and
+  combined variants. Query-mean led the early screen; the release recipe uses
+  decision-marker / option-close after the full model-family run.
+- **Loss:** cross-entropy, pure InfoNCE, and mixed objectives; CE gave the best
+  transfer accuracy in the loss sweep, while small contrastive terms mainly
+  improved calibration. The released checkpoints use CE.
+- **Readout family:** at 4B, direct-token improves JevBench (80.95% vs 80.09%),
+  while pointer is slightly stronger on Transfer-v9 (78.68% vs 78.20%).
+
+### Reproducibility
+
+The five Transfer-v9 reports cover 1,264/1,264 requests; the headline aggregate
+is the fixed 1,046-item clean, knowable subset. JevBench uses the frozen
+`jevbench-public-v1.4.2.2` conversion with 231 items. Exact suite hashes and
+unrounded headline metrics are recorded in the machine-readable results. Release
+manifests, checkpoint-native reload reports, and GPU loader/reconstruction
+parity were checked before publishing.
 
 [Machine-readable release results](results/model-family-v2.json) ·
 [Evaluation protocols and historical results](docs/EVALUATION.md).
@@ -221,7 +255,7 @@ same local protocol produced them. No unavailable sealed-test scores are mixed i
 
 The current family was trained on **1,772,725 text records / 2,180,242 labelled
 decisions** spanning preference, agent/tool decisions, reasoning, classification,
-and safety. Detailed mixture and source-level composition are not released.
+and safety.
 
 Prepare the included starter data:
 

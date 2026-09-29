@@ -78,9 +78,7 @@ They are accuracy, not the sealed JevBench leaderboard composite.
 ## Training data disclosure
 
 Training used **{DATASET_SUMMARY['records']:,} text records / {DATASET_SUMMARY['questions']:,} labelled decisions**.
-Only aggregate size and broad categories are released: preference, agent/tool decisions,
-reasoning, classification, and safety. The detailed mixture and
-source-level composition are not part of this release.
+It spans preference, agent/tool decisions, reasoning, classification, and safety.
 
 ## Readout and limits
 
