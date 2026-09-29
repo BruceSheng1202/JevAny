@@ -175,7 +175,7 @@ def test_to_answers_shapes_and_formulas():
     assert ans["s"]["legend"] == {"0": "lo", "1": "mid", "2": "hi"}
 
 
-@pytest.mark.parametrize("options", [77, 255])
+@pytest.mark.parametrize("options", [77, 255, 256])
 def test_large_choice_response_keeps_a_valid_distribution(options):
     criteria = {f"option_{index}": None for index in range(options)}
     request = SystemOneRequest.model_validate({
@@ -199,7 +199,7 @@ def test_confidence_edge_cases():
 @pytest.mark.parametrize("bad", [
     {"q": {"type": "score", "instructions": "i", "criteria": ["only one"]}},
     {"q": {"type": "bogus", "instructions": "i"}},
-    {"q": {"type": "choice", "instructions": "i", "criteria": {f"o{i}": None for i in range(256)}}},
+    {"q": {"type": "choice", "instructions": "i", "criteria": {f"o{i}": None for i in range(4097)}}},
     {f"q{i}": {"type": "noul", "instructions": "i"} for i in range(65)},
     {},
 ])

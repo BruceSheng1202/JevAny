@@ -17,7 +17,7 @@ python -m pip install -e '.[local,multimodal]'
 from jevany import Choice, JevModel
 
 model = JevModel.from_pretrained(
-    "tianxinwei/JevAny-27B-SFT", device="cuda", dtype="bf16"
+    "tianxinwei/JevAny-Qwen3.8-27B-LoRA", device="cuda", dtype="bf16"
 )
 result = model.system_one(
     state="I was charged twice.",
@@ -65,7 +65,7 @@ caching unless their adapter declares support; this optimization is optional.
 
 ```bash
 python -m pip install -e '.[serve,multimodal]'
-jevany serve --checkpoint tianxinwei/JevAny-27B-SFT \
+jevany serve --checkpoint tianxinwei/JevAny-Qwen3.8-27B-LoRA \
   --device cuda --dtype bf16 --port 8008
 ```
 
@@ -186,9 +186,12 @@ compatibility and the fields specific to JevAny.
 
 | Checkpoint | Role |
 |---|---|
-| `tianxinwei/JevAny-27B-SFT` | Default released adapter |
-| `tianxinwei/JevAny-27B-RLCR` | Experimental RLCR continuation |
-| A training output directory | Your own adapter and pointer head |
+| `tianxinwei/JevAny-Gemma-4B-LoRA` | Gemma 4B pointer LoRA |
+| `tianxinwei/JevAny-Qwen3.5-4B-LoRA` | Qwen 4B pointer LoRA |
+| `tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA` | Qwen 4B direct-token LoRA |
+| `tianxinwei/JevAny-Qwen3.8-27B-LoRA` | Default; highest-accuracy pointer LoRA |
+| `tianxinwei/JevAny-Muse-Glimmer-30B-LoRA` | Muse Glimmer 30B pointer LoRA |
+| A training output directory | Your own adapter and decision-readout metadata |
 
 An adapter is not a standalone copy of the base weights. First loading downloads
 both the adapter and its separately distributed base, unless already cached.
@@ -213,7 +216,7 @@ adapter; setting a media root does not enable vision in a text checkpoint.
 
 ```bash
 JEVANY_MEDIA_ROOT="$PWD/media" jevany serve \
-  --checkpoint tianxinwei/JevAny-27B-SFT --device cuda
+  --checkpoint tianxinwei/JevAny-Qwen3.8-27B-LoRA --device cuda
 ```
 
 See [DATA.md](DATA.md#native-media) for the request format and

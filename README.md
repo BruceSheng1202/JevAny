@@ -28,7 +28,7 @@ Train and serve Jev-style decision models with JevAny: fine-tune an open languag
 
 ## Demos
 
-Examples built with [JevAny-27B-SFT](https://huggingface.co/tianxinwei/JevAny-27B-SFT):
+Examples recorded with an earlier compatible JevAny checkpoint:
 
 [![JevAny choosing actions across robotics, browser, software, laboratory and mobility tasks](docs/demos/jevany-cases.gif)](docs/CASES.md)
 
@@ -52,7 +52,7 @@ Choose the dependencies for your use case:
 | Call an existing HTTP server | `python -m pip install -e .` |
 | Train a text model | `python -m pip install -e '.[train]'` |
 | Run a text model locally or serve it over HTTP | `python -m pip install -e '.[serve]'` |
-| Run the released 27B models with native media support | `python -m pip install -e '.[serve,multimodal]'` |
+| Run a released model with native media support | `python -m pip install -e '.[serve,multimodal]'` |
 
 The client-only installation does not install PyTorch. For image/video training, use `.[train,multimodal]`. Run the commands below from the repository root; model-specific hardware requirements are listed under [Pretrained Models](#pretrained-models).
 
@@ -61,6 +61,11 @@ The client-only installation does not install PyTorch. For image/video training,
 ### Training Data
 
 Training uses the same `state` and `questions` as inference, with a `label` added to each question.
+The current model family was trained on 1,772,725 text records containing 2,180,242
+labelled decisions. Public disclosure is intentionally limited to aggregate size
+and broad categories: preference, agent/tool decisions, reasoning,
+classification, and safety. The detailed mixture and
+source-level composition are not released.
 
 | Data | What is available | Start here |
 |---|---|---|
@@ -100,12 +105,36 @@ See the [training guide](docs/TRAINING.md#backbone-support) for supported backbo
 
 ## Pretrained Models
 
-| Model | Intended use |
-|---|---|
-| [JevAny-27B-SFT](https://huggingface.co/tianxinwei/JevAny-27B-SFT) | Default released model |
-| [JevAny-27B-RLCR](https://huggingface.co/tianxinwei/JevAny-27B-RLCR) | Experimental RLCR continuation |
+| Model | Readout | Intended use |
+|---|---|---|
+| [JevAny-Gemma-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | Pointer | Compact Gemma release |
+| [JevAny-Qwen3.5-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | Pointer | Compact, flexible choice count |
+| [JevAny-Qwen3.5-4B-Direct-Token-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | Direct-token | Best released 4B JevBench accuracy |
+| [JevAny-Qwen3.8-27B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | Default; highest released accuracy |
+| [JevAny-Muse-Glimmer-30B-LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer alternative |
 
-Both releases load a 27B vision-capable base on first use. Allow about 54 GB for BF16 base weights, plus runtime memory, on a single device. You can also train a smaller model and serve it through the same API. See the [hardware and loading guide](docs/DEPLOYMENT.md#checkpoints-and-hardware).
+These are LoRA adapters: the corresponding base model is loaded separately and
+its license and access terms apply. Allow roughly twice the base parameter count
+in bytes for BF16 weights, plus runtime memory. See the
+[hardware and loading guide](docs/DEPLOYMENT.md#checkpoints-and-hardware).
+
+### Pointer vs direct-token
+
+Both variants perform one backbone prefill and return a probability distribution
+without generating answer text, so inference speed should be similar on comparable
+inputs. Pointer learns a compact head over the decision marker and option
+representations; it supports more than 255 choices, bounded in practice by the
+context window. Direct-token has no specialized decision head: it prefixes each
+option with one of 255 fixed, single-token labels and scores those labels with the
+base LM head. The released direct-token model has the better 4B JevBench result,
+but its full-vocabulary cross-entropy makes training slower and it is limited to
+255 choices.
+
+### Release roadmap
+
+The five LoRA checkpoints are the current release. Full-parameter SFT, improved
+post-training, and hyperparameter-optimized variants are planned as later
+releases; they are not included in this version.
 
 ## Inference & Serving
 
@@ -138,7 +167,7 @@ Use `Noul` for binary questions and `Score` for ordered levels. The [API referen
 For the default released model, install `.[serve,multimodal]` and use hardware that meets the [27B requirements](#pretrained-models):
 
 ```bash
-jevany serve --checkpoint tianxinwei/JevAny-27B-SFT \
+jevany serve --checkpoint tianxinwei/JevAny-Qwen3.8-27B-LoRA \
   --device cuda --dtype bf16 --port 8008
 ```
 
@@ -170,7 +199,7 @@ python -m pip install -e .
 jevany demo
 ```
 
-These GIFs show accelerated replays of JevAny-27B-SFT controlling the environments. Each replay preserves the model's actual choices and original option probabilities.
+These GIFs show accelerated replays from an earlier compatible JevAny checkpoint. Each replay preserves the model's actual choices and original option probabilities.
 
 ### [Robot peg insertion](examples/README.md#robot-peg-insertion)
 
@@ -203,9 +232,35 @@ Live model runs currently use text state. Robot control uses the separate `.[rob
 
 ## Evaluation
 
-![JevAny-27B SFT and RLCR accuracy on the transfer suite and public benchmark subsets; MMStar and MVBench have SFT results only](docs/evaluation-checkpoints.svg)
+Accuracy is reported on two fixed protocols: Transfer-v9's 1,046 clean,
+knowable decisions and all 231 public JevBench development items. Every local
+run had complete coverage with no rejected or truncated records. JevBench public
+accuracy is a development-set diagnostic, not the official sealed Benchmark
+Heaven score.
 
-[Full results and evaluation protocols](docs/EVALUATION.md).
+| Released model | Readout | Transfer-v9 | JevBench Acc. | NLL ↓ | Brier ↓ | ECE ↓ |
+|---|---|---:|---:|---:|---:|---:|
+| Gemma 4B LoRA | Pointer | 70.84% | 77.49% | 0.536 | 0.309 | 0.043 |
+| Qwen3.5 4B LoRA | Pointer | **78.68%** | 80.09% | 0.455 | 0.259 | 0.037 |
+| Qwen3.5 4B Direct-Token LoRA | Direct-token | 78.20% | **80.95%** | 0.433 | 0.256 | 0.051 |
+| Qwen3.8 27B LoRA | Pointer | **85.76%** | **90.48%** | **0.270** | **0.145** | 0.036 |
+| Muse Glimmer 30B LoRA | Pointer | 83.46% | 87.45% | 0.316 | 0.174 | **0.027** |
+
+For context, the same two public protocols give:
+
+| Reference model | Transfer-v9 | JevBench public | Provenance |
+|---|---:|---:|---|
+| Kev-4B | 74.19% | 75.32% | Local public-checkpoint runs |
+| Jev 1.13.0 | 85.37% | 86.58% | Local API run / published JevBench reference |
+| Laya (`55cf4c4`) | 52.29% | 58.01% | Local pinned-revision runs |
+
+The direct-token 4B model leads the released 4B models on JevBench, while the
+pointer 4B model is slightly better on Transfer-v9. Reference comparisons use
+accuracy only; calibration metrics are reported for released models where the
+same local protocol produced them. No unavailable sealed-test scores are mixed in.
+
+[Machine-readable release results](results/model-family-v2.json) ·
+[Evaluation protocols and historical results](docs/EVALUATION.md).
 
 ## Supported Model Families
 

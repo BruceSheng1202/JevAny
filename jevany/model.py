@@ -1,6 +1,6 @@
 # Modified for JevAny by Tianxin Wei, 2026.
 # Derived from Kev by Jared Palmer under Apache-2.0. See NOTICE.
-"""Decision model: causal LM backbone + block-causal branch mask + pointer readout."""
+"""Decision model with a shared causal backbone and pointer or LM-token readout."""
 import copy, math, os, re
 import torch
 import torch.nn as nn
@@ -15,6 +15,8 @@ SPECIAL = LEGACY_TOKENS
 # training context: state tokens, tokens per question branch, and the whole packed record. Frozen suites are admitted with
 # this rule (jevany.suite) and training applies it to records built on the fly, so train and eval see the same population.
 MAX_STATE, MAX_BRANCH, MAX_PACKED = 1024, 2048, 2048
+BASE_VERBALIZERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+MAX_DECISION_OPTIONS = 255
 
 
 def load_tokenizer(name, revision=None):
@@ -30,17 +32,59 @@ def tokenizer_of(preprocessor):
     return getattr(preprocessor, "tokenizer", preprocessor)
 
 
+def decision_verbalizers(tok, count=MAX_DECISION_OPTIONS):
+    """Return deterministic, distinct, round-tripping single-token option labels."""
+    if count < 1:
+        raise ValueError("verbalizer count must be positive")
+    symbols, token_ids = [], set()
+
+    def admit(symbol):
+        ids = tok(symbol, add_special_tokens=False).input_ids
+        if len(ids) == 1 and ids[0] not in token_ids and tok.decode(ids) == symbol:
+            symbols.append(symbol)
+            token_ids.add(ids[0])
+
+    for symbol in BASE_VERBALIZERS:
+        admit(symbol)
+    for codepoint in range(0x00A1, 0xA000):
+        if len(symbols) >= count:
+            break
+        symbol = chr(codepoint)
+        if symbol.isspace() or not symbol.isprintable() or symbol in {'"', "\\"}:
+            continue
+        admit(symbol)
+    if len(symbols) < count:
+        raise ValueError(f"tokenizer exposes only {len(symbols)} usable single-token verbalizers; need {count}")
+    return symbols[:count]
+
+
+def verbalizer_token_ids(tok, verbalizers):
+    """Validate a frozen verbalizer table against a tokenizer and return its IDs."""
+    ids = []
+    for symbol in verbalizers:
+        encoded = tok(symbol, add_special_tokens=False).input_ids
+        if len(encoded) != 1 or tok.decode(encoded) != symbol:
+            raise ValueError(f"decision verbalizer is not one round-tripping token: {symbol!r}")
+        ids.append(encoded[0])
+    if len(set(ids)) != len(ids):
+        raise ValueError("decision verbalizers must map to distinct token IDs")
+    return ids
+
+
 _SPECIAL_RE = re.compile(r"<\|([A-Za-z0-9_]+)\|>")
 
 
 def user_tokens(tok, text):
     """Tokenize caller-supplied text so it can never produce delimiter/control tokens (option boundaries are unforgeable).
     The fast tokenizer ignores split_special_tokens, so `<|name|>` is rewritten to `<¦name¦>` before tokenizing."""
-    return tok(_SPECIAL_RE.sub(r"<¦\1¦>", text), add_special_tokens=False).input_ids
+    return tok(safe_text(tok, text), add_special_tokens=False).input_ids
 
 
-def safe_text(text):
-    return _SPECIAL_RE.sub(r"<¦\1¦>", text)
+def safe_text(tok, text):
+    escaped = _SPECIAL_RE.sub(r"<¦\1¦>", str(text))
+    for delimiter in decision_tokens(tok):
+        escaped = escaped.replace(delimiter, delimiter.replace("<", "<¦", 1).replace(">", "¦>", 1))
+    return escaped
 
 
 OPT_NONE, OPT_DECIDE = -1, -2   # values of enc["opt"]: instruction/state tokens, and the <decide> token
@@ -110,7 +154,7 @@ def encode_multimodal(processor, rec, max_state=MAX_STATE, max_branch=MAX_BRANCH
     if unsupported:
         raise ValueError(f"{adapter.name} does not support media types: {sorted(unsupported)}")
     def text(value):
-        value = safe_text(value)
+        value = safe_text(processor.tokenizer, value)
         for token in processor.tokenizer.all_special_tokens:
             if token.startswith(("<", "[")):
                 value = value.replace(token, token.replace("<", "‹").replace("[", "［"))
@@ -213,26 +257,41 @@ def rows_of(enc):
 
 
 class PointerHead(nn.Module):
-    def __init__(self, d, dp=256):
+    def __init__(self, d, dp=256, residual_dim=0):
         """dp = pointer dimension (head capacity knob)."""
         super().__init__()
         self.q, self.k = nn.Linear(d, dp), nn.Linear(d, dp)
         self.scale = 1 / math.sqrt(dp)
+        self.residual = None
+        if residual_dim:
+            self.residual = nn.Sequential(
+                nn.Linear(dp, residual_dim), nn.GELU(), nn.Linear(residual_dim, 1),
+            )
+            nn.init.zeros_(self.residual[-1].weight)
+            nn.init.zeros_(self.residual[-1].bias)
         # calibration: logits are divided by this at inference (eval mode) only. 1.0 = raw. A checkpoint carries the value fitted on
         # its in-distribution development rows (scripts/calibrate_checkpoint.py -> head.pt["temperature"]); training always sees T=1 so
         # a fitted value stays meaningful, and the argmax is unchanged by construction.
         self.temperature = 1.0
 
     def forward(self, h_decide, h_opts):  # [d], [K,d] -> logits [K]
-        z = (self.k(h_opts) @ self.q(h_decide)) * self.scale
+        query, options = self.q(h_decide), self.k(h_opts)
+        z = (options @ query) * self.scale
+        if self.residual is not None:
+            z = z + self.residual(options * query.unsqueeze(0)).squeeze(-1)
         return z if self.training or self.temperature == 1.0 else z / self.temperature
 
 
 class DecisionModel(nn.Module):
-    def __init__(self, name, tok, device, lora=None, revision=None, attn=None, head_dim=256, option_isolation=False,
-                 special_embeddings=False, lora_targets="all", dtype=torch.float32, multimodal=False,
-                 backbone_adapter="auto", branch_mode="auto", lora_target_modules=""):
+    def __init__(self, name, tok, device, lora=None, revision=None, attn=None, head_dim=256,
+                 head_residual_dim=0, option_isolation=False, special_embeddings=False,
+                 lora_targets="all", lora_dropout=0.05, dtype=torch.float32, multimodal=False,
+                 backbone_adapter="auto", branch_mode="auto", lora_target_modules="",
+                 decision_mode="pointer", verbalizers=None):
         super().__init__()
+        if decision_mode not in {"pointer", "lm_token"}:
+            raise ValueError(f"unknown decision mode: {decision_mode}")
+        self.decision_mode = decision_mode
         tokenizer = tokenizer_of(tok)
         prepare_tokenizer(tokenizer)
         self.adapter = get_backbone_adapter(backbone_adapter, multimodal=multimodal, source=name, revision=revision)
@@ -269,9 +328,23 @@ class DecisionModel(nn.Module):
                 tokenizer.convert_tokens_to_ids(t) for t in decision_tokens(tokenizer)
             ]}} if self.special_embeddings else {}
             targets = self.adapter.lora_modules(self.lm, lora_targets, lora_target_modules)
-            cfg = LoraConfig(task_type="FEATURE_EXTRACTION", r=lora, lora_alpha=2 * lora, lora_dropout=0.05, target_modules=targets, **extra)
+            cfg = LoraConfig(task_type="FEATURE_EXTRACTION", r=lora, lora_alpha=2 * lora,
+                             lora_dropout=lora_dropout, target_modules=targets, **extra)
             self.set_language_model(get_peft_model(self.lm, cfg))
-        self.head = PointerHead(self.lm.get_input_embeddings().weight.shape[1], dp=head_dim)
+        self.lm_head = self.adapter.output_embeddings(self.lm, self.mm) if decision_mode == "lm_token" else None
+        if decision_mode == "lm_token" and self.lm_head is None:
+            if not getattr(self.lm.config, "tie_word_embeddings", False):
+                raise ValueError("base model does not expose its original LM head")
+            self.lm_head = self.lm.get_input_embeddings()
+        if self.lm_head is not None:
+            self.lm_head.requires_grad_(False)
+        self.head = (PointerHead(self.lm.get_input_embeddings().weight.shape[1], dp=head_dim,
+                                 residual_dim=head_residual_dim)
+                     if decision_mode == "pointer" else None)
+        self.verbalizers = (list(verbalizers) if verbalizers is not None
+                            else decision_verbalizers(tokenizer)) if decision_mode == "lm_token" else []
+        self.verbalizer_ids = verbalizer_token_ids(tokenizer, self.verbalizers) if self.verbalizers else []
+        self.temperature = 1.0
         self.device = device
         self.to(device)
 
@@ -290,6 +363,16 @@ class DecisionModel(nn.Module):
 
     def encode(self, tok, rec, **kw):
         """encode() with this model's option-isolation setting; use this from serving/eval code."""
+        if self.decision_mode == "lm_token":
+            if any(len(question["options"]) > len(self.verbalizers) for question in rec["questions"]):
+                raise ValueError(f"lm-token mode supports at most {len(self.verbalizers)} options per question")
+            rec = {**rec, "questions": [
+                {**question, "options": [
+                    f"{self.verbalizers[index]}: {option}"
+                    for index, option in enumerate(question["options"])
+                ]}
+                for question in rec["questions"]
+            ]}
         if rec.get("media"):
             if not self.multimodal:
                 raise ValueError("checkpoint does not support media")
@@ -337,8 +420,20 @@ class DecisionModel(nn.Module):
         mask = branch_mask_batch([e["seg"] for e in encs], self.device, dtype=lm_dtype, opts=[e["opt"] for e in encs] if isolate else None, length=ids.shape[1])
         return self.lm(input_ids=ids, position_ids=pos, attention_mask=mask).last_hidden_state.float()   # head stays fp32
 
+    def _question_readout(self, h, decide, options):
+        query = h[decide]
+        if self.decision_mode == "lm_token":
+            logits = F.linear(query.to(self.lm_head.weight.dtype), self.lm_head.weight).float()
+            if self.training:
+                return logits
+            candidates = torch.tensor(self.verbalizer_ids[:len(options)], device=logits.device)
+            logits = logits.index_select(0, candidates)
+            return logits if self.temperature == 1.0 else logits / self.temperature
+        return self.head(query, h[torch.tensor(options, device=self.device)])
+
     def _readout(self, h, enc):
-        return [self.head(h[d], h[torch.tensor(oi, device=self.device)]) for d, oi in zip(enc["decide_idx"], enc["opt_idx"])]
+        return [self._question_readout(h, d, oi)
+                for d, oi in zip(enc["decide_idx"], enc["opt_idx"])]
 
     def forward_rows_batch(self, encs):
         """Row form: every question of every record is one causal row = state tokens + its branch tokens, right-padded
@@ -354,7 +449,7 @@ class DecisionModel(nn.Module):
         h = self.lm(input_ids=ids, position_ids=pos, attention_mask=att).last_hidden_state.float()
         out = [[] for _ in encs]
         for i, (b, d, oi) in enumerate(readouts):
-            out[b].append(self.head(h[i, d], h[i, torch.tensor(oi, device=self.device)]))
+            out[b].append(self._question_readout(h[i], d, oi))
         return out
 
     def forward(self, enc):
@@ -394,7 +489,8 @@ class DecisionModel(nn.Module):
         ids, pos, att = self._pad_rows([(r["ids"], r["pos"]) for r in rows])
         att = torch.cat([torch.ones((Q, len(S)), dtype=torch.long, device=self.device), att], 1)   # the cached state tokens are all real
         h = self.lm(input_ids=ids, position_ids=pos, attention_mask=att, past_key_values=cache, use_cache=True).last_hidden_state.float()
-        return [F.softmax(self.head(h[i, r["decide"]], h[i, torch.tensor(r["opts"], device=self.device)]), -1).cpu() for i, r in enumerate(rows)]
+        return [F.softmax(self._question_readout(h[i], r["decide"], r["opts"]), -1).cpu()
+                for i, r in enumerate(rows)]
 
     def _check_prefix_support(self, enc):
         if enc.get("multimodal"):

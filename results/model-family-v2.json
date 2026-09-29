@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "release": "model-family-v2",
+  "training_data": {
+    "records": 1772725,
+    "questions": 2180242,
+    "categories": [
+      "preference",
+      "agent and tool decisions",
+      "reasoning",
+      "classification",
+      "safety"
+    ]
+  },
+  "protocols": {
+    "transfer_v9": {
+      "headline_population": "clean knowable decisions",
+      "questions": 1046,
+      "evaluated_requests": 1264,
+      "suite_sha256": "3c4f0be94509a3612678bfd3a30fd99a8d0ca3c47ddfe7318075d95b2fa365e4"
+    },
+    "jevbench_public": {
+      "claim": "public development diagnostic; not a sealed Benchmark Heaven score",
+      "questions": 231,
+      "suite": "jevbench-public-v1.4.2.2",
+      "suite_sha256": "b6d6eb34fdbbf46ec11be8657da5e513e3538990d7a00ca5582c55d8bd7941c6"
+    }
+  },
+  "released_models": [
+    {
+      "repository": "tianxinwei/JevAny-Gemma-4B-LoRA",
+      "readout": "pointer",
+      "transfer_v9_accuracy": 0.7084130019120459,
+      "jevbench_public_accuracy": 0.7748917748917749,
+      "jevbench_public_nll": 0.5356955213393567,
+      "jevbench_public_brier": 0.30912978849416195,
+      "jevbench_public_ece": 0.043041233745124516,
+      "jevbench_tiers": {"easy": 1.0, "original": 0.9583333333333334, "hard": 0.5585585585585585}
+    },
+    {
+      "repository": "tianxinwei/JevAny-Qwen3.5-4B-LoRA",
+      "readout": "pointer",
+      "transfer_v9_accuracy": 0.7868068833652008,
+      "jevbench_public_accuracy": 0.8008658008658008,
+      "jevbench_public_nll": 0.45545655640750665,
+      "jevbench_public_brier": 0.2585838755503942,
+      "jevbench_public_ece": 0.037181470023707135,
+      "jevbench_tiers": {"easy": 1.0, "original": 0.9583333333333334, "hard": 0.6126126126126126}
+    },
+    {
+      "repository": "tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA",
+      "readout": "direct-token",
+      "transfer_v9_accuracy": 0.7820267686424475,
+      "jevbench_public_accuracy": 0.8095238095238095,
+      "jevbench_public_nll": 0.43291971261362416,
+      "jevbench_public_brier": 0.25567839211017723,
+      "jevbench_public_ece": 0.051267072125221205,
+      "jevbench_tiers": {"easy": 1.0, "original": 0.9861111111111112, "hard": 0.6126126126126126}
+    },
+    {
+      "repository": "tianxinwei/JevAny-Qwen3.8-27B-LoRA",
+      "readout": "pointer",
+      "transfer_v9_accuracy": 0.8575525812619503,
+      "jevbench_public_accuracy": 0.9047619047619048,
+      "jevbench_public_nll": 0.2700779841994909,
+      "jevbench_public_brier": 0.14524274675774457,
+      "jevbench_public_ece": 0.03592778378552166,
+      "jevbench_tiers": {"easy": 1.0, "original": 0.9861111111111112, "hard": 0.8108108108108109}
+    },
+    {
+      "repository": "tianxinwei/JevAny-Muse-Glimmer-30B-LoRA",
+      "readout": "pointer",
+      "transfer_v9_accuracy": 0.8346080305927343,
+      "jevbench_public_accuracy": 0.8744588744588745,
+      "jevbench_public_nll": 0.31583730444802954,
+      "jevbench_public_brier": 0.17380141586146722,
+      "jevbench_public_ece": 0.027182352142815645,
+      "jevbench_tiers": {"easy": 1.0, "original": 0.9722222222222222, "hard": 0.7567567567567568}
+    }
+  ],
+  "references": [
+    {
+      "model": "Kev-4B",
+      "provenance": "local public-checkpoint runs",
+      "transfer_v9_accuracy": 0.7418738049713193,
+      "jevbench_public_accuracy": 0.7532467532467533
+    },
+    {
+      "model": "Jev 1.13.0",
+      "provenance": "local API Transfer-v9 run and published JevBench reference",
+      "transfer_v9_accuracy": 0.8537284894837476,
+      "jevbench_public_accuracy": 0.8658008658008658
+    },
+    {
+      "model": "Laya",
+      "revision": "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851",
+      "provenance": "local pinned-revision runs",
+      "transfer_v9_accuracy": 0.5229445506692161,
+      "jevbench_public_accuracy": 0.5800865800865801
+    }
+  ]
+}

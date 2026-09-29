@@ -1,6 +1,6 @@
 # Train your own decision model
 
-The trainer fits a LoRA adapter and pointer head over a frozen open backbone.
+The trainer fits a LoRA adapter with either a pointer or direct-token readout over a frozen open backbone.
 Training rows use the same `state` and `questions` as inference, plus labels.
 The output directory can immediately be loaded by `JevModel` or `jevany serve`.
 
@@ -45,7 +45,7 @@ limits and backbone compatibility are checked when training starts.
 | Recipe | Starting point | Output |
 |---|---|---|
 | [`sft.toml`](../recipes/sft.toml) | Open Qwen3.5-0.8B base | `runs/my-jev` |
-| [`finetune.toml`](../recipes/finetune.toml) | Released JevAny-27B-SFT adapter | `runs/domain-jev` |
+| [`finetune.toml`](../recipes/finetune.toml) | Released Qwen3.8-27B LoRA adapter | `runs/domain-jev` |
 | [`rlcr.toml`](../recipes/rlcr.toml) | `runs/my-jev` from the small SFT recipe | `runs/my-jev-rlcr` |
 
 Fine-tune the released checkpoint with your data:
@@ -71,6 +71,25 @@ checkpoint = train("recipes/sft.toml", output_dir="runs/python-jev")
 
 All trainer arguments are available through `jevany train --help`
 and `python -m jevany.train`. Both `--head_dim` and `--head-dim` spellings work.
+
+### Pointer and direct-token readouts
+
+The default `--decision-mode pointer` projects the decision-marker state and
+each option representation through a compact learned head. It supports more
+than 255 choices, with the practical limit set by the context window, and only
+computes logits for the supplied options.
+
+`--decision-mode lm-token` prefixes options with a frozen table of 255 distinct
+single-token labels and scores those labels through the base model's original
+frozen output head. It currently gives the strongest 4B result, but training is
+slower because cross-entropy is normalized over the full vocabulary. It supports
+at most 255 choices. Both readouts use one backbone prefill without answer-token
+generation, so their inference speed should be similar for comparable inputs.
+
+```bash
+jevany train --config recipes/sft.toml --decision-mode lm-token \
+  --lora 8 --lora-dropout 0 --out runs/direct-token-jev
+```
 
 ## Data beyond the starter
 

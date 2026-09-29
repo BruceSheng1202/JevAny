@@ -89,6 +89,20 @@ RECORD = {"state": "state " * 20, "questions": [
 ]}
 
 
+def test_text_causal_lm_direct_token_preserves_vocabulary_head(tmp_path):
+    base = tmp_path / "base"
+    make_base(base, "gpt2", legacy=True)
+    tokenizer = load_tokenizer(base)
+    model = DecisionModel(base, tokenizer, "cpu", lora=2, decision_mode="lm_token",
+                          verbalizers=["yes", "no"])
+    encoded = model.encode(tokenizer, RECORD)
+    model.train()
+    logits = model(encoded)
+    assert all(value.shape == (len(tokenizer),) for value in logits)
+    model.eval()
+    assert all(value.shape == (2,) for value in model(encoded))
+
+
 @pytest.mark.parametrize("family", ["qwen35", "llama", "gemma", "mistral", "qwen35_moe", "gpt2",
                                   "glm", "nemotron"])
 def test_train_tokens_lora_isolation_cache_and_reload(tmp_path, family):
@@ -272,6 +286,15 @@ def test_invalid_tokenizer_and_adapter_configuration(tmp_path):
         DecisionModel(base, tok, "cpu", lora=2, backbone_adapter="builtins:breakpoint")
     model = DecisionModel(base, tok, "cpu", lora=2, lora_targets="all")
     assert any("c_attn.lora_A" in name for name, _ in model.named_parameters())
+
+
+def test_saved_jev_tokens_take_priority_over_base_placeholders():
+    tokenizer = make_tokenizer()
+    tokenizer.add_special_tokens({"additional_special_tokens": [
+        *DECISION_TOKENS, *(f"<unused{index}>" for index in range(5)),
+    ]})
+    prepare_tokenizer(tokenizer)
+    assert decision_tokens(tokenizer) == DECISION_TOKENS
 
 
 def test_saved_token_ids_are_checked_before_loading_adapter_weights(tmp_path):

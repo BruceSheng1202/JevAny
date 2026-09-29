@@ -28,7 +28,7 @@ JevAny 用于训练和部署 Jev 风格的决策模型：你可以微调开源�
 
 ## 演示
 
-以下案例使用 [JevAny-27B-SFT](https://huggingface.co/tianxinwei/JevAny-27B-SFT)：
+以下案例由较早但接口兼容的 JevAny checkpoint 录制：
 
 [![JevAny 在机器人、浏览器、软件、实验室和出行任务中选择动作](docs/demos/jevany-cases.gif)](docs/CASES.md)
 
@@ -52,7 +52,7 @@ source .venv/bin/activate
 | 调用已有 HTTP 服务 | `python -m pip install -e .` |
 | 训练文本模型 | `python -m pip install -e '.[train]'` |
 | 在本地运行文本模型或启动 HTTP 服务 | `python -m pip install -e '.[serve]'` |
-| 运行支持原生媒体输入的已发布 27B 模型 | `python -m pip install -e '.[serve,multimodal]'` |
+| 运行支持原生媒体输入的已发布模型 | `python -m pip install -e '.[serve,multimodal]'` |
 
 只安装客户端不会引入 PyTorch。训练图片/视频模型时，使用 `.[train,multimodal]`。以下命令均在仓库根目录运行；具体模型的硬件要求见[预训练模型](#预训练模型)。
 
@@ -61,6 +61,9 @@ source .venv/bin/activate
 ### 训练数据
 
 训练数据沿用推理时的 `state` 和 `questions`，并为每个问题增加 `label`。
+当前模型系列使用 1,772,725 条文本记录、共 2,180,242 个有标签决策训练。
+公开信息仅包含总规模与大类：偏好、Agent/工具决策、推理、分类和安全；
+不公开数据混合比例和具体来源明细。
 
 | 数据 | 提供的内容 | 使用入口 |
 |---|---|---|
@@ -100,12 +103,31 @@ jevany train --config recipes/rlcr.toml
 
 ## 预训练模型
 
-| 模型 | 用途 |
-|---|---|
-| [JevAny-27B-SFT](https://huggingface.co/tianxinwei/JevAny-27B-SFT) | 默认发布模型 |
-| [JevAny-27B-RLCR](https://huggingface.co/tianxinwei/JevAny-27B-RLCR) | RLCR 实验版本 |
+| 模型 | Readout | 用途 |
+|---|---|---|
+| [JevAny-Gemma-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | Pointer | 轻量 Gemma 版本 |
+| [JevAny-Qwen3.5-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | Pointer | 轻量、支持灵活选项数 |
+| [JevAny-Qwen3.5-4B-Direct-Token-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | Direct-token | 当前 4B JevBench 最优版本 |
+| [JevAny-Qwen3.8-27B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | 默认模型；当前发布准确率最高 |
+| [JevAny-Muse-Glimmer-30B-LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer 版本 |
 
-两个版本首次使用时都会加载 27B 视觉基座。单个设备需容纳约 54 GB 的 BF16 基座权重及额外运行内存。也可以训练更小的模型，再通过同一 API 部署。详见[硬件与加载说明](docs/DEPLOYMENT.md#checkpoints-and-hardware)。
+这些仓库发布的是 LoRA adapter，加载时还需要对应基座，并适用基座模型的
+许可证和访问条款。BF16 基座权重大约需要参数量两倍的字节数，另需运行时
+显存。详见[硬件与加载说明](docs/DEPLOYMENT.md#checkpoints-and-hardware)。
+
+### Pointer 与 direct-token
+
+两种方式都只做一次 backbone prefill，不生成答案文本，因此同等输入下推理
+速度应基本相当。Pointer 使用一个小型可学习 head 对决策标记和选项表示打分；
+它支持超过 255 个选项，实际边界由上下文窗口决定。Direct-token 不使用专用
+决策 head，而是给每个选项加上 255 个固定单 token 标签之一，再通过基座原始
+LM head 打分。已发布 direct-token 模型在 4B JevBench 上效果更好，但训练时
+使用 full-vocabulary cross-entropy，因此训练更慢，并且最多支持 255 个选项。
+
+### 发布计划
+
+当前版本发布下列五个 LoRA checkpoint。Full-parameter SFT、进一步优化的
+post-training，以及超参优化版本计划后续发布，不包含在本次版本中。
 
 ## 推理与部署
 
@@ -138,7 +160,7 @@ print(answer["probabilities"])
 运行默认发布模型时，安装 `.[serve,multimodal]`，并使用满足 [27B 硬件要求](#预训练模型)的设备：
 
 ```bash
-jevany serve --checkpoint tianxinwei/JevAny-27B-SFT \
+jevany serve --checkpoint tianxinwei/JevAny-Qwen3.8-27B-LoRA \
   --device cuda --dtype bf16 --port 8008
 ```
 
@@ -170,7 +192,7 @@ python -m pip install -e .
 jevany demo
 ```
 
-以下动图是 JevAny-27B-SFT 操作环境的加速回放，保留了模型的实际选择和原始选项概率。
+以下动图来自较早但接口兼容的 JevAny checkpoint，保留了模型的实际选择和原始选项概率。
 
 ### [机械臂插孔](examples/README.md#robot-peg-insertion)
 
@@ -203,9 +225,33 @@ jevany demo --base-url http://127.0.0.1:8008 --text-only
 
 ## 评测
 
-![JevAny-27B SFT 和 RLCR 在迁移集及公开 benchmark 子集上的准确率；MMStar 和 MVBench 仅有 SFT 结果](docs/evaluation-checkpoints.svg)
+统一报告两个固定协议的准确率：Transfer-v9 的 1,046 个 clean、knowable
+决策，以及 JevBench 全部 231 个公开 development 项。所有本地评测均完整
+覆盖，没有拒绝或截断样本。JevBench public 是开发集诊断结果，不是
+Benchmark Heaven 的 sealed 官方分数。
 
-[完整结果与评测设置](docs/EVALUATION.md)。
+| 发布模型 | Readout | Transfer-v9 | JevBench 准确率 | NLL ↓ | Brier ↓ | ECE ↓ |
+|---|---|---:|---:|---:|---:|---:|
+| Gemma 4B LoRA | Pointer | 70.84% | 77.49% | 0.536 | 0.309 | 0.043 |
+| Qwen3.5 4B LoRA | Pointer | **78.68%** | 80.09% | 0.455 | 0.259 | 0.037 |
+| Qwen3.5 4B Direct-Token LoRA | Direct-token | 78.20% | **80.95%** | 0.433 | 0.256 | 0.051 |
+| Qwen3.8 27B LoRA | Pointer | **85.76%** | **90.48%** | **0.270** | **0.145** | 0.036 |
+| Muse Glimmer 30B LoRA | Pointer | 83.46% | 87.45% | 0.316 | 0.174 | **0.027** |
+
+同一组公开协议下的参考模型结果如下：
+
+| 参考模型 | Transfer-v9 | JevBench public | 来源 |
+|---|---:|---:|---|
+| Kev-4B | 74.19% | 75.32% | 本地公开 checkpoint 评测 |
+| Jev 1.13.0 | 85.37% | 86.58% | 本地 API 评测 / 已发布 JevBench 参考值 |
+| Laya (`55cf4c4`) | 52.29% | 58.01% | 本地固定 revision 评测 |
+
+Direct-token 4B 在已发布 4B 模型中取得更高的 JevBench 准确率，Pointer
+4B 则在 Transfer-v9 上略高。参考模型之间只比较准确率；校准指标仅列出由
+同一本地协议得到的发布模型结果，不混用不可用的 sealed 测试分数。
+
+[本次发布的机器可读结果](results/model-family-v2.json) ·
+[评测协议与历史结果](docs/EVALUATION.md)。
 
 ## Supported Model Families
 

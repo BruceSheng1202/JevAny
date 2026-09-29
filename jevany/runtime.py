@@ -14,7 +14,7 @@ from .device import default_device, sync
 from .inference import InferenceOptions
 from .model import DecisionModel
 
-DEFAULT_CHECKPOINT = "tianxinwei/JevAny-27B-SFT"
+DEFAULT_CHECKPOINT = "tianxinwei/JevAny-Qwen3.8-27B-LoRA"
 
 
 @dataclass
@@ -35,13 +35,14 @@ class DecisionRuntime:
             raise ValueError("model_name must be a nonempty string")
 
     @property
-    def limits(self) -> dict[str, int]:
+    def limits(self) -> dict[str, int | None]:
         options = self.inference_options
         window = self.model.inference_capabilities.context_window
         return {
             "state_tokens": min(options.max_state_tokens, window) if window else options.max_state_tokens,
             "branch_tokens": min(options.max_branch_tokens, window) if window else options.max_branch_tokens,
             "packed_tokens": options.max_packed_tokens,
+            "choices": len(self.model.verbalizers) if self.model.decision_mode == "lm_token" else None,
         }
 
     @property
@@ -56,7 +57,8 @@ class DecisionRuntime:
                 "id": self.model_id, "aliases": self.aliases,
                 "run": self.checkpoint.requested, "base": self.checkpoint.meta.base,
                 "lora": self.checkpoint.meta.lora, "device": self.device,
-                "temperature": self.model.head.temperature,
+                "temperature": self.model.temperature,
+                "decision_mode": self.checkpoint.meta.decision_mode,
                 "backbone_adapter": self.model.backbone_adapter,
                 "branch_mode": self.model.branch_mode,
                 "capabilities": asdict(capabilities), "limits": self.limits,
@@ -177,9 +179,12 @@ class JevModel(DecisionClient):
         loaded = Checkpoint(checkpoint)
         if model_name is None:
             source = loaded.requested.partition("@")[0]
-            model_name = ("jevany-27b" if source in (
-                DEFAULT_CHECKPOINT, "tianxinwei/JevAny-27B-RLCR",
-            ) else Path(source).name or Path(loaded.path).resolve().name)
+            if source == DEFAULT_CHECKPOINT:
+                model_name = "jevany-qwen3.8-27b-lora"
+            elif source in ("tianxinwei/JevAny-27B-SFT", "tianxinwei/JevAny-27B-RLCR"):
+                model_name = "jevany-27b"
+            else:
+                model_name = Path(source).name or Path(loaded.path).resolve().name
         tokenizer, model = loaded.load(device, options)
         return cls(DecisionRuntime(loaded, tokenizer, model, device, model_name, inference_options))
 

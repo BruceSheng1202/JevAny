@@ -34,7 +34,10 @@ class DecisionPredictor:
             torch.backends.cuda.enable_flash_sdp(False)
             torch.backends.cuda.enable_mem_efficient_sdp(False)
         self.tokenizer, self.model = self.checkpoint.load(device, options)
-        self.temperature = self.model.head.temperature
+        self.temperature = getattr(
+            self.model, "temperature",
+            self.model.head.temperature if self.model.head is not None else 1.0,
+        )
         self.provenance = {
             "backend": backend, "requested_checkpoint": checkpoint,
             "base": self.checkpoint.meta.base,

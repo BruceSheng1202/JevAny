@@ -1,11 +1,11 @@
 # Modified for JevAny by Tianxin Wei, 2026.
 # Derived from Kev by Jared Palmer under Apache-2.0. See NOTICE.
-"""Trained checkpoints: a run directory or a Hub repo holding a LoRA adapter, `head.pt` and the tokenizer.
+"""Trained checkpoints: a run directory or Hub repo holding a LoRA adapter, metadata, and a tokenizer.
 
 This is the one place that knows the layout of `head.pt` and how a checkpoint becomes a `DecisionModel`:
 `jevany.serve`, `jevany.benchmark` and `jevany.train --init_from` all go through it.
 
-    ck = Checkpoint("tianxinwei/JevAny-27B-RLCR")    # or a local run directory; `@tag` pins a Hub revision
+    ck = Checkpoint("tianxinwei/JevAny-Qwen3.8-27B-LoRA")  # or a local run directory; `@tag` pins a Hub revision
     tok, model = ck.load("mps", LoadOptions.from_env())
     ck.meta.temperature                             # the calibration the checkpoint carries
 """
@@ -28,7 +28,7 @@ def is_hub_id(run):
 
 
 def resolve_run(run):
-    """Local run directory as given, or a Hub repo id such as tianxinwei/JevAny-27B-RLCR, optionally pinned to a revision."""
+    """Local run directory or a Hub ID such as tianxinwei/JevAny-Qwen3.8-27B-LoRA, optionally pinned."""
     if os.path.isdir(run):
         if not (Path(run) / "head.pt").is_file():
             raise ValueError(f"{run}: missing head.pt; pass a trained JevAny checkpoint, not base weights")
@@ -51,6 +51,8 @@ class Meta:
     base_revision: str | None = None
     lora: int = 0
     head_dim: int = 256
+    head_residual_dim: int = 0
+    head_type: str = "linear"
     option_isolation: bool = False
     special_embeddings: bool = False
     multimodal: bool = False
@@ -58,12 +60,15 @@ class Meta:
     branch_mode: str = "auto"
     tokenizer_saved: bool = False
     weights_dtype: str = "fp32"
+    decision_mode: str = "pointer"
+    verbalizers: list = field(default_factory=list)
     temperature: float = 1.0
     holdout: list = field(default_factory=list)
     extra: dict = field(default_factory=dict)
 
-    KNOWN = ("base", "head", "base_revision", "lora", "head_dim", "option_isolation", "special_embeddings",
-             "multimodal", "backbone_adapter", "branch_mode", "tokenizer_saved", "weights_dtype", "temperature", "holdout")
+    KNOWN = ("base", "head", "base_revision", "lora", "head_dim", "head_residual_dim", "head_type",
+             "option_isolation", "special_embeddings", "multimodal", "backbone_adapter", "branch_mode",
+             "tokenizer_saved", "weights_dtype", "decision_mode", "verbalizers", "temperature", "holdout")
 
     @classmethod
     def from_dict(cls, d):
@@ -128,7 +133,7 @@ class Checkpoint:
         return json.loads(self.file("adapter_config.json").read_text(encoding="utf-8"))
 
     def load(self, device, opts=LoadOptions()):
-        """-> (tokenizer, DecisionModel) in eval mode with the LoRA applied and the pointer head loaded."""
+        """Return an eval model with its LoRA and configured decision readout loaded."""
         meta = self.meta
         dtype, merge = opts.dtype or torch.float32, opts.merge
         if meta.weights_dtype == "bf16":
@@ -147,14 +152,28 @@ class Checkpoint:
             raise ValueError(f"{self.path}: missing saved tokenizer_config.json")
         tok = load_preprocessor(tokenizer_source, revision=None if meta.tokenizer_saved else revision,
                                 multimodal=meta.multimodal, backbone_adapter=adapter_name)
-        merge = merge and not self.adapter_config().get("trainable_token_indices")   # token-trained adapters stay unmerged
-        lora_targets = meta.extra.get("args", {}).get("lora_targets", "all")
+        adapter_config = self.adapter_config()
+        # Direct-token scoring reuses the causal model's frozen vocabulary
+        # projection, which is outside the feature-extraction PEFT wrapper.
+        # Keep that association intact instead of merging the wrapper away.
+        merge = (merge and meta.decision_mode != "lm_token"
+                 and not adapter_config.get("trainable_token_indices"))
+        saved_args = meta.extra.get("args", {})
+        lora_targets = saved_args.get("lora_targets", "all")
+        explicit_targets = saved_args.get("lora_target_modules", "")
+        if not explicit_targets and adapter_config.get("target_modules"):
+            # Exact saved modules are the portable contract. Presets can expand
+            # as new backbone implementations expose additional linear layers.
+            explicit_targets = ",".join(sorted(adapter_config["target_modules"]))
         m = DecisionModel(source, tok, device, lora=meta.lora, revision=revision, head_dim=meta.head_dim,
-                          lora_targets=lora_targets, special_embeddings=meta.special_embeddings,
+                          head_residual_dim=meta.head_residual_dim, lora_targets=lora_targets,
+                          lora_dropout=float(adapter_config.get("lora_dropout", 0.05)),
+                          special_embeddings=meta.special_embeddings,
                           option_isolation=meta.option_isolation, dtype=torch.float32 if merge else dtype,
                           attn=opts.attn, multimodal=meta.multimodal,
                           backbone_adapter=adapter_name, branch_mode=meta.branch_mode,
-                          lora_target_modules=meta.extra.get("args", {}).get("lora_target_modules", ""))
+                          lora_target_modules=explicit_targets,
+                          decision_mode=meta.decision_mode, verbalizers=meta.verbalizers or None)
         self.warm_start(m, meta)
         if opts.lora_scale != 1:
             for module in m.lm.modules():
@@ -165,11 +184,16 @@ class Checkpoint:
             m.set_language_model(m.lm.merge_and_unload())
             if dtype != torch.float32:
                 m.set_language_model(m.lm.to(dtype))
-        m.head.load_state_dict(meta.head); m.eval()
-        m.head.temperature = meta.temperature if opts.temperature is None else opts.temperature
+        if m.head is not None:
+            m.head.load_state_dict(meta.head)
+        m.eval()
+        m.temperature = meta.temperature if opts.temperature is None else opts.temperature
+        if m.head is not None:
+            m.head.temperature = m.temperature
         return tok, m
 
-    COMPAT_FIELDS = ("base", "base_revision", "lora", "head_dim", "option_isolation", "special_embeddings", "multimodal")
+    COMPAT_FIELDS = ("base", "base_revision", "lora", "head_dim", "head_residual_dim", "head_type",
+                     "option_isolation", "special_embeddings", "multimodal", "decision_mode", "verbalizers")
 
     def warm_start(self, model, ours):
         """Delta training: load this checkpoint's adapter and pointer head into `model` (a fresh DecisionModel built with
@@ -204,7 +228,8 @@ class Checkpoint:
         if missing:
             raise ValueError(f"--init_from {self.path} does not cover {len(missing)} of this model's adapter tensors (e.g. {missing[:2]}); check --lora_targets")
         set_peft_model_state_dict(model.lm, weights)
-        model.head.load_state_dict(self.meta.head)
+        if model.head is not None:
+            model.head.load_state_dict(self.meta.head)
         return {"init_from": self.requested, "resolved": self.path, "adapter_sha256": digest(self.file("adapter_model.safetensors")),
                 "head_sha256": digest(self.file("head.pt")), "adapter_tensors": len(weights)}
 

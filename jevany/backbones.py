@@ -18,6 +18,12 @@ from transformers.pytorch_utils import Conv1D
 
 LEGACY_TOKENS = ["<|fim_prefix|>", "<|fim_middle|>", "<|box_start|>", "<|box_end|>", "<|fim_suffix|>"]
 DECISION_TOKENS = ["<|jev_state|>", "<|jev_question|>", "<|jev_option|>", "<|jev_end_option|>", "<|jev_decide|>"]
+EXISTING_TOKEN_ALPHABETS = (
+    LEGACY_TOKENS,
+    DECISION_TOKENS,
+    [f"<unused{index}>" for index in range(5)],
+    [f"<|reserved_special_token_{index}|>" for index in range(2, 7)],
+)
 
 
 @dataclass(frozen=True)
@@ -48,6 +54,11 @@ class InferenceCapabilities:
 
 def decision_tokens(tokenizer: PreTrainedTokenizerBase) -> list[str]:
     """Return this tokenizer's persisted decision alphabet."""
+    explicit = getattr(tokenizer, "init_kwargs", {}).get("jevany_decision_tokens")
+    if explicit is not None:
+        if not isinstance(explicit, list) or len(explicit) != 5 or len(set(explicit)) != 5:
+            raise ValueError("jevany_decision_tokens must contain five distinct strings")
+        return explicit
     schema = getattr(tokenizer, "init_kwargs", {}).get("jevany_token_schema", "legacy")
     if schema not in ("legacy", "v1"):
         raise ValueError(f"unsupported JevAny tokenizer schema: {schema!r}")
@@ -57,14 +68,27 @@ def decision_tokens(tokenizer: PreTrainedTokenizerBase) -> list[str]:
 def prepare_tokenizer(tokenizer: PreTrainedTokenizerBase) -> PreTrainedTokenizerBase:
     """Reuse legacy delimiters or add five model-independent special tokens."""
     vocabulary = tokenizer.get_vocab()
+    explicit = tokenizer.init_kwargs.get("jevany_decision_tokens")
+    if explicit is not None:
+        tokens = decision_tokens(tokenizer)
+        if any(token not in vocabulary for token in tokens):
+            raise ValueError("saved tokenizer is missing its explicit JevAny decision tokens")
+        if len({tokenizer.convert_tokens_to_ids(token) for token in tokens}) != len(tokens):
+            raise ValueError("JevAny decision tokens must have distinct token IDs")
+        return tokenizer
     schema = tokenizer.init_kwargs.get("jevany_token_schema")
     if schema is None:
-        schema = "legacy" if all(token in vocabulary for token in LEGACY_TOKENS) else "v1"
-        tokenizer.init_kwargs["jevany_token_schema"] = schema
-        tokens = decision_tokens(tokenizer)
-        added = [token for token in tokens if token not in vocabulary]
-        tokenizer.add_special_tokens({"extra_special_tokens": tokens}, replace_extra_special_tokens=False)
-        tokenizer.init_kwargs["jevany_added_tokens"] = added
+        unknown = getattr(tokenizer, "unk_token_id", None)
+        for candidates in EXISTING_TOKEN_ALPHABETS:
+            ids = [tokenizer.convert_tokens_to_ids(token) for token in candidates]
+            if all(value is not None and value != unknown for value in ids) and len(set(ids)) == 5:
+                tokenizer.init_kwargs["jevany_decision_tokens"] = list(candidates)
+                break
+        else:
+            tokenizer.init_kwargs["jevany_token_schema"] = "v1"
+            tokenizer.add_special_tokens({"extra_special_tokens": DECISION_TOKENS},
+                                         replace_extra_special_tokens=False)
+            tokenizer.init_kwargs["jevany_added_tokens"] = list(DECISION_TOKENS)
     tokens = decision_tokens(tokenizer)
     vocabulary = tokenizer.get_vocab()
     if any(token not in vocabulary for token in tokens):
@@ -145,7 +169,14 @@ class BackboneAdapter:
                                                      attn_implementation=attn, **kwargs)
         if causal.base_model is causal:
             raise ValueError("causal model does not expose its base_model; provide a custom backbone_adapter")
+        self._output_embeddings = causal.get_output_embeddings()
         return causal.base_model, None
+
+    def output_embeddings(self, language_model, multimodal_model):
+        """Return the base model's original frozen vocabulary projection."""
+        owner = multimodal_model if multimodal_model is not None else language_model
+        head = owner.get_output_embeddings()
+        return head if head is not None else getattr(self, "_output_embeddings", None)
 
     def supports_packed(self, config) -> bool:
         layer_types = set(getattr(config, "layer_types", None) or [])
@@ -254,7 +285,10 @@ class VisionAdapter(BackboneAdapter):
 
     def load_preprocessor(self, name: str, revision: str | None = None):
         processor = AutoProcessor.from_pretrained(name, revision=revision, fix_mistral_regex=True)
-        prepare_tokenizer(processor.tokenizer)
+        # Some multimodal repositories expose a tokenizer-only AutoProcessor
+        # fallback. Text inference must still work; native media calls will
+        # fail later with the adapter's normal processor capability error.
+        prepare_tokenizer(getattr(processor, "tokenizer", processor))
         return processor
 
     def load_model(self, name: str, *, revision: str | None, dtype: torch.dtype,
@@ -263,6 +297,7 @@ class VisionAdapter(BackboneAdapter):
         model = AutoModel.from_pretrained(name, revision=revision, dtype=dtype, attn_implementation=attn,
                                           **frozen_weight_options(config))
         model.requires_grad_(False)
+        self._output_embeddings = model.get_output_embeddings()
         if not self.language_model_path:
             return model, None
         try:

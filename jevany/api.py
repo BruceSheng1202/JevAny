@@ -14,7 +14,10 @@ from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, Field, model_validator
 
 JSONContent = Union[str, dict, list, int, float, bool, None]
-MAX_OPTIONS = 255
+# The HTTP shape is shared by both readouts. Pointer checkpoints are bounded by
+# the configured context window rather than by a fixed verbalizer vocabulary;
+# LM-token checkpoints enforce their tighter 255-option limit while encoding.
+MAX_OPTIONS = 4096
 MAX_QUESTIONS = 64
 
 

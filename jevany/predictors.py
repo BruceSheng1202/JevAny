@@ -35,19 +35,22 @@ def base_loading_provenance(meta, options):
 class ModelPredictor:
     """Adapt an in-memory DecisionModel to the benchmark predictor interface."""
 
-    def __init__(self, model, tok, device):
+    def __init__(self, model, tok, device, max_packed=MAX_PACKED):
         self.model, self.tok, self.device = model, tok, device
-        self.temperature = model.head.temperature
+        self.max_packed = max_packed
+        self.temperature = getattr(
+            model, "temperature", model.head.temperature if model.head is not None else 1.0,
+        )
 
     @torch.no_grad()
     def __call__(self, record):
         # Frozen benchmarks may devote the full 2048-token packed window to
         # state or one branch. Training admission remains deliberately tighter;
         # the interactive server has a separately documented larger limit.
-        enc = self.model.encode(self.tok, materialize(record), max_state=MAX_PACKED,
-                                max_branch=MAX_PACKED, strict=True)
-        if len(enc["ids"]) > MAX_PACKED:
-            raise ValueError(f"packed request exceeds frozen {MAX_PACKED}-token limit")
+        enc = self.model.encode(self.tok, materialize(record), max_state=self.max_packed,
+                                max_branch=self.max_packed, strict=True)
+        if len(enc["ids"]) > self.max_packed:
+            raise ValueError(f"packed request exceeds frozen {self.max_packed}-token limit")
         sync(self.device)
         start = time.perf_counter()
         logits = self.model.forward(enc)
@@ -62,7 +65,7 @@ class ModelPredictor:
 
 
 class LocalPredictor(ModelPredictor):
-    def __init__(self, run, device, opts=LoadOptions()):
+    def __init__(self, run, device, opts=LoadOptions(), max_packed=MAX_PACKED):
         """opts.temperature=None scores with the temperature the checkpoint carries; 1.0 scores raw logits."""
         if opts.temperature is not None and not (math.isfinite(opts.temperature) and opts.temperature > 0):
             raise ValueError("temperature must be finite and positive")
@@ -74,7 +77,7 @@ class LocalPredictor(ModelPredictor):
             torch.backends.cuda.matmul.allow_tf32 = False; torch.backends.cudnn.allow_tf32 = False
             torch.backends.cuda.enable_flash_sdp(False); torch.backends.cuda.enable_mem_efficient_sdp(False)
         tok, model = checkpoint.load(device, opts)
-        super().__init__(model, tok, device)
+        super().__init__(model, tok, device, max_packed=max_packed)
 
 
 class RemotePredictor:

@@ -2,7 +2,7 @@
 # Derived from Kev by Jared Palmer under Apache-2.0. See NOTICE.
 """Score a predictor on a frozen suite partition (or your own labelled JSONL).
 
-    python -m jevany.benchmark --run models/JevAny-27B-RLCR --suite data/eval-suite --out runs/eval
+    python -m jevany.benchmark --run models/JevAny-Qwen3.8-27B-LoRA --suite data/eval-suite --out runs/eval
     uv run python -m jevany.benchmark --remote http://127.0.0.1:8008 --suite ... --out ...      # any System One endpoint
 
 Every prediction becomes one row per question (prediction_rows); jevany.metrics scores rows; evaluate_records writes

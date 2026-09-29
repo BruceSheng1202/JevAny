@@ -1,7 +1,6 @@
 # Modified for JevAny by Tianxin Wei, 2026.
 # Derived from Kev by Jared Palmer under Apache-2.0. See NOTICE.
-"""Fine-tune the decision model on labelled requests (a frozen suite's training partition, records built on the
-fly from the public sources, or your own JSONL), with the pointer head trained from scratch.
+"""Fine-tune a pointer or direct-token decision model on labelled requests.
 
     python -m jevany.train --data examples/train.jsonl --out runs/sft
     uv run python -m jevany.train --data data/rlcr.jsonl --init_from runs/sft --rlcr --out runs/rlcr
@@ -20,7 +19,8 @@ from .checkpoint import Checkpoint, Meta, write_meta
 from .device import allocated_bytes, default_device, empty_cache
 from .data import EVAL_ONLY, augment, load_records, materialize, none_pair, source_seed
 from .suite import ENCODING, digest, load_split, read_manifest, validate_training, write_json
-from .model import MAX_BRANCH, MAX_PACKED, MAX_STATE, DecisionModel, load_preprocessor
+from .model import (MAX_BRANCH, MAX_PACKED, MAX_STATE, DecisionModel,
+                    decision_verbalizers, load_preprocessor, tokenizer_of)
 
 
 # --- losses -----------------------------------------------------------------------------------------------------------
@@ -32,6 +32,23 @@ def question_loss(z, q, dev):
         return -(t * F.log_softmax(z, -1)).sum()
     y = torch.tensor([q["label"]], device=dev)
     return F.cross_entropy(z[None], y)
+
+
+def lm_token_loss(vocabulary_logits, q, verbalizer_ids, dev):
+    """Next-token CE over the complete vocabulary at the decision marker.
+
+    Candidate positions are represented by frozen, distinct single-token
+    verbalizers. Keeping the full-vocabulary denominator makes training match
+    ordinary language-model token prediction; inference renormalizes only the
+    candidates present in the request.
+    """
+    candidate_ids = torch.tensor(verbalizer_ids[:len(q["options"])], device=dev)
+    if q.get("target") is not None:
+        target = torch.tensor(q["target"], device=dev, dtype=vocabulary_logits.dtype)
+    else:
+        target = F.one_hot(torch.tensor(q["label"], device=dev), len(candidate_ids)).to(vocabulary_logits.dtype)
+    selected_log_probs = F.log_softmax(vocabulary_logits, -1).index_select(0, candidate_ids)
+    return -(target * selected_log_probs).sum()
 
 
 def rlcr_reward(correctness, confidence):
@@ -274,7 +291,9 @@ def batch_loss(model, a, batch, dev, autocast, distributed_forward=None, rlcr_si
             terms["rlcr_n"] += 1
             terms["ce"] += ce.item(); loss = loss + objective
         else:
-            ce = sum(question_loss(z.float(), q, dev)
+            loss_fn = (lambda z, q: lm_token_loss(z.float(), q, model.verbalizer_ids, dev)) \
+                if model.decision_mode == "lm_token" else (lambda z, q: question_loss(z.float(), q, dev))
+            ce = sum(loss_fn(z, q)
                      for z, q in zip(logits, v.rec["questions"])) / len(logits)
             terms["objective"] += ce.item(); terms["ce"] += ce.item(); loss = loss + ce
     if not torch.isfinite(loss):
@@ -301,6 +320,8 @@ def parse_args(argv=None):
     ap.add_argument("--head_lr", type=float, default=0.0, help="separate learning rate for the pointer head (0 = same as --lr); the head trains from scratch")
     ap.add_argument("--weight_decay", type=float, default=0.01, help="AdamW weight decay on LoRA and head parameters")
     ap.add_argument("--lora", type=int, default=16)
+    ap.add_argument("--decision_mode", choices=("pointer", "lm_token"), default="pointer",
+                    help="pointer head or next-token prediction through the frozen original LM head")
     ap.add_argument("--rlcr", action="store_true", help="optimize correctness plus Brier reward over noisy pointer distributions")
     ap.add_argument("--rlcr_group_size", type=int, default=32, help="noisy answer-confidence candidates per question")
     ap.add_argument("--rlcr_sigma_start", type=float, default=0.4, help="initial standard deviation of pointer-logit exploration")
@@ -323,7 +344,10 @@ def parse_args(argv=None):
     ap.add_argument("--max_branch", type=int, default=MAX_BRANCH, help="maximum tokens in one state-plus-question branch")
     ap.add_argument("--max_packed", type=int, default=MAX_PACKED, help="maximum tokens in one packed training record")
     ap.add_argument("--head_dim", type=int, default=256, help="pointer head dimension")
+    ap.add_argument("--head_residual_dim", type=int, default=0,
+                    help="hidden size of a zero-output-initialized residual MLP over pointer features")
     ap.add_argument("--lora_targets", choices=["all", "dense", "attn", "qv"], default="all", help="LoRA module set; fewer modules = less drift from the base; dense = all minus the DeltaNet projections on hybrid bases")
+    ap.add_argument("--lora_dropout", type=float, default=0.05)
     ap.add_argument("--base_revision", default="", help="pin the base commit when the suite manifest does not pin this base")
     ap.add_argument("--p_none", type=float, default=0.1)
     ap.add_argument("--p_none_distract", type=float, default=0.12)
@@ -357,6 +381,10 @@ def parse_args(argv=None):
         ap.error("numeric training settings must be finite")
     if min(a.epochs, a.accum, a.lora, a.batch) < 1:
         ap.error("epochs, accum, lora and batch must be positive")
+    if a.head_residual_dim < 0 or not math.isfinite(a.lora_dropout) or not 0 <= a.lora_dropout < 1:
+        ap.error("invalid residual-head dimension or LoRA dropout")
+    if a.decision_mode == "lm_token" and (a.rlcr or a.head_lr or a.head_residual_dim):
+        ap.error("lm-token mode supports supervised training without a specialized head")
     if a.dtype == "bf16" and a.device != "cuda":
         ap.error("--dtype bf16 requires --device cuda")
     if any(not math.isfinite(value) for value in (a.lr, a.head_lr, a.weight_decay)) or a.lr <= 0 or a.head_lr < 0 or a.weight_decay < 0:
@@ -599,12 +627,15 @@ def main(argv=None):
     tok = load_preprocessor(initial_checkpoint.path if saved_tokenizer else model_source,
                             revision=None if saved_tokenizer else load_revision, multimodal=a.multimodal,
                             backbone_adapter=adapter_name)
+    verbalizers = decision_verbalizers(tokenizer_of(tok)) if a.decision_mode == "lm_token" else None
     model = DecisionModel(model_source, tok, dev, lora=a.lora, revision=load_revision,
-                          head_dim=a.head_dim, lora_targets=a.lora_targets,
+                          head_dim=a.head_dim, head_residual_dim=a.head_residual_dim,
+                          lora_targets=a.lora_targets, lora_dropout=a.lora_dropout,
                           option_isolation=bool(a.option_isolation), special_embeddings=bool(a.special_embeddings),
                           dtype=torch.bfloat16 if a.weights_dtype == "bf16" else torch.float32,
                           multimodal=a.multimodal, backbone_adapter=adapter_name,
-                          branch_mode=a.branch_mode, lora_target_modules=a.lora_target_modules)
+                          branch_mode=a.branch_mode, lora_target_modules=a.lora_target_modules,
+                          decision_mode=a.decision_mode, verbalizers=verbalizers)
     for adapter_config in getattr(model.lm, "peft_config", {}).values():
         adapter_config.base_model_name_or_path = a.base
     if a.checkpointing:
@@ -612,10 +643,13 @@ def main(argv=None):
     model.lm.config.use_cache = False
     # what this run will save as head.pt; also the architecture a warm start must match
     meta = Meta(base=a.base, base_revision=revision, lora=a.lora, head_dim=a.head_dim,
+                head_residual_dim=a.head_residual_dim,
+                head_type="residual" if a.head_residual_dim else "linear",
                 option_isolation=bool(a.option_isolation),
                 special_embeddings=model.special_embeddings, multimodal=a.multimodal,
                 backbone_adapter=model.backbone_adapter, branch_mode=model.branch_mode, tokenizer_saved=True,
-                weights_dtype=a.weights_dtype, holdout=holdout)
+                weights_dtype=a.weights_dtype, holdout=holdout,
+                decision_mode=a.decision_mode, verbalizers=model.verbalizers)
     init_source = None
     if a.init_from:
         # Start from an already trained adapter and pointer head for the RLCR or domain-adaptation stage.
@@ -646,11 +680,13 @@ def main(argv=None):
             tracker.config.update({"world_size": world_size, "global_effective_batch": global_batch,
                                    "planned_optimizer_steps": planned_steps})
 
-    head_params = list(model.head.parameters()); head_ids = {id(p) for p in head_params}
-    groups = [{"params": [p for p in model.trainable_parameters() if id(p) not in head_ids], "lr": a.lr},
-              {"params": head_params, "lr": a.head_lr or a.lr}]
+    head_params = list(model.head.parameters()) if model.head is not None else []
+    head_ids = {id(p) for p in head_params}
+    groups = [{"params": [p for p in model.trainable_parameters() if id(p) not in head_ids], "lr": a.lr}]
+    if head_params:
+        groups.append({"params": head_params, "lr": a.head_lr or a.lr})
     opt = torch.optim.AdamW(groups, lr=a.lr, weight_decay=a.weight_decay)
-    sched = learning_rate_schedule(opt, [a.lr, a.head_lr or a.lr], steps)
+    sched = learning_rate_schedule(opt, [group["lr"] for group in groups], steps)
     distributed_forward = None
     if distributed:
         device_index = torch.cuda.current_device()
@@ -672,7 +708,7 @@ def main(argv=None):
         if main_process:
             model.lm.save_pretrained(directory, save_embedding_layers=False)
         if main_process:
-            checkpoint_meta = replace(meta, head=model.head.state_dict(),
+            checkpoint_meta = replace(meta, head=model.head.state_dict() if model.head is not None else None,
                                       extra={"args": vars(a), "suite_sha256": suite_hash, "init_source": init_source,
                                              "optimizer_step": checkpoint_step})
             write_meta(directory, checkpoint_meta)

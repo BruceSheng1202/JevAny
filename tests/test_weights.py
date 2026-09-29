@@ -15,7 +15,9 @@ def test_checkpoint_loads_and_scores_one_request():
     from jevany.api import SystemOneRequest, to_record
     from jevany.checkpoint import LoadOptions, load
 
-    tok, model = load(run, "cuda", LoadOptions(dtype=None, merge=False))
+    tok, model = load(run, "cuda", LoadOptions(
+        dtype=None, merge=False, base_load_path=os.environ.get("JEVANY_BASE_LOAD_PATH"),
+    ))
     record, _ = to_record(SystemOneRequest.model_validate({
         "state": "The order was charged twice.",
         "questions": {
@@ -62,16 +64,27 @@ def test_checkpoint_load_matches_training_reconstruction():
     source = base_load_path or checkpoint.meta.base
     revision = None if base_load_path else checkpoint.meta.base_revision
     tokenizer = load_preprocessor(source, revision=revision, multimodal=checkpoint.meta.multimodal)
+    saved_args = checkpoint.meta.extra.get("args", {})
+    explicit_targets = saved_args.get("lora_target_modules", "")
+    if not explicit_targets:
+        explicit_targets = ",".join(sorted(checkpoint.adapter_config().get("target_modules", [])))
     trained = DecisionModel(
         source, tokenizer, "cuda", lora=checkpoint.meta.lora, revision=revision,
-        head_dim=checkpoint.meta.head_dim, option_isolation=checkpoint.meta.option_isolation,
+        head_dim=checkpoint.meta.head_dim, head_residual_dim=checkpoint.meta.head_residual_dim,
+        option_isolation=checkpoint.meta.option_isolation,
         special_embeddings=checkpoint.meta.special_embeddings,
-        lora_targets=checkpoint.meta.extra.get("args", {}).get("lora_targets", "all"),
+        lora_targets=saved_args.get("lora_targets", "all"),
+        lora_target_modules=explicit_targets,
+        lora_dropout=float(checkpoint.adapter_config().get("lora_dropout", 0.05)),
         dtype=torch.bfloat16 if checkpoint.meta.weights_dtype == "bf16" else torch.float32,
-        multimodal=checkpoint.meta.multimodal,
+        multimodal=checkpoint.meta.multimodal, backbone_adapter=checkpoint.meta.backbone_adapter,
+        branch_mode=checkpoint.meta.branch_mode, decision_mode=checkpoint.meta.decision_mode,
+        verbalizers=checkpoint.meta.verbalizers or None,
     )
     checkpoint.warm_start(trained, checkpoint.meta)
     trained.eval()
-    trained.head.temperature = 1.0
+    trained.temperature = 1.0
+    if trained.head is not None:
+        trained.head.temperature = 1.0
     trained_logits = trained.forward(trained.encode(tokenizer, record))[0].float().cpu()
     assert torch.equal(loaded_logits, trained_logits)
