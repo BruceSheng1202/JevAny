@@ -12,27 +12,27 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | <strong>简体中文</strong>
+  <a href="README.md">English</a> | <strong>简体中文</strong><br>
+  <a href="#快速上手">⚡ 快速上手</a> ·
+  <a href="#演示">🎮 演示</a> ·
+  <a href="#预训练模型">🤗 模型</a> ·
+  <a href="#评测">📊 评测</a> ·
+  <a href="#训练">🛠️ 训练</a> ·
+  <a href="#文档与贡献">📚 文档</a>
 </p>
+
+**JevAny 是面向决策模型训练与部署的开源 infra。** 你可以直接使用已发布模型，也可以用自己的数据训练，
+用于工单分流、工具选择和机器人动作决策。统一 API 接收状态、问题和候选选项，
+直接返回选择结果与各选项概率，无需生成答案文本。
 
 <p align="center">
-  <strong>将开源模型训练成决策模型，通过统一 API 部署到应用中。</strong><br>
-  输入状态、问题和候选选项，获取选择结果与各选项的概率。
+  <img src="docs/hero.png" alt="JevAny infra：决策模型训练、部署与应用集成" width="100%">
 </p>
-
-用 JevAny 分流客服工单、选择 Agent 的下一步工具，或决定机器人的下一个动作。
-你可以直接使用已发布模型，也可以用自己的标注数据训练。模型直接为给定选项打分，无需生成答案文本。
-
-<p align="center">
-  <img src="docs/hero.png" alt="基于开源基座训练决策模型，再通过统一 API 部署到应用中" width="100%">
-</p>
-
-[快速上手](#快速上手) · [演示](#演示) · [模型](#预训练模型) · [评测](#评测) · [训练](#训练) · [文档](#文档与贡献)
 
 ## 演示
 
 以下 30 个精选成功案例展示了 JevAny 在机器人、浏览器、软件、实验室和出行任务中的动作选择。
-这些案例由较早但接口兼容的模型录制。
+演示使用的模型是 `JevAny-27B-SFT`。
 
 [![JevAny 在机器人、浏览器、软件、实验室和出行任务中选择动作](docs/demos/jevany-cases.gif)](docs/CASES.md)
 
@@ -54,16 +54,14 @@ jevany demo
 ```
 
 打开 `http://127.0.0.1:8090`，点击 **Replay** 观看录制的运行过程。
-内置回放不需要 GPU、模型下载或推理服务；此安装也不会引入 PyTorch。
-在终端按 Ctrl+C 停止演示。
+只需 CPU 即可播放内置录制内容。在终端按 Ctrl+C 停止演示。
 
 以下命令均在仓库根目录运行，并使用上述虚拟环境。
 
 ### 给客服工单选择处理部门
 
-要运行模型，先安装推理依赖并启动已发布的 Qwen 4B 模型。
-此示例使用 CUDA GPU，需要容纳基座模型与运行开销的显存；详见
-[硬件与加载说明](docs/DEPLOYMENT.md#checkpoints-and-hardware)。
+安装推理依赖，在 CUDA GPU 上启动已发布的 Qwen 4B 模型。
+显存要求见[硬件与加载说明](docs/DEPLOYMENT.md#checkpoints-and-hardware)。
 
 ```bash
 python -m pip install -e '.[serve,multimodal]'
@@ -96,12 +94,12 @@ print("Probabilities:", answer["probabilities"])
 
 二分类问题使用 `Noul`，例如判断工单是否需要紧急处理；有序评分使用 `Score`，
 例如低、普通、高三个优先级。三类问题的完整格式见 [API 文档](docs/API.md)。
-也可以[在 Python 进程中直接加载模型](docs/DEPLOYMENT.md#python)，通过相同接口调用，
-无需启动 HTTP 服务。图片和视频输入需要[媒体配置](docs/DEPLOYMENT.md#native-media-and-limits)。
+进程内推理可以[在 Python 中加载模型](docs/DEPLOYMENT.md#python)，通过相同接口调用。
+图片和视频输入见[媒体配置](docs/DEPLOYMENT.md#native-media-and-limits)。
 
 ## 示例与测试环境
 
-交互演示包含以下三个环境。动图是较早兼容模型的加速回放，保留了模型的实际选择和原始选项概率。
+交互演示包含以下三个环境。动图展示 `JevAny-27B-SFT` 的加速回放，以及记录的动作和选项概率。
 
 ### [机械臂插孔](examples/README.md#robot-peg-insertion)
 
@@ -131,7 +129,7 @@ jevany demo --base-url http://127.0.0.1:8008 --text-only
 ```
 
 在浏览器中选择 **Run model** 让模型操作，或选择 **Play yourself** 自己操作。
-实时模型决策目前使用文本状态；机械臂控制需要单独的 `.[robotics]` 依赖。
+实时控制向模型发送文本状态；机械臂控制使用 `.[robotics]` 依赖。
 平台要求与环境接口见[演示指南](examples/README.md)，结合 LLM 规划器使用
 JevAny 决策可参考[集成文档](docs/INTEGRATIONS.md)。
 
@@ -184,7 +182,7 @@ NLL、Brier 和 ECE 均在 Kev Transfer-v9 上计算。
 ## 训练
 
 训练数据沿用推理时的 `state` 和 `questions`，为每个问题增加标签。
-随包提供的合成客服工单用于体验训练流程；为自己的应用训练时，请使用对应的标注数据。
+先用随包提供的合成客服工单开始训练，再换成自己的标注数据。
 
 入门配置在 CUDA 上以 BF16 训练 Qwen3.5-0.8B，结果写入 `runs/my-jev`：
 
@@ -207,9 +205,9 @@ jevany decide examples/request.json --checkpoint runs/my-jev
 CPU 配置、多模态数据和标准 `torchrun` 启动方式见[训练指南](docs/TRAINING.md)。
 训练图片或视频模型时，安装 `.[train,multimodal]`。
 
-### 尝试 RLCR
+### RLCR（实验功能）
 
-完成 SFT 后，可以继续使用兼顾正确率与概率校准的奖励训练。RLCR 目前属于实验功能：
+完成 SFT 后，可以继续使用兼顾正确率与概率校准的奖励训练：
 
 ```bash
 jevany train --config recipes/rlcr.toml
@@ -235,4 +233,4 @@ jevany train --config recipes/rlcr.toml
 [方法报告](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)及其
 [LaTeX 源文件](docs/JEVANY_METHOD_AND_ABLATIONS.tex)介绍了模型设计与实验。
 
-JevAny 独立于 Jev 和 TypeSafe，不包含 Jev 权重或私有实现。部分基础设施改编自 [Kev](https://github.com/jaredpalmer/kev)，归属说明见 [NOTICE](NOTICE) 和 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)。代码和入门数据采用 Apache-2.0；基础模型与上游数据集保留各自条款。
+代码和入门数据采用 Apache-2.0。部分组件改编自 [Kev](https://github.com/jaredpalmer/kev)，归属说明见 [NOTICE](NOTICE) 和 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)。基座模型与上游数据集保留各自条款。

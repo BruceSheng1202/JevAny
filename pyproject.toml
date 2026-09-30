@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jevany"
 version = "0.3.0"
-description = "Open infra for training and serving Jev-style decision models"
+description = "Open infra for decision model training and deployment"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]

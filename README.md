@@ -12,29 +12,28 @@
 </p>
 
 <p align="center">
-  <strong>English</strong> | <a href="README.zh-CN.md">简体中文</a>
+  <strong>English</strong> | <a href="README.zh-CN.md">简体中文</a><br>
+  <a href="#quickstart">⚡ Quickstart</a> ·
+  <a href="#demos">🎮 Demos</a> ·
+  <a href="#pretrained-models">🤗 Models</a> ·
+  <a href="#evaluation">📊 Results</a> ·
+  <a href="#training">🛠️ Training</a> ·
+  <a href="#documentation-and-contributing">📚 Docs</a>
 </p>
+
+**JevAny is open infra for decision model training and deployment.** Use a
+released model or train on your own data to route support tickets, select tools,
+or choose a robot's next action. One API takes the state, question and candidate
+options, then returns a choice and its probabilities without generating answer text.
 
 <p align="center">
-  <strong>Train and deploy decision models on open backbones.</strong><br>
-  Give JevAny a state, a question and candidate options. Get a choice and its probabilities through one API.
+  <img src="docs/hero.png" alt="JevAny infra for decision model training, deployment and application integration" width="100%">
 </p>
-
-Use JevAny to route support tickets, select an agent's next tool, or choose a
-robot's next action. Start with a released model, then train on your own labelled
-examples. The model scores the supplied options without generating answer text.
-
-<p align="center">
-  <img src="docs/hero.png" alt="Train a decision model on an open backbone, then deploy it through the same API in your applications" width="100%">
-</p>
-
-[Quickstart](#quickstart) · [Demos](#demos) · [Models](#pretrained-models) · [Results](#evaluation) · [Training](#training) · [Docs](#documentation-and-contributing)
 
 ## Demos
 
 These 30 selected successful runs show JevAny choosing actions across robotics,
-browser, software, laboratory and mobility tasks. We recorded them with an
-earlier compatible checkpoint.
+browser, software, laboratory and mobility tasks using `JevAny-27B-SFT`.
 
 [![JevAny choosing actions across robotics, browser, software, laboratory and mobility tasks](docs/demos/jevany-cases.gif)](docs/CASES.md)
 
@@ -57,16 +56,15 @@ jevany demo
 ```
 
 Open `http://127.0.0.1:8090` and choose **Replay** to watch a recorded run.
-The included replays need no GPU, model download or inference server; this
-installation does not install PyTorch. Press Ctrl+C in the terminal to stop.
+The bundled recordings play locally on CPU. Press Ctrl+C in the terminal to stop.
 
 Run the following commands from the repository root with this environment active.
 
 ### Route a support ticket
 
-To run a model yourself, install the serving dependencies and start the released
-Qwen 4B model. This example uses a CUDA GPU with enough memory for the base model
-and runtime; see the [hardware and loading guide](docs/DEPLOYMENT.md#checkpoints-and-hardware).
+Install the serving dependencies and start the released Qwen 4B model on a CUDA
+GPU. See the [hardware and loading guide](docs/DEPLOYMENT.md#checkpoints-and-hardware)
+for memory requirements.
 
 ```bash
 python -m pip install -e '.[serve,multimodal]'
@@ -101,16 +99,15 @@ for review when the decision is uncertain.
 
 Use `Noul` for yes/no questions, such as whether a ticket needs urgent review,
 and `Score` for ordered levels, such as low, normal and high priority.
-See the [API reference](docs/API.md) for all three question types, or
-[load a model in your Python process](docs/DEPLOYMENT.md#python) to use the same
-interface without an HTTP server. Image and video inputs require the
+See the [API reference](docs/API.md) for all three question types. For in-process
+inference, [load a model in Python](docs/DEPLOYMENT.md#python) and use the same
+interface. Image and video inputs use the
 [media setup](docs/DEPLOYMENT.md#native-media-and-limits).
 
 ## Examples & Test Environments
 
 The playground includes the three environments below. These GIFs show accelerated
-replays from an earlier compatible checkpoint, preserving its actual choices
-and original option probabilities.
+`JevAny-27B-SFT` replays with recorded actions and option probabilities.
 
 ### [Robot peg insertion](examples/README.md#robot-peg-insertion)
 
@@ -142,7 +139,7 @@ jevany demo --base-url http://127.0.0.1:8008 --text-only
 ```
 
 Choose **Run model** in the browser, or **Play yourself** to control the game.
-Live model runs currently use text state. Robot control needs the separate
+Live control sends text state to the model. Robot control uses the
 `.[robotics]` extra. See the [playground guide](examples/README.md) for platform
 requirements and environment APIs, or [integrations](docs/INTEGRATIONS.md) to
 combine JevAny decisions with an LLM planner.
@@ -198,8 +195,8 @@ NLL, Brier and ECE are measured on Kev Transfer-v9.
 ## Training
 
 Train on the same `state` and `questions` you send at inference, with a label
-for each question. The bundled synthetic support tickets demonstrate the
-workflow; use your own labelled data to train for your application.
+for each question. Start with the bundled synthetic support tickets, then
+train on your own labelled data.
 
 The starter recipe uses Qwen3.5-0.8B on CUDA with BF16 and writes `runs/my-jev`:
 
@@ -222,10 +219,9 @@ Pass `--data` to train on your own JSONL, or use
 See the [training guide](docs/TRAINING.md) for CPU settings, multimodal data and
 standard `torchrun` launches. For image/video training, install `.[train,multimodal]`.
 
-### Experiment with RLCR
+### RLCR (experimental)
 
-After SFT, you can continue training with rewards for correctness and probability
-calibration. RLCR is experimental:
+After SFT, continue training with rewards for correctness and probability calibration:
 
 ```bash
 jevany train --config recipes/rlcr.toml
@@ -253,4 +249,4 @@ To contribute a model adapter, evaluation or application example, start with the
 [method report](docs/JEVANY_METHOD_AND_ABLATIONS.pdf) and its
 [LaTeX source](docs/JEVANY_METHOD_AND_ABLATIONS.tex) describe the model design and experiments.
 
-JevAny is independent of Jev and TypeSafe and includes no Jev weights or private implementation. It includes infrastructure adapted from [Kev](https://github.com/jaredpalmer/kev); see [NOTICE](NOTICE) and [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md). Code and starter data are Apache-2.0. Base models and upstream datasets retain their own terms.
+Code and starter data are Apache-2.0. Some components are adapted from [Kev](https://github.com/jaredpalmer/kev); see [NOTICE](NOTICE) and [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md). Base models and upstream datasets retain their own terms.
