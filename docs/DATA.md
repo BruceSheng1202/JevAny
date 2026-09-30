@@ -106,9 +106,11 @@ When creating data:
 
 ## Current Release Scale
 
-The current five-model LoRA family was trained with supervised fine-tuning on
-**1,772,725 text records** containing **2,180,242 labelled decisions**. At a
-high level, the corpus covers:
+The five LoRA SFT releases listed in the README's Pretrained Models table
+belong to `model-family-v2`. They were trained with supervised fine-tuning on
+**1,772,725 text records** containing **2,180,242 labelled decisions**. See the
+[release metadata](../results/model-family-v2.json) for the recorded counts and
+model list. At a high level, the corpus covers:
 
 - preference and ranking decisions;
 - agent, tool-use, and action selection;
