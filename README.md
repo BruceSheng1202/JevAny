@@ -149,11 +149,11 @@ and use the same interface. For image and video inputs, follow the
 
 | Model | Readout | Intended use |
 |---|---|---|
-| <img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Gemma-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | Pointer | Compact Gemma release |
-| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Qwen3.5-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | Pointer | Compact, flexible choice count |
-| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Qwen3.5-4B-Direct-Token-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | Direct-token | Best released 4B JevBench accuracy |
-| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Qwen3.8-27B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | Default; highest released accuracy |
-| <img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Muse-Glimmer-30B-LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer alternative |
+| [<img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Gemma-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | Pointer | Compact Gemma release |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | Pointer | Compact, flexible choice count |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B-Direct-Token-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | Direct-token | Best released 4B JevBench accuracy |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.8-27B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | Default; highest released accuracy |
+| [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B-LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer alternative |
 
 These LoRA adapters were trained with SFT on 1,772,725 text records containing
 2,180,242 labelled decisions; see [training compute and experiments](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
@@ -180,16 +180,16 @@ Among 4B releases, direct-token leads on JevBench; pointer leads on Kev Transfer
 
 | Model | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
 |:---|---:|---:|---:|---:|---:|
-| <img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
-| <img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-27B | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
-| <img src="docs/model-logos/typesafe.png" width="24" height="24" align="middle" alt="">&nbsp;Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
-| <img src="docs/model-logos/laya.svg" width="24" height="24" align="middle" alt="">&nbsp;Laya | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
+| [<img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-4B](https://huggingface.co/jaredpalmer/kev-4b) | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
+| [<img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-27B](https://huggingface.co/jaredpalmer/kev-27b) | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
+| [<img src="docs/model-logos/typesafe.png" width="24" height="24" align="middle" alt="">&nbsp;Jev 1.13.0](https://docs.typesafe.ai/models) | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
+| [<img src="docs/model-logos/laya.svg" width="24" height="24" align="middle" alt="">&nbsp;Laya](https://huggingface.co/convaiinnovations/laya) | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
 | **JevAny releases** |  |  |  |  |  |
-| <img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;Gemma 4B LoRA | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
-| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;Qwen3.5 4B LoRA | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
-| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;Qwen3.5 4B Direct-Token LoRA | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
-| <img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
-| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
+| [<img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;Gemma 4B LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;Qwen3.5 4B LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;Qwen3.5 4B Direct-Token LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
+| [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;Muse Glimmer 30B LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**Qwen3.8 27B LoRA**](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
 NLL, Brier and ECE are measured on Kev Transfer-v9.
 
@@ -208,20 +208,20 @@ The playground includes the three environments below. These GIFs show accelerate
 
 Use a Franka gripper to grasp, align and insert a peg, checked by PyBullet contact physics.
 
-![Robot browser replay showing the Franka arm inserting a peg, recorded model probabilities and physical success checks](docs/demos/playground-arm.gif)
+[![Robot browser replay showing the Franka arm inserting a peg, recorded model probabilities and physical success checks](docs/demos/playground-arm.gif)](examples/README.md#robot-peg-insertion)
 
 ### 🔫 4.2 [Doom corridor · 3D](examples/README.md#doom-corridor-3d) <a name="doom-corridor-3d"></a>
 
 Clear the final room by defeating the enemies on the left and right, then move
 forward. The environment uses ViZDoom and the included Freedoom assets.
 
-![Doom checkpoint replay: kill both enemies, then advance](docs/demos/playground-doom.gif)
+[![Doom checkpoint replay: kill both enemies, then advance](docs/demos/playground-doom.gif)](examples/README.md#doom-corridor-3d)
 
 ### ⛏️ 4.3 [Crafter survival · 2D](examples/README.md#crafter-survival-2d) <a name="crafter-survival-2d"></a>
 
 Gather wood, craft tools and mine stone while managing health and supplies.
 
-![Crafter browser replay showing resource gathering, crafting actions and progress through four goal milestones](docs/demos/playground-crafter.gif)
+[![Crafter browser replay showing resource gathering, crafting actions and progress through four goal milestones](docs/demos/playground-crafter.gif)](examples/README.md#crafter-survival-2d)
 
 ### 🎮 4.4 Try the playground <a name="try-the-playground"></a>
 
@@ -253,7 +253,7 @@ combine JevAny decisions with an LLM planner.
 
 [Model IDs, supported inputs and setup requirements](docs/TRAINING.md#backbone-support).
 
-![26 supported models across Qwen, Gemma, Muse, Mistral, GLM, Nemotron and Llama](docs/supported-model-families.svg)
+[![26 supported models across Qwen, Gemma, Muse, Mistral, GLM, Nemotron and Llama](docs/supported-model-families.svg)](docs/TRAINING.md#backbone-support)
 
 ## 📚 6. Documentation and Contributing <a name="documentation-and-contributing"></a>
 
