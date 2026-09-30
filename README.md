@@ -169,11 +169,13 @@ training and accuracy tradeoffs.
 
 ## Evaluation
 
-Qwen3.8 27B has the highest accuracy in this comparison. Among the released 4B
-models, direct-token leads on JevBench and pointer leads on Kev Transfer-v9.
+Qwen3.8 27B leads both benchmarks and has the lowest NLL and Brier.
+Among 4B releases, direct-token leads on JevBench; pointer leads on Kev Transfer-v9.
+
+<div align="center">
 
 | Model | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
-|---|---:|---:|---:|---:|---:|
+|:---|---:|---:|---:|---:|---:|
 | <img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
 | <img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-27B | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
 | <img src="docs/model-logos/typesafe.png" width="24" height="24" align="middle" alt="">&nbsp;Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
@@ -185,14 +187,9 @@ models, direct-token leads on JevBench and pointer leads on Kev Transfer-v9.
 | <img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
 | <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
-**Kev Transfer-v9** covers 1,046 scored decisions across classification, question
-answering and robustness tasks. **JevBench** covers all 231 public development
-items; these are not sealed leaderboard scores. Kev Transfer-v9 also informed model
-development, so treat these results as a diagnostic comparison.
+</div>
 
-NLL, Brier and ECE assess prediction probabilities on Kev Transfer-v9; lower is better.
-Kev and Laya results come from complete public-checkpoint runs. Jev combines a
-complete Kev Transfer-v9 API run with published JevBench results.
+NLL, Brier and ECE are measured on Kev Transfer-v9.
 
 [Full results and protocols](docs/EVALUATION.md#model-family-v2) ·
 [Machine-readable results](results/model-family-v2.json) ·

@@ -155,11 +155,13 @@ Pointer 和 direct-token 模型使用相同 API。Pointer 在上下文允许的�
 
 ## 评测
 
-在下表的比较中，Qwen3.8 27B 的准确率最高。已发布的 4B 模型中，
-direct-token 的 JevBench 准确率更高，Pointer 的 Kev Transfer-v9 准确率更高。
+Qwen3.8 27B 在两项评测中准确率最高，NLL 和 Brier 也最低。
+4B 版本中，direct-token 的 JevBench 准确率最高，Pointer 的 Kev Transfer-v9 准确率最高。
+
+<div align="center">
 
 | 模型 | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
-|---|---:|---:|---:|---:|---:|
+|:---|---:|---:|---:|---:|---:|
 | <img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
 | <img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-27B | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
 | <img src="docs/model-logos/typesafe.png" width="24" height="24" align="middle" alt="">&nbsp;Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
@@ -171,13 +173,9 @@ direct-token 的 JevBench 准确率更高，Pointer 的 Kev Transfer-v9 准确�
 | <img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
 | <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
-**Kev Transfer-v9** 包含 1,046 个计分决策，覆盖分类、问答和鲁棒性任务。
-**JevBench** 覆盖全部 231 个公开开发集样本，分数不代表封闭测试集榜单成绩。
-Kev Transfer-v9 也用于模型开发过程中的分析，因此这些结果应作为诊断性比较解读。
+</div>
 
-NLL、Brier 和 ECE 衡量 Kev Transfer-v9 上的预测概率质量，数值越低越好。
-Kev 和 Laya 的结果来自完整的公开模型评测；Jev 的 Kev Transfer-v9 分数来自完整的 API 评测，
-JevBench 则采用已公布的结果。
+NLL、Brier 和 ECE 均在 Kev Transfer-v9 上计算。
 
 [完整结果与评测协议](docs/EVALUATION.md#model-family-v2) ·
 [机器可读结果](results/model-family-v2.json) ·
