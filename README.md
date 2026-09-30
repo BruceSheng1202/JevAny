@@ -96,7 +96,8 @@ jevany decide examples/request.json --checkpoint runs/my-jev
 Pass `--data` to train on your own [JSONL data](docs/DATA.md), or use
 [`recipes/finetune.toml`](recipes/finetune.toml) to adapt the released 27B model.
 See the [training guide](docs/TRAINING.md) for CPU settings, multimodal data and
-standard `torchrun` launches. For image/video training, install `.[train,multimodal]`.
+standard `torchrun` launches. For image/video training or fine-tuning the released
+27B model, install `.[train,multimodal]`.
 
 After SFT, you can continue with experimental [RLCR](docs/ALGORITHM.md#rlcr),
 which rewards correctness and probability calibration:

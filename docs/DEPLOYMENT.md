@@ -184,14 +184,18 @@ compatibility and the fields specific to JevAny.
 
 ## Checkpoints and hardware
 
-| Checkpoint | Role |
-|---|---|
-| `SimpleJev/JevAny-Gemma-4B-LoRA` | Gemma 4B pointer LoRA |
-| `SimpleJev/JevAny-Qwen3.5-4B-LoRA` | Qwen 4B pointer LoRA |
-| `SimpleJev/JevAny-Qwen3.5-4B-Direct-Token-LoRA` | Qwen 4B direct-token LoRA |
-| `SimpleJev/JevAny-Qwen3.8-27B-LoRA` | Default; highest-accuracy pointer LoRA |
-| `SimpleJev/JevAny-Muse-Glimmer-30B-LoRA` | Muse Glimmer 30B pointer LoRA |
-| A training output directory | Your own adapter and decision-readout metadata |
+| Checkpoint | Base model | Estimated BF16 weight memory |
+|---|---|---:|
+| `SimpleJev/JevAny-Gemma-4B-LoRA` | [google/gemma-4-E4B-it](https://huggingface.co/google/gemma-4-E4B-it) | ~16 GB |
+| `SimpleJev/JevAny-Qwen3.5-4B-LoRA` | [Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B) | ~8 GB |
+| `SimpleJev/JevAny-Qwen3.5-4B-Direct-Token-LoRA` | [Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B) | ~8 GB |
+| `SimpleJev/JevAny-Qwen3.8-27B-LoRA` (default) | [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B) | ~54 GB |
+| `SimpleJev/JevAny-Muse-Glimmer-30B-LoRA` | [meta-models/Muse-Glimmer-30B](https://huggingface.co/meta-models/Muse-Glimmer-30B) | ~59 GB |
+
+These estimates use two bytes per base parameter. Allow additional memory for
+the adapter and inference activations. Gemma E4B has about 8B total parameters
+including its embedding tables; E4B refers to its effective parameter count.
+For your own training output, use the parameter count of the base you selected.
 
 First loading downloads both the adapter and its separately distributed base,
 unless already cached.
@@ -199,8 +203,7 @@ Use `owner/repo@revision` to pin an adapter. For offline deployment, prepopulate
 the Hugging Face cache and set `HF_HUB_OFFLINE=1`. `JEVANY_BASE_LOAD_PATH` can point
 to a local base mirror while retaining the checkpoint's canonical provenance.
 
-The runtime loads one full backbone on one device. The released 27B model needs
-about 54 GB for BF16 base tensors alone, plus adapter and runtime memory.
+The runtime loads one full backbone on one device.
 CPU/MPS are available for backbones that fit, including smaller models you train.
 Quantization and model sharding are
 not implemented. BF16-trained checkpoints retain their recorded loading behavior.

@@ -79,10 +79,11 @@ computes logits for the supplied options.
 
 `--decision-mode lm_token` prefixes options with a frozen table of 255 distinct
 single-token labels and scores those labels through the base model's original
-frozen output head. It currently gives the strongest 4B result, but training is
-slower because cross-entropy is normalized over the full vocabulary. It supports
-at most 255 choices. Both readouts use one backbone prefill without answer-token
-generation, so their inference speed should be similar for comparable inputs.
+frozen output head. It gives the highest JevBench accuracy among the released 4B
+models, but training is slower because cross-entropy is normalized over the full
+vocabulary. It supports at most 255 choices. Both readouts use one backbone prefill
+without answer-token generation, so their inference speed should be similar for
+comparable inputs.
 
 ```bash
 jevany train --config recipes/sft.toml --decision-mode lm_token \
@@ -156,8 +157,7 @@ different checkpoint, `selection.json` records that path; the root directory
 always holds the final weights. Serve the selected path explicitly.
 
 SFT is the default recipe. RLCR is an experimental continuation with calibration
-rewards; its released version did not improve overall transfer accuracy.
-Measure task accuracy and calibration on your own held-out data before selecting
+rewards. Measure task accuracy and calibration on your own held-out data before selecting
 a checkpoint. See [the objective](ALGORITHM.md) and [release results](EVALUATION.md).
 
 ## Backbone support
