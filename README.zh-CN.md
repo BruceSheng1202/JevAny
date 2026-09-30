@@ -156,6 +156,8 @@ Pointer 和 direct-token 模型使用相同 API。Pointer 在上下文允许的�
 Qwen3.8 27B 在两项评测中准确率最高，NLL 和 Brier 也最低。
 4B 版本中，direct-token 的 JevBench 准确率最高，Pointer 的 Kev Transfer-v9 准确率最高。
 
+[![JevAny checkpoint 与基线模型按 Kev Transfer-v9 和 JevBench 的平均准确率排序](docs/evaluation-overview.svg)](docs/evaluation-overview.svg)
+
 <div align="center">
 
 | 模型 | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |

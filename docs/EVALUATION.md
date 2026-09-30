@@ -90,6 +90,19 @@ all 231 public development items. Exact suite hashes and unrounded metrics are i
 the machine-readable results. Release manifests, checkpoint-native reload reports,
 and GPU loader/reconstruction parity were checked before publishing.
 
+The [README comparison figure](evaluation-overview.svg) ranks models by the
+equal-weight mean of Kev Transfer-v9 and JevBench accuracy, using unrounded values.
+The ordering depends on these weights: at 4B, direct-token leads with equal suite
+weights, while pointer leads with equal item weights. The ranking does not imply
+statistical significance. Model icons and their sources are in
+[`model-logos/`](model-logos/checkpoint-sources.json).
+
+Regenerate the figure from the repository root with matplotlib and cairosvg installed:
+
+```bash
+python scripts/plot_evaluation_overview.py
+```
+
 [Machine-readable release results](../results/model-family-v2.json) ·
 [Historical results](#earlier-releases-and-evaluations) ·
 [Method and ablation report](JEVANY_METHOD_AND_ABLATIONS.pdf)

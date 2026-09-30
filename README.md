@@ -169,6 +169,8 @@ training and accuracy tradeoffs.
 Qwen3.8 27B leads both benchmarks and has the lowest NLL and Brier.
 Among 4B releases, direct-token leads on JevBench; pointer leads on Kev Transfer-v9.
 
+[![JevAny checkpoints and baselines ranked by mean accuracy on Kev Transfer-v9 and JevBench](docs/evaluation-overview.svg)](docs/evaluation-overview.svg)
+
 <div align="center">
 
 | Model | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
