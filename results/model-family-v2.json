@@ -16,7 +16,7 @@
     "hardware": "NVIDIA H200",
     "scope": "training through each released checkpoint; excludes ablations, evaluation, and later training",
     "calculation": "elapsed wall-clock hours multiplied by DDP world size",
-    "total_gpu_hours": 1422.5982218246077,
+    "total_gpu_hours": 2081.6701764987984,
     "maximum_parallel_gpus_per_run": 40,
     "models": {
       "SimpleJev/JevAny-Gemma-4B-LoRA": {
@@ -45,12 +45,13 @@
         "estimated": false
       },
       "SimpleJev/JevAny-Qwen3.8-27B-LoRA": {
-        "released_step": 22160,
+        "released_step": 44319,
         "parallel_gpus": 32,
-        "wall_seconds": 67800.68154883385,
-        "wall_hours": 18.83,
-        "gpu_hours": 602.7,
-        "estimated": false
+        "wall_seconds": 141946.27644968033,
+        "wall_hours": 39.43,
+        "gpu_hours": 1261.7,
+        "estimated": true,
+        "estimate_basis": "cumulative seconds-per-record telemetry at checkpoint"
       },
       "SimpleJev/JevAny-Muse-Glimmer-30B-LoRA": {
         "released_step": 3324,
@@ -119,15 +120,15 @@
     {
       "repository": "SimpleJev/JevAny-Qwen3.8-27B-LoRA",
       "readout": "pointer",
-      "transfer_v9_accuracy": 0.8575525812619503,
-      "transfer_v9_nll": 0.39249213352292833,
-      "transfer_v9_brier": 0.19963286508097494,
-      "transfer_v9_ece": 0.029761370312249628,
-      "jevbench_public_accuracy": 0.9047619047619048,
-      "jevbench_public_nll": 0.2700779841994909,
-      "jevbench_public_brier": 0.14524274675774457,
-      "jevbench_public_ece": 0.03592778378552166,
-      "jevbench_tiers": {"easy": 1.0, "original": 0.9861111111111112, "hard": 0.8108108108108109}
+      "transfer_v9_accuracy": 0.8604206500956023,
+      "transfer_v9_nll": 0.38782967075925884,
+      "transfer_v9_brier": 0.19524463105141282,
+      "transfer_v9_ece": 0.026304156956950514,
+      "jevbench_public_accuracy": 0.9004329004329005,
+      "jevbench_public_nll": 0.26504695855468874,
+      "jevbench_public_brier": 0.14556199524820898,
+      "jevbench_public_ece": 0.02122154456035335,
+      "jevbench_tiers": {"easy": 1.0, "original": 0.9722222222222222, "hard": 0.8108108108108109}
     },
     {
       "repository": "SimpleJev/JevAny-Muse-Glimmer-30B-LoRA",

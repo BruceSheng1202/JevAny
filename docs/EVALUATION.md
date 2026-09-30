@@ -24,7 +24,16 @@ and ECE in the main table are Transfer metrics; every run covers every item.
 | JevAny-Qwen3.5-4B | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
 | JevAny-Qwen3.5-4B-Direct-Token | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
 | JevAny-Muse-Glimmer-30B | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
-| **JevAny-Qwen3.8-27B** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
+| **JevAny-Qwen3.8-27B** | **86.04%** | **90.04%** | **0.388** | **0.195** | **0.026** |
+
+The 27B release uses step 44,319. Against the earlier step 22,160 checkpoint,
+it trades one JevBench answer for three additional Transfer answers and improves
+NLL on both suites:
+
+| Step | Transfer accuracy | Transfer NLL | JevBench accuracy | JevBench NLL | Correct across both |
+|---:|---:|---:|---:|---:|---:|
+| 22,160 | 85.76% | 0.392 | **90.48%** | 0.270 | 1,106 / 1,277 |
+| **44,319** | **86.04%** | **0.388** | 90.04% | **0.265** | **1,108 / 1,277** |
 
 ### Transfer breakdown
 
@@ -43,7 +52,7 @@ Columns are dataset or robustness-slice accuracy. Sample counts are respectively
 | JevAny-Qwen3.5-4B | 86.25 | 75.00 | 93.75 | 81.25 | 77.50 | 58.50 | 97.50 | 77.50 | 87.50 | 76.25 | 81.82 | 78.68 |
 | JevAny-Qwen3.5-4B-Direct-Token | 85.00 | 77.50 | **95.00** | 81.25 | 75.00 | 52.50 | **98.75** | 78.75 | 86.46 | 83.75 | 81.82 | 78.20 |
 | JevAny-Muse-Glimmer-30B | 81.25 | 77.50 | 92.50 | **83.75** | 83.75 | 61.00 | **98.75** | **82.50** | **95.83** | **98.75** | 90.91 | 83.46 |
-| **JevAny-Qwen3.8-27B** | **90.00** | **86.25** | **95.00** | **83.75** | 86.25 | 68.00 | 97.50 | 78.75 | 90.62 | 97.50 | 92.73 | **85.76** |
+| **JevAny-Qwen3.8-27B** | **91.25** | **86.25** | 91.25 | **85.00** | 87.50 | 67.50 | 97.50 | 81.25 | 89.58 | **98.75** | 94.55 | **86.04** |
 
 `Buried` tests hidden instructions; `Comp.` tests AND/OR/conditional composition;
 `Policy` contrasts authorization/deadline rules; `Ctrl.` contains 11 knowable
@@ -63,7 +72,7 @@ policy controls. Values are percentages.
 | JevAny-Qwen3.5-4B | **100.00%** | 95.83% | 61.26% | 80.09% |
 | JevAny-Qwen3.5-4B-Direct-Token | **100.00%** | 98.61% | 61.26% | 80.95% |
 | JevAny-Muse-Glimmer-30B | **100.00%** | 97.22% | 75.68% | 87.45% |
-| **JevAny-Qwen3.8-27B** | **100.00%** | 98.61% | **81.08%** | **90.48%** |
+| **JevAny-Qwen3.8-27B** | **100.00%** | 97.22% | **81.08%** | **90.04%** |
 
 The direct-token 4B model leads the released 4B models on JevBench, while the
 pointer 4B model is slightly better on Transfer. Kev and Laya use complete local
@@ -115,9 +124,9 @@ python scripts/plot_evaluation_overview.py
 | JevAny-Qwen3.5-4B | 13,850 | 32 H200 | 10.33 h | 330.6 |
 | JevAny-Qwen3.5-4B-Direct-Token | 9,695 | 32 H200 | 8.41 h | 269.1 |
 | JevAny-Muse-Glimmer-30B | 3,324 | 40 H200 | 2.88 h | 115.4 |
-| JevAny-Qwen3.8-27B | 22,160 | 32 H200 | 18.83 h | 602.7 |
+| JevAny-Qwen3.8-27B | 44,319 | 32 H200 | 39.43 h | 1,261.7 |
 
-The five released checkpoints represent approximately **1,423 H200 GPU-hours**
+The five released checkpoints represent approximately **2,082 H200 GPU-hours**
 of training, with at most 40 GPUs used in parallel within one run. GPU-hours are
 elapsed training time through the released checkpoint multiplied by the DDP
 world size; ablations, evaluation, and training after a selected checkpoint are

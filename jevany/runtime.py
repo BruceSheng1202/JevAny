@@ -61,6 +61,9 @@ class DecisionRuntime:
                 "decision_mode": self.checkpoint.meta.decision_mode,
                 "backbone_adapter": self.model.backbone_adapter,
                 "branch_mode": self.model.branch_mode,
+                "acceleration": getattr(self.model, "inference_acceleration", {
+                    "compile_mode": None, "lora_merged": False, "approximate_bf16_merge": False,
+                }),
                 "capabilities": asdict(capabilities), "limits": self.limits,
                 "prefix_cache": {
                     "enabled": self.inference_options.prefix_cache_size > 0 and capabilities.prefix_cache,

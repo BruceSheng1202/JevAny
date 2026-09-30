@@ -50,6 +50,7 @@ def model_card(args, metadata):
     mode = metadata["decision_mode"]
     readout = "direct-token" if mode == "lm_token" else "pointer"
     limit = "255 choices" if mode == "lm_token" else "more than 255 choices (subject to context limits)"
+    checkpoint = f" The released weights are from training step {metadata['checkpoint_step']:,}." if metadata.get("checkpoint_step") else ""
     return f"""---
 base_model: {args.base}
 library_name: peft
@@ -64,7 +65,7 @@ tags:
 
 Official JevAny LoRA checkpoint using the **{readout}** readout on
 [`{args.base}`](https://huggingface.co/{args.base}). It requires the JevAny code
-at the release revision linked from the [project repository](https://github.com/SimpleJev/JevAny).
+at the release revision linked from the [project repository](https://github.com/SimpleJev/JevAny).{checkpoint}
 
 ## Evaluation
 
@@ -171,6 +172,7 @@ def main(argv=None):
         "weights_dtype": original.get("weights_dtype", "fp32"),
         "decision_mode": mode,
         "verbalizers": original.get("verbalizers") or [],
+        "checkpoint_step": int(original.get("optimizer_step", 0)),
         "temperature": float(original.get("temperature", 1.0)),
         "holdout": [],
         "args": {key: old_args[key] for key in SAFE_ARGUMENTS if key in old_args},

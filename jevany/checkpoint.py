@@ -12,6 +12,7 @@ This is the one place that knows the layout of `head.pt` and how a checkpoint be
 import json
 import os
 import re
+from importlib import metadata as importlib_metadata
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -21,6 +22,39 @@ from .model import DecisionModel, load_preprocessor
 from .backbones import get_backbone_adapter
 
 HUB_ID = re.compile(r"[\w.-]+/[\w.-]+(@[\w.-]+)?")
+COMPILE_MODES = frozenset({"default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs"})
+
+
+def _compile_mode(value):
+    value = str(value or "").strip().lower()
+    if value in ("", "0", "false", "off", "no"):
+        return None
+    if value in ("1", "true", "on", "yes"):
+        return "reduce-overhead"
+    if value not in COMPILE_MODES:
+        raise ValueError(f"JEVANY_COMPILE must be 0, 1, or one of {sorted(COMPILE_MODES)}")
+    return value
+
+
+def _check_compile_runtime():
+    """Reject a mismatched Torch/Triton pair before an expensive model load."""
+    from packaging.requirements import Requirement
+    try:
+        installed = importlib_metadata.version("triton")
+    except importlib_metadata.PackageNotFoundError as error:
+        raise ValueError("torch.compile on CUDA requires the Triton version declared by torch") from error
+    requirements = importlib_metadata.requires("torch") or ()
+    for value in requirements:
+        requirement = Requirement(value)
+        if requirement.name.casefold() != "triton":
+            continue
+        if requirement.marker is not None and not requirement.marker.evaluate():
+            continue
+        if installed not in requirement.specifier:
+            raise ValueError(
+                f"torch.compile is disabled: torch requires {requirement}, but Triton {installed} is installed"
+            )
+        return
 
 
 def is_hub_id(run):
@@ -101,6 +135,8 @@ class LoadOptions:
     temperature  None = the temperature the checkpoint carries (fitted by scripts/calibrate_checkpoint.py); 1.0 = raw logits.
     base_load_path
                  optional node-local mirror for base-model I/O. Checkpoint metadata still names the canonical base.
+    merge_bf16   allow the faster but slightly approximate merge of a LoRA adapter into BF16 base weights.
+    compile_mode opt into torch.compile. ``reduce-overhead`` also enables CUDA Graphs for compatible graph segments.
     """
     dtype: torch.dtype | None = None
     merge: bool = True
@@ -108,16 +144,23 @@ class LoadOptions:
     lora_scale: float = 1.0
     temperature: float | None = None
     base_load_path: str | None = None
+    merge_bf16: bool = False
+    compile_mode: str | None = None
+
+    def __post_init__(self):
+        if self.compile_mode not in (None, *COMPILE_MODES):
+            raise ValueError(f"compile_mode must be one of {sorted(COMPILE_MODES)}")
 
     @classmethod
     def from_env(cls, env=os.environ):
-        """Read JEVANY_DTYPE, JEVANY_MERGE, JEVANY_ATTN, JEVANY_LORA_SCALE,
-        JEVANY_TEMPERATURE, and JEVANY_BASE_LOAD_PATH at command-line entry points."""
+        """Read checkpoint loading and optional inference acceleration settings."""
         return cls(dtype={"bf16": torch.bfloat16, "fp16": torch.float16}.get(env.get("JEVANY_DTYPE", "")),
                    merge=env.get("JEVANY_MERGE", "1") != "0", attn=env.get("JEVANY_ATTN") or None,
                    lora_scale=float(env.get("JEVANY_LORA_SCALE", "1")),
                    temperature=float(env["JEVANY_TEMPERATURE"]) if env.get("JEVANY_TEMPERATURE") else None,
-                   base_load_path=env.get("JEVANY_BASE_LOAD_PATH") or None)
+                   base_load_path=env.get("JEVANY_BASE_LOAD_PATH") or None,
+                   merge_bf16=env.get("JEVANY_MERGE_BF16", "0") == "1",
+                   compile_mode=_compile_mode(env.get("JEVANY_COMPILE")))
 
 
 class Checkpoint:
@@ -134,11 +177,16 @@ class Checkpoint:
 
     def load(self, device, opts=LoadOptions()):
         """Return an eval model with its LoRA and configured decision readout loaded."""
+        if opts.compile_mode:
+            if not str(device).startswith("cuda"):
+                raise ValueError("torch.compile acceleration is supported only on CUDA")
+            _check_compile_runtime()
         meta = self.meta
         dtype, merge = opts.dtype or torch.float32, opts.merge
         if meta.weights_dtype == "bf16":
-            # Keep a fp32 adapter unmerged when the checkpoint was trained over a bf16 backbone.
-            dtype, merge = torch.bfloat16, False
+            # The exact path keeps the FP32 adapter separate from BF16 base weights.
+            # An explicit fast-mode opt-in permits the lossy BF16 merge.
+            dtype, merge = torch.bfloat16, merge and opts.merge_bf16
         source, revision = meta.base, meta.base_revision
         if opts.base_load_path:
             if not Path(opts.base_load_path).is_dir():
@@ -190,6 +238,13 @@ class Checkpoint:
         m.temperature = meta.temperature if opts.temperature is None else opts.temperature
         if m.head is not None:
             m.head.temperature = m.temperature
+        m.inference_acceleration = {
+            "compile_mode": opts.compile_mode,
+            "lora_merged": bool(merge),
+            "approximate_bf16_merge": bool(merge and meta.weights_dtype == "bf16"),
+        }
+        if opts.compile_mode:
+            m.lm.compile(mode=opts.compile_mode, fullgraph=False, dynamic=True)
         return tok, m
 
     COMPAT_FIELDS = ("base", "base_revision", "lora", "head_dim", "head_residual_dim", "head_type",

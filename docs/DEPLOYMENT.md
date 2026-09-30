@@ -135,6 +135,37 @@ environment when loading. Invalid values fail before weights load. Weight-loadin
 controls remain in `jevany.checkpoint.LoadOptions`, shared with training and
 evaluation.
 
+### Optional CUDA acceleration
+
+The exact BF16 path keeps LoRA weights separate. For latency-sensitive serving,
+merge them into the BF16 backbone at load time:
+
+```bash
+JEVANY_MERGE_BF16=1 jevany serve \
+  --checkpoint SimpleJev/JevAny-Qwen3.8-27B-LoRA --device cuda --dtype bf16
+```
+
+On one H200, this reduced warmed Qwen3.8-27B forward latency by 31–33% in the
+measured short and long requests. The merge changes BF16 rounding: in the full
+release checks it changed two predictions on each of Transfer-v9 and public
+JevBench. Leave it disabled when reproducing published metrics.
+
+`torch.compile` is also opt-in. Its `reduce-overhead` mode uses CUDA Graphs for
+compatible graph segments:
+
+```bash
+JEVANY_COMPILE=reduce-overhead jevany serve \
+  --checkpoint SimpleJev/JevAny-Qwen3.5-4B-LoRA --device cuda --dtype bf16
+```
+
+Compilation requires the Triton version declared by the installed PyTorch
+package. JevAny checks that pair before loading model weights. The first request
+can spend about a minute compiling, and new shapes may trigger more work. In the
+H200 measurements it improved warmed 4B forwards by roughly 15–21%, but did not
+materially improve 27B latency. Use it for a persistent 4B service with recurring
+shapes, not for short evaluation jobs. Set `JEVANY_COMPILE=default` to compile
+without requesting CUDA Graphs, or `JEVANY_COMPILE=0` to disable compilation.
+
 ## A lightweight HTTP client
 
 The base package installs the schema, HTTP client and starter-data tools without

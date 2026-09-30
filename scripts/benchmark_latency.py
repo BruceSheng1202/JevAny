@@ -136,6 +136,7 @@ def main(argv=None):
             "dtype": str(options.dtype) if options.dtype else "checkpoint",
             "merge": options.merge, "attn": options.attn,
             "lora_scale": options.lora_scale, "temperature": options.temperature,
+            "merge_bf16": options.merge_bf16, "compile_mode": options.compile_mode,
         },
     )
     target.parent.mkdir(parents=True, exist_ok=True)
