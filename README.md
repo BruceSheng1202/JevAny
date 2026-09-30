@@ -13,12 +13,12 @@
 
 <p align="center">
   <strong>🇺🇸 English</strong> | <a href="README.zh-CN.md">🇨🇳 简体中文</a><br>
-  <a href="#quickstart">⚡ Quickstart</a> ·
+  <strong><a href="#quickstart">⚡ Quickstart</a> ·
   <a href="#demos">🎮 Demos</a> ·
   <a href="#pretrained-models">🤗 Models</a> ·
   <a href="#evaluation">📊 Results</a> ·
   <a href="#training">🛠️ Training</a> ·
-  <a href="#documentation-and-contributing">📚 Docs</a>
+  <a href="#documentation-and-contributing">📚 Docs</a></strong>
 </p>
 
 **JevAny is open infra for decision model training and deployment.** Use a

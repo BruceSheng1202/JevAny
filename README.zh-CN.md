@@ -13,12 +13,12 @@
 
 <p align="center">
   <a href="README.md">🇺🇸 English</a> | <strong>🇨🇳 简体中文</strong><br>
-  <a href="#快速上手">⚡ 快速上手</a> ·
+  <strong><a href="#快速上手">⚡ 快速上手</a> ·
   <a href="#演示">🎮 演示</a> ·
   <a href="#预训练模型">🤗 模型</a> ·
   <a href="#评测">📊 评测</a> ·
   <a href="#训练">🛠️ 训练</a> ·
-  <a href="#文档与贡献">📚 文档</a>
+  <a href="#文档与贡献">📚 文档</a></strong>
 </p>
 
 **JevAny 是面向决策模型训练与部署的开源 infra。** 你可以直接使用已发布模型，也可以用自己的数据训练，
