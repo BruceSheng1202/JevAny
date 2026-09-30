@@ -1,0 +1,599 @@
+% Build with: latexmk -xelatex JEVANY_METHOD_AND_ABLATIONS.tex
+\documentclass[10pt]{article}
+
+\usepackage{fontspec}
+\setmainfont{DejaVu Sans}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}
+\usepackage{unicode-math}
+\setmathfont{Latin Modern Math}
+\usepackage[letterpaper,margin=0.72in,headheight=15pt]{geometry}
+\usepackage{booktabs,array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{navy}{HTML}{101A35}
+\definecolor{blue}{HTML}{2563EB}
+\definecolor{cyan}{HTML}{06B6D4}
+\definecolor{violet}{HTML}{7C3AED}
+\definecolor{mint}{HTML}{10B981}
+\definecolor{amber}{HTML}{F59E0B}
+\definecolor{ink}{HTML}{172033}
+\definecolor{muted}{HTML}{5F6B7A}
+\definecolor{paper}{HTML}{F7F9FC}
+\definecolor{line}{HTML}{D9E1EC}
+\definecolor{softblue}{HTML}{EEF4FF}
+\definecolor{softmint}{HTML}{ECFDF5}
+\definecolor{softamber}{HTML}{FFF7E6}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=violet,
+  pdftitle={JevAny: Method, Training, and Ablation Report},
+  pdfauthor={JevAny contributors}
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\renewcommand{\arraystretch}{1.16}
+
+\makeatletter
+\renewcommand\section{\@startsection{section}{1}{\z@}%
+  {-3.0ex \@plus -1ex \@minus -.2ex}{1.4ex \@plus .2ex}%
+  {\color{navy}\Large\bfseries}}
+\renewcommand\subsection{\@startsection{subsection}{2}{\z@}%
+  {-2.4ex \@plus -1ex \@minus -.2ex}{.8ex \@plus .2ex}%
+  {\color{blue}\large\bfseries}}
+\makeatother
+
+\pagestyle{plain}
+
+\newcommand{\good}[1]{\textcolor{mint!60!black}{\textbf{#1}}}
+\newenvironment{summarybox}{%
+  \par\medskip\noindent\begin{center}\begin{minipage}{.94\linewidth}%
+  \color{ink}\textcolor{blue}{\rule{3pt}{\baselineskip}}\hspace{7pt}%
+}{\end{minipage}\end{center}\medskip}
+
+\begin{document}
+
+\begin{titlepage}
+\pagecolor{navy}\color{white}
+
+\vspace*{1.30in}
+{\color{cyan}\rule{\textwidth}{5pt}\par}\vspace{0.32in}
+{\color{white}\fontsize{36}{39}\selectfont\bfseries JevAny\par}
+\vspace{0.16in}
+{\color{white}\fontsize{21}{25}\selectfont Method, Training, and Ablation Report\par}
+\vspace{0.22in}
+{\color{cyan!35}\large One decision interface across open language-model backbones\par}
+
+\vfill
+\noindent\fcolorbox{white!22}{navy}{\begin{minipage}{.78\textwidth}\color{white}\vspace{5pt}
+\textbf{Release snapshot} \hfill 30 September 2026\\[4pt]
+Five open LoRA checkpoints $\cdot$ Pointer and direct-token readouts $\cdot$
+Transfer and JevBench evaluation $\cdot$ Reproducible training telemetry
+\vspace{5pt}\end{minipage}}\par
+\vspace{0.22in}
+{\color{white!68}\small
+Repository: \href{https://github.com/SimpleJev/JevAny}{github.com/SimpleJev/JevAny}\\
+Models: \href{https://huggingface.co/collections/tianxinwei/jevany-adaptive-decision-systems-6ab2c941bcecb4d2c61d1326}{JevAny model collection}\par}
+\end{titlepage}
+\nopagecolor\color{ink}
+
+\tableofcontents
+\clearpage
+
+\section{Executive summary}
+
+\begin{summarybox}
+\textbf{JevAny turns a language-model backbone into a bounded decision model.}
+It consumes a shared state, one or more questions, and explicit candidate answers;
+it returns a normalized distribution over the supplied candidates without decoding
+answer text. The current release trains rank-8 LoRA adapters in BF16 with a
+cross-entropy objective and either a residual pointer head or a direct-token
+readout. The strongest released model, Qwen3.8 27B LoRA, reaches
+\textbf{85.76\% Transfer accuracy} and \textbf{90.48\% JevBench accuracy}.
+\end{summarybox}
+
+The release family spans Gemma 4B, Qwen3.5 4B, Qwen3.8 27B, and Muse Glimmer
+30B. The training corpus contains \textbf{1,772,725 text records} and
+\textbf{2,180,242 labelled decisions} across preference, agent/tool decision,
+reasoning, classification, and safety tasks. This report describes aggregate
+scale and task families only.
+
+The ablation program did not treat one short sweep as a universal truth. It used
+fixed-step screens, held-out calibration, paired record-group bootstrap intervals,
+explicit promotion gates, and full-run confirmation. Several locally attractive
+ideas---pure InfoNCE, supervised Brier regularization, RLCR variants, targeted
+mixture changes, and dual-tower alternatives---were not promoted when their
+predeclared gates failed.
+
+\section{Problem formulation}
+
+For a state $s$, question $q$, and explicit choices
+$\mathcal{C}=\{c_1,\ldots,c_K\}$, JevAny predicts
+\[
+  p(y=i\mid s,q,\mathcal{C}), \qquad i\in\{1,\ldots,K\}.
+\]
+Unlike a chat model, it does not generate a free-form answer and then parse it.
+The candidate set is part of the model input, and the output is already a
+probability simplex suitable for ranking, confidence thresholds, or downstream
+control.
+
+\begin{center}
+\fcolorbox{line}{paper}{\parbox[c][12mm][c]{25mm}{\centering\bfseries State +\\question + choices}}
+$\;\longrightarrow\;$
+\fcolorbox{blue!25}{softblue}{\parbox[c][12mm][c]{25mm}{\centering\bfseries Structured\\causal encoding}}
+$\;\longrightarrow\;$
+\fcolorbox{blue!25}{softblue}{\parbox[c][12mm][c]{22mm}{\centering\bfseries Frozen LM\\+ LoRA}}
+$\;\longrightarrow\;$
+\fcolorbox{mint!30}{softmint}{\parbox[c][12mm][c]{25mm}{\centering\bfseries Decision\\readout}}
+$\;\longrightarrow\;$
+\fcolorbox{mint!30}{softmint}{\parbox[c][12mm][c]{20mm}{\centering\bfseries $p(c_i)$}}
+\end{center}
+
+\subsection{Structured causal input}
+
+The text layout is
+\[
+\langle\mathrm{state}\rangle\;s\;
+\langle\mathrm{question}\rangle\;q\;
+\prod_{i=1}^{K}\bigl(\langle\mathrm{option}\rangle\;c_i\;
+\langle/\mathrm{option}\rangle\bigr)\;
+\langle\mathrm{decide}\rangle.
+\]
+User text is escaped so it cannot forge control delimiters. When a backbone has
+validated custom-mask support, questions may be packed with a block-causal mask.
+Recurrent, sliding-window, and other unsupported architectures instead receive
+independent causal rows that repeat the shared state. This preserves
+question-level isolation across backbone families.
+
+\subsection{Pointer readout}
+
+Let $h_d$ be the hidden state at the decision marker and $h_i$ the state at the
+closing marker of option $i$. With pointer width $d_p=256$,
+\[
+ q_d=W_qh_d+b_q,\qquad k_i=W_kh_i+b_k,\qquad
+ z_i=\frac{k_i^\top q_d}{\sqrt{d_p}}.
+\]
+The released pointer checkpoints add a zero-output-initialized residual scorer,
+\[
+ z_i\leftarrow z_i+w_2^\top\operatorname{GELU}(W_1(k_i\odot q_d)+b_1)+b_2,
+\]
+where the residual width is 256. Softmax is applied only across the options in
+the request. Consequently, the head has no fixed option-vocabulary ceiling; the
+practical choice limit is the model context window.
+
+\subsection{Direct-token readout}
+
+Direct-token mode prefixes candidates with a deterministic table of distinct,
+round-tripping single-token labels. At the decision marker, the frozen base LM
+head produces full-vocabulary logits $v$ and training minimizes
+\[
+  \mathcal{L}_{\mathrm{DT}}=-\sum_{i=1}^{K}t_i
+  \log\operatorname{softmax}(v)_{\nu_i},
+\]
+where $\nu_i$ is the vocabulary ID assigned to option $i$. Inference selects
+the $K$ candidate logits and renormalizes them. The released implementation
+supports up to 255 candidates.
+
+\begin{summarybox}
+\textbf{Pointer vs direct-token at a glance}\par\smallskip
+\begin{tabular}{>{\bfseries}p{.18\linewidth}p{.36\linewidth}p{.36\linewidth}}
+\toprule
+ & Pointer & Direct-token \\
+\midrule
+Scoring & Learned query--option compatibility & Frozen LM head over fixed label tokens \\
+Training & Candidate-only softmax; efficient & Full-vocabulary normalization; slower \\
+Choices & More than 255, context permitting & Up to 255 \\
+Inference & One backbone prefill, no decoding & One backbone prefill, no decoding \\
+Observed 4B result & Better Transfer: 78.68\% & Better JevBench: 80.95\% \\
+\bottomrule
+\end{tabular}
+\end{summarybox}
+
+Both paths have similar expected inference latency for comparable inputs because
+neither autoregressively generates an answer. In the complete Qwen 4B training
+trajectory, direct-token consumed 381.9 H200 GPU-hours versus 330.6 for pointer,
+about 15.5\% more; the released direct-token checkpoint was selected earlier in
+that trajectory.
+
+\section{Training method}
+
+\subsection{Supervised objective}
+
+For a hard label $y$, the default objective is
+\[
+  \mathcal{L}_{\mathrm{CE}}=-\log p_y.
+\]
+For a normalized soft target $t$, it becomes
+\[
+  \mathcal{L}_{\mathrm{soft}}=-\sum_i t_i\log p_i.
+\]
+The release runs use CE, rank-8 LoRA over the backbone's supported linear
+projections, zero LoRA dropout, a one-cycle learning-rate schedule, BF16 weights
+and autocast, and seed 0. Pointer models train the 256-dimensional residual head
+alongside LoRA. Direct-token freezes the original LM head and trains only the
+adapter path.
+
+\subsection{Optional research objectives}
+
+The training code also supports contrastive terms, supervised Brier penalties,
+and an experimental calibration-aware policy stage. These were ablated, but are
+not part of the five current releases.
+
+For RLCR, noisy logit proposals $z'=z+\epsilon$ use
+$\epsilon\sim\mathcal{N}(0,\sigma^2I)$ after per-proposal mean centering. If
+$a=\arg\max_i\operatorname{softmax}(z')_i$, confidence is
+$q=\operatorname{softmax}(z')_a$, correctness is $c=t_a$, and reward is
+\[
+  r(c,q)=c-(q-c)^2.
+\]
+A group-relative advantage multiplies the Gaussian location score, while a CE
+anchor limits decision drift. This is policy optimization over perturbed decision
+logits; it is not token-level GRPO and does not generate reasoning rollouts.
+
+\subsection{Production release recipe}
+
+\begin{tabular}{p{.30\linewidth}rrrrr}
+\toprule
+Model & Readout & LoRA & Global batch & GPUs & Released step \\
+\midrule
+Gemma 4B & Pointer & 8 & 384 & 32 & 2,771 \\
+Qwen3.5 4B & Pointer & 8 & 128 & 32 & 13,850 \\
+Qwen3.5 4B & Direct-token & 8 & 128 & 32 & 9,695 \\
+Muse Glimmer 30B & Pointer & 8 & 160 & 40 & 3,324 \\
+Qwen3.8 27B & Pointer & 8 & 32 & 32 & 22,160 \\
+\bottomrule
+\end{tabular}
+
+All five runs use one epoch, learning rate $5\times10^{-5}$, weight decay 0.01,
+BF16 training, gradient checkpointing, and LoRA targets resolved from the loaded
+architecture. The release data scale is fixed at 1,772,725 text records and
+2,180,242 labelled decisions.
+
+\section{Evaluation protocol}
+
+\subsection{Suites}
+
+\begin{itemize}
+  \item \textbf{Transfer} contains 1,046 clean, knowable decisions spanning seven
+  cross-domain datasets and four robustness slices. Every reported run covers all
+  1,046 scored items.
+  \item \textbf{JevBench} contains all 231 items in the frozen public development
+  conversion. These numbers are public-development scores, not sealed leaderboard
+  results.
+\end{itemize}
+
+Transfer accuracy is an item-level mean. NLL, multiclass Brier score, and
+10-bin ECE use the candidate probabilities. A scalar temperature is fit on a
+separate calibration partition by micro NLL and then applied unchanged to the
+evaluation rows. Temperature scaling cannot change argmax accuracy.
+
+For controlled ablations, comparisons use identical rows and option order.
+Uncertainty is estimated by paired, source-stratified record-group bootstrap;
+sibling questions remain together. Registered studies use 2,000 or 5,000
+resamples and apply explicit non-inferiority and calibration-improvement gates.
+
+\subsection{Released model results}
+
+\begin{tabular}{p{.32\linewidth}rrrrr}
+\toprule
+Model & Transfer $\uparrow$ & JevBench $\uparrow$ & NLL $\downarrow$ & Brier $\downarrow$ & ECE $\downarrow$ \\
+\midrule
+Gemma 4B LoRA & 70.84 & 77.49 & 0.706 & 0.369 & 0.056 \\
+Qwen3.5 4B LoRA & 78.68 & 80.09 & 0.587 & 0.297 & 0.035 \\
+Qwen3.5 4B Direct-Token & 78.20 & 80.95 & 0.564 & 0.291 & \good{0.029} \\
+Muse Glimmer 30B LoRA & 83.46 & 87.45 & 0.464 & 0.229 & 0.032 \\
+Qwen3.8 27B LoRA & \good{85.76} & \good{90.48} & \good{0.392} & \good{0.200} & 0.030 \\
+\bottomrule
+\end{tabular}
+
+All accuracy values are percentages. NLL, Brier, and ECE are Transfer metrics.
+Unrounded values and suite hashes live in
+\href{https://github.com/SimpleJev/JevAny/blob/main/results/model-family-v2.json}{the machine-readable release record}.
+
+\section{Ablation program}
+
+\subsection{Process and safeguards}
+
+The ablation program used a funnel rather than repeatedly tuning on a final
+headline number:
+
+\begin{enumerate}
+  \item \textbf{Register} the arm, frozen inputs, causal comparison step, metrics,
+  and promotion gate before training.
+  \item \textbf{Audit step zero} for identical predictions or initialized weights
+  whenever an arm reuses a parent.
+  \item \textbf{Screen at fixed budget} so capacity, head, readout, and objective
+  candidates receive matched exposure.
+  \item \textbf{Recalibrate independently} on held-out calibration rows; never fit
+  temperature on Transfer or JevBench.
+  \item \textbf{Compare paired rows} with group bootstrap intervals and reject an
+  arm if either accuracy non-inferiority or calibration improvement fails.
+  \item \textbf{Confirm at scale}; a short-screen winner does not automatically
+  become the release recipe.
+\end{enumerate}
+
+This distinction matters: the early 4B sweep favored rank 32, query-mean, and a
+small contrastive weight by aggregate rank at its fixed causal checkpoint. The
+separate full model-family runs use rank 8, decision-marker/option-close, and CE,
+which is the configuration recorded by the published checkpoints.
+
+\subsection{Integrity-only outcomes}
+
+Not every execution became scientific evidence. One CE-path isolation run was
+marked invalid after its parity audit and is excluded from all conclusions.
+Capacity probes, failed launches, and telemetry-recovery jobs likewise do not
+enter the result tables. A post-terminal audit also found that two early reviews
+had reported raw rather than temperature-scaled NLL because saved logits took
+precedence over calibrated probabilities in the metric helper. The amended NLL
+values are used here; accuracy, Brier, ECE, promotion gates, and selected arms
+were verified unchanged.
+
+\subsection{Pointer-head structure}
+
+A controlled 250-step screen compared the dot-product head, an MLP scorer, and
+a zero-initialized residual correction. The table shows calibrated development
+metrics over 904 decisions.
+
+\begin{tabular}{p{.29\linewidth}rrrrr}
+\toprule
+Head & Accuracy $\uparrow$ & NLL $\downarrow$ & Brier $\downarrow$ & ECE $\downarrow$ & Parameters \\
+\midrule
+Linear pointer & 81.97 & 0.4776 & 0.2603 & 0.0671 & 2,621,952 \\
+MLP scorer & 82.41 & 0.4935 & 0.2596 & 0.0722 & 2,688,001 \\
+Residual pointer & \good{82.63} & \good{0.4586} & \good{0.2497} & \good{0.0601} & 2,688,001 \\
+\bottomrule
+\end{tabular}
+
+The residual arm passed the registered gate and was selected. Its final layer
+starts at zero, preserving the base pointer score at initialization while
+allowing a nonlinear correction during training.
+
+\subsection{Representation readout}
+
+The early Qwen 4B study compared the decision marker and option closing marker
+against mean-pooled query, option, and combined representations. Results below
+are the fixed-screen development values.
+
+\begin{tabular}{p{.38\linewidth}rrrr}
+\toprule
+Readout & Accuracy $\uparrow$ & NLL $\downarrow$ & Brier $\downarrow$ & ECE $\downarrow$ \\
+\midrule
+Decision / option-close control & 77.88 & 0.5405 & 0.3065 & 0.0642 \\
+Query-mean & \good{78.87} & \good{0.5117} & \good{0.2991} & \good{0.0428} \\
+Option-mean & 74.45 & 0.6422 & 0.3653 & 0.0514 \\
+Combined means & 73.34 & 0.6322 & 0.3709 & 0.0628 \\
+\bottomrule
+\end{tabular}
+
+Query-mean led this early screen. Full family training later retained
+decision-marker / option-close because it was the stable cross-backbone recipe;
+the result is therefore evidence about the screen, not a claim that query-mean
+universally dominates.
+
+\subsection{LoRA rank}
+
+Two studies addressed different questions and should not be pooled.
+
+\textbf{Qwen 4B early screen.} At the fixed causal checkpoint, aggregate ranking
+over development and diagnostic Transfer metrics selected rank 32.
+
+\begin{tabular}{p{.20\linewidth}rr|rr}
+\toprule
+ & \multicolumn{2}{c|}{Development} & \multicolumn{2}{c}{Transfer diagnostic} \\
+Rank & Accuracy & NLL & Accuracy & NLL \\
+\midrule
+2  & 76.11 & 0.6385 & 67.59 & 0.9183 \\
+4  & 76.33 & 0.6187 & 68.55 & 0.9013 \\
+8  & 77.88 & 0.5405 & 70.08 & 0.8642 \\
+16 & \good{78.87} & 0.5128 & 69.69 & 0.8601 \\
+32 & 77.99 & \good{0.5010} & \good{70.27} & \good{0.7800} \\
+\bottomrule
+\end{tabular}
+
+\textbf{27B base-start gate.} A separate 250-step, single-seed study compared
+ranks 8, 16, 32, and 64. Rank 16 was the registered control and the only eligible
+arm after multiplicity-corrected gates; rank 8 had better point estimates but did
+not pass the adjusted promotion rule. This is a useful warning against choosing
+capacity solely from a single point estimate.
+
+\begin{tabular}{p{.20\linewidth}rrrr}
+\toprule
+Rank & Dev. accuracy $\uparrow$ & Dev. NLL $\downarrow$ & Dev. Brier $\downarrow$ & Gate \\
+\midrule
+8  & \good{83.63} & \good{0.4445} & \good{0.2467} & not eligible \\
+16 & 82.08 & 0.4708 & 0.2568 & \good{selected control} \\
+32 & 82.08 & 0.4788 & 0.2599 & not eligible \\
+64 & 82.52 & 0.4805 & 0.2579 & not eligible \\
+\bottomrule
+\end{tabular}
+
+The production family ultimately uses rank 8 based on its separate full-run
+cost/quality trade-off. The two screens have different bases, budgets, and
+selection rules and are not contradictory replications.
+
+\subsection{Loss and calibration objectives}
+
+The objective studies covered CE, pure InfoNCE, mixed CE--InfoNCE, supervised
+Brier penalties, and RLCR-style policy terms.
+
+\begin{itemize}
+  \item In the controlled 27B base-start comparison, CE and pure InfoNCE had the
+  same corrected development NLL to four decimals (0.4766), but InfoNCE worsened
+  Brier from 0.2592 to 0.2700. CE was selected.
+  \item In the early 4B sweep, contrastive weights from 0.01 through 3.0 were
+  tested. A weight of 0.03 ranked first on the development aggregate, but its
+  diagnostic Transfer accuracy was 67.97\%, below CE's 69.41\%. The production
+  release therefore uses CE.
+  \item A rank-16 factorial screen selected residual + CE + 0.1 contrastive weight
+  within that local screen. Effects were small: under the residual head the
+  contrastive term changed accuracy by $-0.11$ points and Brier by $-0.00157$.
+  This did not override the later full-run recipe.
+  \item Supervised Brier weights 0.1, 0.25, and 0.5 produced no arm satisfying the
+  registered joint accuracy/calibration gate.
+  \item Correctness-only, selected-action Brier, full-distribution Brier, and a
+  calibration-penalized RLCR variant were separated in staged controls. No RLCR
+  arm passed the complete promotion gate. In the earlier released SFT/RLCR pair,
+  RLCR changed Transfer accuracy by $-0.10$ points (95\% paired interval
+  $[-0.58,+0.39]$) while the small development-NLL gain did not survive
+  independent recalibration.
+\end{itemize}
+
+\subsection{Data-mixture interventions}
+
+The data studies changed broad task balance while holding the model and training
+budget fixed. They are reported only at the aggregate level here.
+
+\begin{itemize}
+  \item Two targeted-text variants were tested against the same control at the
+  fixed checkpoint. Variant v5 failed both calibrated-Brier improvement and
+  accuracy non-inferiority; variant v6a improved its accuracy point estimate by
+  about one point but still failed the calibrated-Brier promotion gate.
+  \item A matched whole-mixture intervention and a matched hard-reasoning
+  intervention were compared with their frozen control. Neither passed all
+  registered gates, so no candidate was selected.
+  \item A proposed dose study was stopped before training because no eligible
+  fresh selection panel was available. This is recorded as a stopped protocol,
+  not a negative model result.
+\end{itemize}
+
+\subsection{Alternative decision architectures}
+
+An exploratory route compared a jointly encoded cross scorer with dual-tower
+alternatives on the same 1,046 Transfer decisions.
+
+\begin{tabular}{p{.32\linewidth}rrrr}
+\toprule
+Architecture & Accuracy $\uparrow$ & NLL $\downarrow$ & Brier $\downarrow$ & ECE $\downarrow$ \\
+\midrule
+Cross-joint & \good{57.17} & \good{1.1766} & \good{0.5915} & 0.1494 \\
+Scalar dual tower & 35.28 & 1.2459 & 0.6633 & \good{0.0136} \\
+Expressive dual, scratch & 47.42 & 1.1958 & 0.6176 & 0.0717 \\
+Expressive dual, official init & 41.78 & 1.2351 & 0.6390 & 0.0944 \\
+\bottomrule
+\end{tabular}
+
+The cross-joint package beat the original dual tower, and the expressive scratch
+dual improved substantially over the scalar dual. Nevertheless, the complete
+registered gates failed: one dual comparator did not establish learning, and the
+rescued variants did not jointly pass learning and cross-comparison conditions.
+No architecture was promoted. These one-seed packages differ from the released
+LoRA system and do not establish a universal cross-encoder advantage.
+
+A separate LM-token package compared the official next-token objective,
+InfoNCE-soft, and hard/soft SoftCE variants. SoftCE-soft was promoted within that
+local screen (43.69\% accuracy, 1.2627 NLL, 0.6501 Brier after calibration), but
+the preregistration labels its comparison with JevAny as a same-benchmark system
+comparison rather than a controlled training-method ablation.
+
+\subsection{Readout family and backbone scale}
+
+The final release provides the cleanest practical readout comparison because the
+two Qwen 4B models share the same base revision, data scale, rank, optimizer
+family, and precision. Direct-token gains 0.86 JevBench points and improves all
+three Transfer calibration metrics, while pointer gains 0.48 Transfer accuracy
+points, supports more choices, and trains faster over a full trajectory.
+
+Across released pointer models, scaling/backbone choice matters substantially:
+Gemma 4B reaches 70.84\% Transfer, Qwen 4B 78.68\%, Muse 30B 83.46\%, and Qwen
+27B 85.76\%. Because architecture and parameter count change together, this is a
+family comparison rather than a controlled scaling-law estimate.
+
+\subsection{Ablation ledger}
+
+\begin{tabular}{>{\raggedright\arraybackslash}p{.20\linewidth}>{\raggedright\arraybackslash}p{.27\linewidth}>{\raggedright\arraybackslash}p{.43\linewidth}}
+\toprule
+Track & Arms & Outcome \\
+\midrule
+Pointer head & Linear, MLP, residual & Residual selected in the controlled screen. \\
+Representation & Marker/close, query mean, option mean, combined & Query mean led the early screen; marker/close retained for the full family. \\
+LoRA rank & 2/4/8/16/32 at 4B; 8/16/32/64 at 27B & Local winners depended on protocol; production uses rank 8. \\
+Contrastive loss & CE, InfoNCE, seven mixed weights & Small mixed terms helped some calibration screens; CE retained at full scale. \\
+Supervised Brier & Weights 0.1/0.25/0.5 vs CE & No weight passed the joint gate. \\
+Post-training & CE-path controls, correctness-only, selected/full Brier RLCR & No policy arm promoted; RLCR remains experimental. \\
+Data mixture & Control, targeted variants, matched package/hardness changes & No candidate passed all gates; one planned dose study stopped pre-run. \\
+Architecture & Cross-joint, scalar dual, expressive dual, initialized dual & Informative package differences, but complete promotion gates failed. \\
+LM-token objective & Official CLM, InfoNCE-soft, SoftCE hard/soft & SoftCE-soft won its local screen; treated as a system-package result. \\
+Decision readout & Pointer vs direct-token & Complementary 4B trade-off; both released. \\
+Backbone family & Gemma, Qwen, Muse & Qwen3.8 27B is the highest-accuracy release. \\
+\bottomrule
+\end{tabular}
+
+\section{Compute accounting}
+
+Compute below covers training through each released checkpoint. GPU-hours equal
+elapsed wall-clock hours times the actual DDP world size and exclude ablation,
+evaluation, failed jobs, and training after the selected checkpoint.
+
+\begin{tabular}{p{.34\linewidth}rrrr}
+\toprule
+Model & Step & Parallel H200s & Wall hours & H200 GPU-hours \\
+\midrule
+Gemma 4B LoRA & 2,771 & 32 & $\sim$3.28 & $\sim$104.9 \\
+Qwen3.5 4B LoRA & 13,850 & 32 & 10.33 & 330.6 \\
+Qwen3.5 4B Direct-Token & 9,695 & 32 & 8.41 & 269.1 \\
+Muse Glimmer 30B LoRA & 3,324 & 40 & 2.88 & 115.4 \\
+Qwen3.8 27B LoRA & 22,160 & 32 & 18.83 & 602.7 \\
+\midrule
+\textbf{Released-checkpoint total} & & & & \textbf{$\sim$1,423} \\
+\bottomrule
+\end{tabular}
+
+Gemma is approximate because that earlier checkpoint format did not persist
+cumulative elapsed seconds; its value uses the recorded run start and checkpoint
+timestamp. Direct-token, Qwen 27B, and Muse use checkpoint-native elapsed time;
+Qwen 4B pointer uses terminal trainer telemetry because the released checkpoint
+is the completed step 13,850 run. Peak within-run parallelism was 40 GPUs.
+
+\section{Reproducibility and claim boundaries}
+
+\begin{summarybox}
+\textbf{Release checks.} Base revisions are pinned. Every public artifact carries
+its adapter metadata and tokenizer state. Release manifests, checkpoint-native
+reload reports, and GPU loader/reconstruction parity were checked before
+publication. Transfer covers 1,046/1,046 scored decisions and JevBench covers
+231/231 public development items.
+\end{summarybox}
+
+\begin{itemize}
+  \item Short screens are single-seed exploratory evidence unless stated
+  otherwise. Their point estimates do not measure training-seed uncertainty.
+  \item Transfer was used diagnostically in several research stages. The release
+  table is a transparent benchmark comparison, not a claim of untouched-test
+  generalization.
+  \item Different backbone families are not weight-matched and may differ in
+  architecture, tokenizer, and native media machinery.
+  \item GPU-hours report selected-checkpoint training only, not total research
+  spend or inference cost.
+  \item The current release contains LoRA SFT checkpoints. Full-parameter SFT,
+  improved post-training, and hyperparameter-optimized variants are roadmap
+  items, not completed results.
+\end{itemize}
+
+\section{Release map}
+
+\begin{tabular}{p{.25\linewidth}p{.66\linewidth}}
+\toprule
+Artifact & Location \\
+\midrule
+Source code & \url{https://github.com/SimpleJev/JevAny} \\
+Model collection & \href{https://huggingface.co/collections/tianxinwei/jevany-adaptive-decision-systems-6ab2c941bcecb4d2c61d1326}{Hugging Face / JevAny Adaptive Decision Systems} \\
+Machine-readable metrics & \texttt{results/model-family-v2.json} \\
+Algorithm reference & \texttt{docs/ALGORITHM.md} \\
+Training guide & \texttt{docs/TRAINING.md} \\
+Evaluation guide & \texttt{docs/EVALUATION.md} \\
+\bottomrule
+\end{tabular}
+
+\vfill
+\begin{center}
+\color{muted}\small
+JevAny is independent of Jev and TypeSafe. Infrastructure adapted from Kev is
+credited in the repository NOTICE and acknowledgements. Code is Apache-2.0;
+base models and upstream datasets retain their own terms.
+\end{center}
+
+\end{document}

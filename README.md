@@ -7,7 +7,7 @@
   <a href="docs/API.md"><img alt="API docs" src="https://img.shields.io/badge/docs-API-0ea5e9"></a>
   <a href="docs/CASES.md"><img alt="Examples" src="https://img.shields.io/badge/examples-gallery-8b5cf6"></a>
   <a href="pyproject.toml"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&amp;logoColor=white"></a>
-  <a href="https://github.com/weitianxin/JevAny/actions"><img alt="Tests" src="https://github.com/weitianxin/JevAny/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/SimpleJev/JevAny/actions"><img alt="Tests" src="https://github.com/SimpleJev/JevAny/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-32d6c5"></a>
 </p>
 
@@ -41,7 +41,7 @@ Examples recorded with an earlier compatible JevAny checkpoint:
 Use Python 3.12 or newer. Clone the repository and create an environment:
 
 ```bash
-git clone https://github.com/weitianxin/JevAny.git
+git clone https://github.com/SimpleJev/JevAny.git
 cd JevAny
 python3.12 -m venv .venv
 source .venv/bin/activate
@@ -72,6 +72,24 @@ These are LoRA adapters: the corresponding base model is loaded separately and
 its license and access terms apply. Allow roughly twice the base parameter count
 in bytes for BF16 weights, plus runtime memory. See the
 [hardware and loading guide](docs/DEPLOYMENT.md#checkpoints-and-hardware).
+
+### Training compute
+
+| Model | Released step | Parallel GPUs | Wall time | GPU-hours |
+|---|---:|---:|---:|---:|
+| Gemma 4B LoRA | 2,771 | 32 H200 | ~3.28 h | ~104.9 |
+| Qwen3.5 4B LoRA | 13,850 | 32 H200 | 10.33 h | 330.6 |
+| Qwen3.5 4B Direct-Token LoRA | 9,695 | 32 H200 | 8.41 h | 269.1 |
+| Muse Glimmer 30B LoRA | 3,324 | 40 H200 | 2.88 h | 115.4 |
+| Qwen3.8 27B LoRA | 22,160 | 32 H200 | 18.83 h | 602.7 |
+
+The five released checkpoints represent approximately **1,423 H200 GPU-hours**
+of training, with at most 40 GPUs used in parallel within one run. GPU-hours are
+elapsed training time through the released checkpoint multiplied by the DDP
+world size; ablations, evaluation, and training after a selected checkpoint are
+excluded. Gemma uses run/checkpoint timestamps because its earlier checkpoint
+format did not store cumulative elapsed seconds; the other figures come from
+checkpoint or terminal trainer telemetry.
 
 ### Pointer vs direct-token
 
@@ -176,7 +194,9 @@ the machine-readable results. Release manifests, checkpoint-native reload report
 and GPU loader/reconstruction parity were checked before publishing.
 
 [Machine-readable release results](results/model-family-v2.json) ·
-[Evaluation protocols and historical results](docs/EVALUATION.md).
+[Evaluation protocols and historical results](docs/EVALUATION.md) ·
+[Method and ablation report](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
+([LaTeX source](docs/JEVANY_METHOD_AND_ABLATIONS.tex)).
 
 ## Inference & Serving
 

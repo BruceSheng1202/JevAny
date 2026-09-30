@@ -24,8 +24,8 @@ dependencies = ["pydantic>=2.9"]
 jevany = "jevany.cli:main"
 
 [project.urls]
-Repository = "https://github.com/weitianxin/JevAny"
-Issues = "https://github.com/weitianxin/JevAny/issues"
+Repository = "https://github.com/SimpleJev/JevAny"
+Issues = "https://github.com/SimpleJev/JevAny/issues"
 Models = "https://huggingface.co/collections/tianxinwei/jevany-adaptive-decision-systems-6ab2c941bcecb4d2c61d1326"
 
 [project.optional-dependencies]

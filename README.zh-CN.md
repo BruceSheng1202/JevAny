@@ -7,7 +7,7 @@
   <a href="docs/API.md"><img alt="API 文档" src="https://img.shields.io/badge/docs-API-0ea5e9"></a>
   <a href="docs/CASES.md"><img alt="示例" src="https://img.shields.io/badge/examples-gallery-8b5cf6"></a>
   <a href="pyproject.toml"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&amp;logoColor=white"></a>
-  <a href="https://github.com/weitianxin/JevAny/actions"><img alt="测试" src="https://github.com/weitianxin/JevAny/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/SimpleJev/JevAny/actions"><img alt="测试" src="https://github.com/SimpleJev/JevAny/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="许可证" src="https://img.shields.io/badge/license-Apache--2.0-32d6c5"></a>
 </p>
 
@@ -41,7 +41,7 @@
 使用 Python 3.12 或更新版本。克隆仓库并创建环境：
 
 ```bash
-git clone https://github.com/weitianxin/JevAny.git
+git clone https://github.com/SimpleJev/JevAny.git
 cd JevAny
 python3.12 -m venv .venv
 source .venv/bin/activate
@@ -71,6 +71,22 @@ source .venv/bin/activate
 这些仓库发布的是 LoRA adapter，加载时还需要对应基座，并适用基座模型的
 许可证和访问条款。BF16 基座权重大约需要参数量两倍的字节数，另需运行时
 显存。详见[硬件与加载说明](docs/DEPLOYMENT.md#checkpoints-and-hardware)。
+
+### 训练算力
+
+| 模型 | 发布步数 | 并行 GPU | 训练时长 | GPU-hours |
+|---|---:|---:|---:|---:|
+| Gemma 4B LoRA | 2,771 | 32 × H200 | ~3.28 h | ~104.9 |
+| Qwen3.5 4B LoRA | 13,850 | 32 × H200 | 10.33 h | 330.6 |
+| Qwen3.5 4B Direct-Token LoRA | 9,695 | 32 × H200 | 8.41 h | 269.1 |
+| Muse Glimmer 30B LoRA | 3,324 | 40 × H200 | 2.88 h | 115.4 |
+| Qwen3.8 27B LoRA | 22,160 | 32 × H200 | 18.83 h | 602.7 |
+
+五个发布 checkpoint 合计约 **1,423 H200 GPU-hours**，单次训练最多并行使用
+40 张 GPU。GPU-hours 按训练到发布 checkpoint 的实际经过时间乘以 DDP world size
+计算；不包含 ablation、评测和所选 checkpoint 之后继续训练的开销。Gemma 的早期
+checkpoint 格式未记录累计秒数，因此使用运行起点与 checkpoint 时间戳估算；其余数字
+来自 checkpoint 或训练结束时的 trainer telemetry。
 
 ### Pointer 与 direct-token
 
@@ -171,7 +187,9 @@ Transfer 报告 1,046 个计分决策，无缺失样本；JevBench 报告全部
 并完成 GPU loader/reconstruction logits 等价测试。
 
 [本次发布的机器可读结果](results/model-family-v2.json) ·
-[评测协议与历史结果](docs/EVALUATION.md)。
+[评测协议与历史结果](docs/EVALUATION.md) ·
+[方法与消融实验报告](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
+（[LaTeX 源文件](docs/JEVANY_METHOD_AND_ABLATIONS.tex)）。
 
 ## 推理与部署
 

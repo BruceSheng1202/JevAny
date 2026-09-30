@@ -12,6 +12,56 @@
       "safety"
     ]
   },
+  "training_compute": {
+    "hardware": "NVIDIA H200",
+    "scope": "training through each released checkpoint; excludes ablations, evaluation, and later training",
+    "calculation": "elapsed wall-clock hours multiplied by DDP world size",
+    "total_gpu_hours": 1422.5982218246077,
+    "maximum_parallel_gpus_per_run": 40,
+    "models": {
+      "tianxinwei/JevAny-Gemma-4B-LoRA": {
+        "released_step": 2771,
+        "parallel_gpus": 32,
+        "wall_seconds": 11802.619868,
+        "wall_hours": 3.28,
+        "gpu_hours": 104.9,
+        "estimated": true,
+        "estimate_basis": "run start and checkpoint timestamps"
+      },
+      "tianxinwei/JevAny-Qwen3.5-4B-LoRA": {
+        "released_step": 13850,
+        "parallel_gpus": 32,
+        "wall_seconds": 37187.75734710693,
+        "wall_hours": 10.33,
+        "gpu_hours": 330.6,
+        "estimated": false
+      },
+      "tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA": {
+        "released_step": 9695,
+        "parallel_gpus": 32,
+        "wall_seconds": 30270.641902685165,
+        "wall_hours": 8.41,
+        "gpu_hours": 269.1,
+        "estimated": false
+      },
+      "tianxinwei/JevAny-Qwen3.8-27B-LoRA": {
+        "released_step": 22160,
+        "parallel_gpus": 32,
+        "wall_seconds": 67800.68154883385,
+        "wall_hours": 18.83,
+        "gpu_hours": 602.7,
+        "estimated": false
+      },
+      "tianxinwei/JevAny-Muse-Glimmer-30B-LoRA": {
+        "released_step": 3324,
+        "parallel_gpus": 40,
+        "wall_seconds": 10384.479430913925,
+        "wall_hours": 2.88,
+        "gpu_hours": 115.4,
+        "estimated": false
+      }
+    }
+  },
   "protocols": {
     "transfer_v9": {
       "headline_population": "clean knowable decisions",

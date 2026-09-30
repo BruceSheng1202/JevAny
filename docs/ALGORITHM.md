@@ -31,7 +31,10 @@ where `d_p=256` in the released checkpoints. Temperature scaling divides `z` by 
 
 For a hard target `y`, SFT minimizes `-log p_y`. A row may instead carry a normalized soft target `t`, in which case the loss is `-Σ t_i log p_i`. Soft targets represent ambiguity or missing information without inventing a single correct label.
 
-The released SFT adapter uses LoRA rank 16 over the Qwen attention, MLP, and Gated DeltaNet projections. The pointer head is trained with the adapter; the base weights remain frozen.
+The current model-family releases use LoRA rank 8 over each backbone's supported
+linear projections. Pointer checkpoints train the residual head with the adapter;
+the direct-token checkpoint keeps the base LM head frozen. The earlier v0.2 SFT
+adapter used rank 16. In every case, the base weights remain frozen.
 
 ## RLCR
 

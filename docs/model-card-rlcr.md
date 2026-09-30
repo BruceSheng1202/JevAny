@@ -32,7 +32,7 @@ The 40,000-record RL mixture emphasizes hard reasoning, many-choice questions, a
 | AI2D accuracy | 87.0% |
 | MMMU accuracy | 63.0% |
 
-Development metrics exclude a 100-question single-class VideoFeedback slice. Against SFT, transfer accuracy changed by -0.10 percentage points, with 3 fixes and 4 regressions. The paired 95% bootstrap interval is [-0.58, 0.39] points. Full measurements are in the repository [release results](https://github.com/weitianxin/JevAny/blob/main/results/release-v0.2.json).
+Development metrics exclude a 100-question single-class VideoFeedback slice. Against SFT, transfer accuracy changed by -0.10 percentage points, with 3 fixes and 4 regressions. The paired 95% bootstrap interval is [-0.58, 0.39] points. Full measurements are in the repository [release results](https://github.com/SimpleJev/JevAny/blob/main/results/release-v0.2.json).
 
 ## Limits
 
