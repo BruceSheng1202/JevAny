@@ -16,47 +16,124 @@
 </p>
 
 <p align="center">
-  <strong>一个决策 API，五个开放 LoRA 模型，覆盖任意有限选项决策。</strong><br>
-  输入状态、问题与候选答案，直接返回校准后的选择概率，无需生成答案文本。
+  <strong>将开源模型训练成决策模型，通过统一 API 部署到应用中。</strong><br>
+  输入状态、问题和候选选项，获取选择结果与各选项的概率。
 </p>
+
+用 JevAny 分流客服工单、选择 Agent 的下一步工具，或决定机器人的下一个动作。
+你可以直接使用已发布模型，也可以用自己的标注数据训练。模型直接为给定选项打分，无需生成答案文本。
 
 <p align="center">
-  <img src="docs/hero.png" alt="JevAny 训练与部署流程：多模态数据、RLCR/SFT 训练、统一 API、测试环境与应用示例" width="100%">
+  <img src="docs/hero.png" alt="基于开源基座训练决策模型，再通过统一 API 部署到应用中" width="100%">
 </p>
 
-| 🤗 [模型](#预训练模型) | 📊 [结果](#评测) | ⚡ [部署](#推理与部署) | 🛠️ [训练](#训练) |
-|---|---|---|---|
-| Gemma、Qwen、Muse | Transfer + JevBench | Python + HTTP | SFT + RLCR |
+[快速上手](#快速上手) · [演示](#演示) · [模型](#预训练模型) · [评测](#评测) · [训练](#训练) · [文档](#文档与贡献)
 
 ## 演示
 
-以下案例由较早但接口兼容的 JevAny checkpoint 录制：
+以下 30 个精选成功案例展示了 JevAny 在机器人、浏览器、软件、实验室和出行任务中的动作选择。
+这些案例由较早但接口兼容的模型录制。
 
 [![JevAny 在机器人、浏览器、软件、实验室和出行任务中选择动作](docs/demos/jevany-cases.gif)](docs/CASES.md)
 
-[查看 30 个精选成功案例](docs/CASES.md)，或通过[示例与测试环境](#示例与测试环境)试用自己的模型。
+[查看全部案例](docs/CASES.md)，或按下面的步骤打开演示，查看记录的动作和选项概率。
 
-## 安装
+## 快速上手
 
-使用 Python 3.12 或更新版本。克隆仓库并创建环境：
+### 打开交互演示
+
+使用 Python 3.12 或更新版本，克隆仓库并安装轻量客户端：
 
 ```bash
 git clone https://github.com/SimpleJev/JevAny.git
 cd JevAny
 python3.12 -m venv .venv
 source .venv/bin/activate
+python -m pip install -e .
+jevany demo
 ```
 
-按用途选择依赖：
+打开 `http://127.0.0.1:8090`，点击 **Replay** 观看录制的运行过程。
+内置回放不需要 GPU、模型下载或推理服务；此安装也不会引入 PyTorch。
+在终端按 Ctrl+C 停止演示。
 
-| 用途 | 安装命令 |
-|---|---|
-| 调用已有 HTTP 服务 | `python -m pip install -e .` |
-| 训练文本模型 | `python -m pip install -e '.[train]'` |
-| 在本地运行文本模型或启动 HTTP 服务 | `python -m pip install -e '.[serve]'` |
-| 运行支持原生媒体输入的已发布模型 | `python -m pip install -e '.[serve,multimodal]'` |
+以下命令均在仓库根目录运行，并使用上述虚拟环境。
 
-只安装客户端不会引入 PyTorch。训练图片/视频模型时，使用 `.[train,multimodal]`。以下命令均在仓库根目录运行；具体模型的硬件要求见[预训练模型](#预训练模型)。
+### 给客服工单选择处理部门
+
+要运行模型，先安装推理依赖并启动已发布的 Qwen 4B 模型。
+此示例使用 CUDA GPU，需要容纳基座模型与运行开销的显存；详见
+[硬件与加载说明](docs/DEPLOYMENT.md#checkpoints-and-hardware)。
+
+```bash
+python -m pip install -e '.[serve,multimodal]'
+jevany serve --checkpoint tianxinwei/JevAny-Qwen3.5-4B-LoRA \
+  --device cuda --dtype bf16 --port 8008
+```
+
+保持服务运行，在使用相同虚拟环境的 Python 会话中，发送工单和候选处理部门：
+
+```python
+from jevany import Choice, JevClient
+
+jev = JevClient("http://127.0.0.1:8008")
+result = jev.system_one(
+    state={"ticket": "I was charged twice. Please help."},
+    questions={
+        "department": Choice(
+            instructions="Which team should handle this?",
+            criteria={"billing": "Payment problems", "shipping": "Delivery problems"},
+        ),
+    },
+)
+answer = result["answers"]["department"]
+print("Selected team:", answer["choice"])
+print("Probabilities:", answer["probabilities"])
+```
+
+`choice` 返回一个候选部门名称，`probabilities` 返回各部门的概率。
+你可以据此分配工单，也可以在结果不确定时转交人工审核。
+
+二分类问题使用 `Noul`，例如判断工单是否需要紧急处理；有序评分使用 `Score`，
+例如低、普通、高三个优先级。三类问题的完整格式见 [API 文档](docs/API.md)。
+也可以[在 Python 进程中直接加载模型](docs/DEPLOYMENT.md#python)，通过相同接口调用，
+无需启动 HTTP 服务。图片和视频输入需要[媒体配置](docs/DEPLOYMENT.md#native-media-and-limits)。
+
+## 示例与测试环境
+
+交互演示包含以下三个环境。动图是较早兼容模型的加速回放，保留了模型的实际选择和原始选项概率。
+
+### [机械臂插孔](examples/README.md#robot-peg-insertion)
+
+控制 Franka 夹爪抓取、对准并插入工件，由 PyBullet 接触物理验证结果。
+
+![机械臂浏览器回放：Franka 插孔动作、模型原始选项概率和物理成功检查](docs/demos/playground-arm.gif)
+
+### [Doom 走廊 · 3D](examples/README.md#doom-corridor-3d)
+
+击败最后一个房间中左右两侧的敌人，再向前移动。使用 ViZDoom 和随包提供的 Freedoom 资源。
+
+![Doom checkpoint 回放：击杀左右两名敌人后继续前进](docs/demos/playground-doom.gif)
+
+### [Crafter 生存建造 · 2D](examples/README.md#crafter-survival-2d)
+
+采集木材、制作工具、开采石头，同时管理生命值和物资。
+
+![Crafter 浏览器回放：资源采集、制作工具和四项目标的完成进度](docs/demos/playground-crafter.gif)
+
+### 让模型在环境中运行
+
+停止只播放回放的演示，保持模型服务运行。安装可选游戏引擎，再连接模型服务启动演示：
+
+```bash
+python -m pip install -e '.[demo]'
+jevany demo --base-url http://127.0.0.1:8008 --text-only
+```
+
+在浏览器中选择 **Run model** 让模型操作，或选择 **Play yourself** 自己操作。
+实时模型决策目前使用文本状态；机械臂控制需要单独的 `.[robotics]` 依赖。
+平台要求与环境接口见[演示指南](examples/README.md)，结合 LLM 规划器使用
+JevAny 决策可参考[集成文档](docs/INTEGRATIONS.md)。
 
 ## 预训练模型
 
@@ -72,51 +149,21 @@ source .venv/bin/activate
 许可证和访问条款。BF16 基座权重大约需要参数量两倍的字节数，另需运行时
 显存。详见[硬件与加载说明](docs/DEPLOYMENT.md#checkpoints-and-hardware)。
 
-### 训练算力
-
-| 模型 | 发布步数 | 并行 GPU | 训练时长 | GPU-hours |
-|---|---:|---:|---:|---:|
-| Gemma 4B LoRA | 2,771 | 32 × H200 | ~3.28 h | ~104.9 |
-| Qwen3.5 4B LoRA | 13,850 | 32 × H200 | 10.33 h | 330.6 |
-| Qwen3.5 4B Direct-Token LoRA | 9,695 | 32 × H200 | 8.41 h | 269.1 |
-| Muse Glimmer 30B LoRA | 3,324 | 40 × H200 | 2.88 h | 115.4 |
-| Qwen3.8 27B LoRA | 22,160 | 32 × H200 | 18.83 h | 602.7 |
-
-五个发布 checkpoint 合计约 **1,423 H200 GPU-hours**，单次训练最多并行使用
-40 张 GPU。GPU-hours 按训练到发布 checkpoint 的实际经过时间乘以 DDP world size
-计算；不包含 ablation、评测和所选 checkpoint 之后继续训练的开销。Gemma 的早期
-checkpoint 格式未记录累计秒数，因此使用运行起点与 checkpoint 时间戳估算；其余数字
-来自 checkpoint 或训练结束时的 trainer telemetry。
-
-### Pointer 与 direct-token
-
-- **Pointer：**用轻量可学习 head 比较决策标记与选项表示；训练更高效，支持
-  超过 255 个选项，实际边界由上下文窗口决定。
-- **Direct-token：**用基座 LM head 对 255 个固定单 token 标签打分；4B
-  JevBench 更高，但 full-vocabulary 训练更慢，最多支持 255 个选项。
-- **推理：**两者都只做一次 backbone prefill、无需生成答案文本，同等输入下
-  延迟应基本相当。
-
-### 发布计划
-
-- **当前：**五个已验证的 LoRA checkpoint。
-- **下一步：**Full-parameter SFT。
-- **后续：**改进的 post-training 与超参优化版本。
+Pointer 和 direct-token 模型使用相同 API。Pointer 在上下文允许的范围内支持最多
+4,096 个选项，direct-token 最多支持 255 个。
+训练与准确率的取舍见[输出方式说明](docs/TRAINING.md#pointer-and-direct-token-readouts)。
 
 ## 评测
 
-我们将 **Transfer** 作为固定的跨领域与鲁棒性评测，包含 1,046 个
-clean、knowable 决策，覆盖 Emotion、PAWS、QNLI、TweetEval、MMLU、
-MMLU-Pro、SciQ 和四类鲁棒性切片。**JevBench** 是全部 231 个公开
-development 项的准确率，不是 sealed 榜单分数。主表中的 NLL、Brier
-和 ECE 均来自 Transfer；每次评测都完整覆盖所有样本。
+在下表的比较中，Qwen3.8 27B 的准确率最高。已发布的 4B 模型中，
+direct-token 的 JevBench 准确率更高，Pointer 的 Transfer 准确率更高。
 
 | 模型 | Transfer ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
 |---|---:|---:|---:|---:|---:|
 | Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
-| Kev-27B (`01b8199`) | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
+| Kev-27B | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
 | Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
-| Laya (`55cf4c4`) | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
+| Laya | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
 | **JevAny Releases** |  |  |  |  |  |
 | Gemma 4B LoRA | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
 | Qwen3.5 4B LoRA | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
@@ -124,201 +171,59 @@ development 项的准确率，不是 sealed 榜单分数。主表中的 NLL、Br
 | Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
 | **Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
-### Transfer 分项
+**Transfer** 包含 1,046 个计分决策，覆盖分类、问答和鲁棒性任务。
+**JevBench** 覆盖全部 231 个公开开发集样本，分数不代表封闭测试集榜单成绩。
+Transfer 也用于模型开发过程中的分析，因此这些结果应作为诊断性比较解读。
 
-各列为数据集或鲁棒性切片准确率，样本数依次为
-80 / 80 / 80 / 80 / 80 / 200 / 80 / 80 / 96 / 80 / 110。
+NLL、Brier 和 ECE 衡量 Transfer 上的预测概率质量，数值越低越好。
+Kev 和 Laya 的结果来自完整的公开模型评测；Jev 的 Transfer 来自完整的 API 评测，
+JevBench 则采用已公布的结果。
 
-| 模型 | Emo | PAWS | QNLI | Tweet | MMLU | M-Pro | SciQ | Buried | Comp. | Policy | Ctrl. | Mean |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| **Baselines** |  |  |  |  |  |  |  |  |  |  |  |  |
-| Kev-4B | 53.75 | 73.75 | 92.50 | 73.75 | 70.00 | 50.00 | 98.75 | 66.25 | 92.71 | 77.50 | 92.73 | 74.19 |
-| Kev-27B | 60.00 | 78.75 | 95.00 | 80.00 | 83.75 | 66.00 | 97.50 | 76.25 | 89.58 | 96.25 | 99.09 | 82.31 |
-| Jev 1.13.0 | 58.75 | 80.00 | 91.25 | 81.25 | 90.00 | 84.00 | 98.75 | 70.00 | 90.62 | 97.50 | 94.55 | 85.37 |
-| Laya | 61.25 | 77.50 | 83.75 | 75.00 | 33.75 | 11.00 | 87.50 | 58.75 | 51.04 | 52.50 | 47.27 | 52.29 |
-| **JevAny (Ours)** |  |  |  |  |  |  |  |  |  |  |  |  |
-| Gemma 4B | 75.00 | 80.00 | 91.25 | 80.00 | 65.00 | 38.50 | 97.50 | 70.00 | 67.71 | 77.50 | 81.82 | 70.84 |
-| Qwen 4B P | 86.25 | 75.00 | 93.75 | 81.25 | 77.50 | 58.50 | 97.50 | 77.50 | 87.50 | 76.25 | 81.82 | 78.68 |
-| Qwen 4B DT | 85.00 | 77.50 | 95.00 | 81.25 | 75.00 | 52.50 | 98.75 | 78.75 | 86.46 | 83.75 | 81.82 | 78.20 |
-| Muse 30B | 81.25 | 77.50 | 92.50 | 83.75 | 83.75 | 61.00 | 98.75 | 82.50 | 95.83 | 98.75 | 90.91 | 83.46 |
-| **Qwen 27B** | **90.00** | **86.25** | **95.00** | **83.75** | **86.25** | **68.00** | **97.50** | **78.75** | **90.62** | **97.50** | **92.73** | **85.76** |
-
-`Buried` 测试隐藏指令；`Comp.` 测试 AND/OR/conditional 组合；
-`Policy` 对比 authorization/deadline 规则；`Ctrl.` 包含 11 类
-knowable policy control。数值均为百分比。
-
-### JevBench 分项
-
-| 模型 | Easy | Original | Hard | Score |
-|---|---:|---:|---:|---:|
-| **Baselines** |  |  |  |  |
-| Kev-4B | 100.00% | 94.44% | 52.25% | 75.32% |
-| Kev-27B | 100.00% | 100.00% | 69.37% | 85.28% |
-| Jev 1.13.0 | 100.00% | 98.61% | 72.97% | 86.58% |
-| Laya | 95.83% | 70.83% | 33.33% | 58.01% |
-| **JevAny (Ours)** |  |  |  |  |
-| Gemma 4B | 100.00% | 95.83% | 55.86% | 77.49% |
-| Qwen 4B P | 100.00% | 95.83% | 61.26% | 80.09% |
-| Qwen 4B DT | 100.00% | 98.61% | 61.26% | 80.95% |
-| Muse 30B | 100.00% | 97.22% | 75.68% | 87.45% |
-| **Qwen 27B** | **100.00%** | **98.61%** | **81.08%** | **90.48%** |
-
-Direct-token 4B 在已发布 4B 模型中取得更高的 JevBench 准确率，Pointer
-4B 则在 Transfer 上略高。Kev 与 Laya 来自完整的本地公开
-checkpoint 评测（Kev-27B 固定到 `01b8199`，Laya 固定到 `55cf4c4`）；Jev 采用
-完整的本地 API Transfer 结果与 JevBench 公布的分难度准确率。
-
-### Ablation 摘要
-
-- **Pointer 结构：**比较 linear、MLP 和 zero-initialized residual head；
-  residual 在受控实验中取得更好的 development NLL 与校准表现。
-- **表示 readout：**比较 decision token、query mean、option mean 和 combined；
-  query-mean 在早期筛选中领先，完整模型系列最终采用 decision-marker / option-close。
-- **Loss：**比较 cross-entropy、纯 InfoNCE 和混合目标；CE 在 loss sweep 中
-  Transfer 准确率最高，小权重 contrastive 项主要改善校准。本次发布使用 CE。
-- **Readout family：**4B direct-token 的 JevBench 更高（80.95% vs 80.09%），
-  pointer 的 Transfer 略高（78.68% vs 78.20%）。
-
-### 可复现性
-
-Transfer 报告 1,046 个计分决策，无缺失样本；JevBench 报告全部
-231 个公开 development 项。完整 suite hash 和未舍入指标记录在机器可读
-结果中。发布前已核对 release manifest、checkpoint 自带 reload report，
-并完成 GPU loader/reconstruction logits 等价测试。
-
-[本次发布的机器可读结果](results/model-family-v2.json) ·
-[评测协议与历史结果](docs/EVALUATION.md) ·
+[完整结果与评测协议](docs/EVALUATION.md#model-family-v2) ·
+[机器可读结果](results/model-family-v2.json) ·
 [方法与消融实验报告](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
-（[LaTeX 源文件](docs/JEVANY_METHOD_AND_ABLATIONS.tex)）。
-
-## 推理与部署
-
-### Python API
-
-[HTTP 服务](#http-服务)启动后，发送状态和带有候选选项的问题。返回值包含选中的选项及各选项的概率：
-
-```python
-from jevany import Choice, JevClient
-
-state = {"ticket": "I was charged twice. Please help."}
-questions = {
-    "department": Choice(
-        instructions="Which team should handle this?",
-        criteria={"billing": "Payment problems", "shipping": "Delivery problems"},
-    ),
-}
-
-jev = JevClient("http://127.0.0.1:8008")
-result = jev.system_one(state=state, questions=questions)
-answer = result["answers"]["department"]
-print(answer["choice"])
-print(answer["probabilities"])
-```
-
-二分类问题使用 `Noul`，有序评分使用 `Score`。[API 文档](docs/API.md) 介绍了三种问题类型及兼容 Jev 的请求/返回格式。
-
-### HTTP 服务
-
-运行默认发布模型时，安装 `.[serve,multimodal]`，并使用满足 [27B 硬件要求](#预训练模型)的设备：
-
-```bash
-jevany serve --checkpoint tianxinwei/JevAny-Qwen3.8-27B-LoRA \
-  --device cuda --dtype bf16 --port 8008
-```
-
-部署前面 SFT 示例训练的小模型时，运行：
-
-```bash
-jevany serve --checkpoint runs/my-jev --model-name my-jev --port 8008
-```
-
-### 进程内推理
-
-在应用中加载一次 checkpoint，复用上例中的 `state` 和 `questions`：
-
-```python
-from jevany import JevModel
-
-jev = JevModel.from_pretrained("runs/my-jev", model_name="my-jev")
-result = jev.system_one(state=state, questions=questions)
-```
-
-更多模型调用方式见[部署指南](docs/DEPLOYMENT.md)，图片和视频输入见[媒体配置](docs/DEPLOYMENT.md#native-media-and-limits)。
-
-## 示例与测试环境
-
-在本地浏览器中打开交互演示。内置回放不需要 GPU、模型下载或推理服务：
-
-```bash
-python -m pip install -e .
-jevany demo
-```
-
-以下动图来自较早但接口兼容的 JevAny checkpoint，保留了模型的实际选择和原始选项概率。
-
-### [机械臂插孔](examples/README.md#robot-peg-insertion)
-
-控制 Franka 夹爪抓取、对准并插入工件，由 PyBullet 接触物理验证结果。
-
-![机械臂浏览器回放：Franka 插孔动作、模型原始选项概率和物理成功检查](docs/demos/playground-arm.gif)
-
-### [Doom 走廊 · 3D](examples/README.md#doom-corridor-3d)
-
-从最后一个房间开始，击杀左右两名敌人，再继续前进。使用 ViZDoom 和随包提供的 Freedoom 资源。
-
-![Doom checkpoint 回放：击杀左右两名敌人后继续前进](docs/demos/playground-doom.gif)
-
-### [Crafter 生存建造 · 2D](examples/README.md#crafter-survival-2d)
-
-采集木材、制作工具、开采石头，同时管理生命值和物资。
-
-![Crafter 浏览器回放：资源采集、制作工具和四项目标的完成进度](docs/demos/playground-crafter.gif)
-
-### 实时控制
-
-安装可选游戏引擎后，可以自己操作，也可以连接[已启动的模型服务](#http-服务)，在浏览器中选择 **Run model**：
-
-```bash
-python -m pip install -e '.[demo]'
-jevany demo --base-url http://127.0.0.1:8008 --text-only
-```
-
-实时模型决策目前使用文本状态。机械臂控制使用单独的 `.[robotics]` 依赖。安装步骤、平台要求和环境接口见[演示指南](examples/README.md)，结合 LLM 规划器使用 Jev 决策可参考[集成文档](docs/INTEGRATIONS.md)。
 
 ## 训练
 
-当前模型系列使用 **1,772,725 条文本记录 / 2,180,242 个有标签决策**训练，
-覆盖偏好、Agent/工具决策、推理、分类和安全。
+训练数据沿用推理时的 `state` 和 `questions`，为每个问题增加标签。
+随包提供的合成客服工单用于体验训练流程；为自己的应用训练时，请使用对应的标注数据。
 
-准备随包提供的入门数据：
+入门配置在 CUDA 上以 BF16 训练 Qwen3.5-0.8B，结果写入 `runs/my-jev`：
 
 ```bash
+python -m pip install -e '.[train]'
 jevany data init --out data/starter
 jevany data validate data/starter/train.jsonl
-```
-
-### SFT
-
-```bash
 jevany train --config recipes/sft.toml --dry-run
 jevany train --config recipes/sft.toml
 ```
 
-通过 `--data` 使用自己的 JSONL，或用 [`recipes/finetune.toml`](recipes/finetune.toml)
-继续微调已发布模型。
+训练完成后，用随包提供的工单请求试用模型：
 
-### RLCR
+```bash
+jevany decide examples/request.json --checkpoint runs/my-jev
+```
 
-在 SFT checkpoint 上继续进行兼顾正确率与校准的奖励训练：
+通过 `--data` 指定自己的 JSONL，或用
+[`recipes/finetune.toml`](recipes/finetune.toml) 微调已发布的 27B 模型。
+CPU 配置、多模态数据和标准 `torchrun` 启动方式见[训练指南](docs/TRAINING.md)。
+训练图片或视频模型时，安装 `.[train,multimodal]`。
+
+### 尝试 RLCR
+
+完成 SFT 后，可以继续使用兼顾正确率与概率校准的奖励训练。RLCR 目前属于实验功能：
 
 ```bash
 jevany train --config recipes/rlcr.toml
 ```
 
-[训练指南](docs/TRAINING.md) · [数据格式](docs/DATA.md) ·
-[RLCR 目标](docs/ALGORITHM.md#rlcr)
+当前发布系列采用 LoRA SFT，训练数据包含 1,772,725 条文本记录和 2,180,242 个有标签决策。
+全参数 SFT 与进一步的后训练改进仍在计划中。
 
-## Supported Model Families
+[数据格式](docs/DATA.md) · [RLCR 目标](docs/ALGORITHM.md#rlcr) ·
+[训练算力与实验说明](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
+
+## 支持的模型系列
 
 ![支持的 26 个模型，涵盖 Qwen、Gemma、Muse、Mistral、GLM、Nemotron 和 Llama](docs/supported-model-families.svg)
 
@@ -326,6 +231,10 @@ jevany train --config recipes/rlcr.toml
 
 ## 文档与贡献
 
-[训练](docs/TRAINING.md) · [部署](docs/DEPLOYMENT.md) · [API 兼容性](docs/API.md) · [数据](docs/DATA.md) · [评测](docs/EVALUATION.md) · [贡献指南](CONTRIBUTING.md)
+[训练](docs/TRAINING.md) · [部署](docs/DEPLOYMENT.md) · [API](docs/API.md) · [数据](docs/DATA.md) · [评测](docs/EVALUATION.md) · [贡献指南](CONTRIBUTING.md)
+
+欢迎贡献模型适配、评测或应用示例，开发步骤见[贡献指南](CONTRIBUTING.md)。
+[方法报告](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)及其
+[LaTeX 源文件](docs/JEVANY_METHOD_AND_ABLATIONS.tex)介绍了模型设计与实验。
 
 JevAny 独立于 Jev 和 TypeSafe，不包含 Jev 权重或私有实现。部分基础设施改编自 [Kev](https://github.com/jaredpalmer/kev)，归属说明见 [NOTICE](NOTICE) 和 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)。代码和入门数据采用 Apache-2.0；基础模型与上游数据集保留各自条款。

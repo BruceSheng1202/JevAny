@@ -1,5 +1,119 @@
 # Evaluation
 
+## Model family v2
+
+This section contains the full results for the five current LoRA SFT releases.
+Transfer also informed model development; interpret it as a diagnostic comparison.
+The tables below retain the release's evaluation scope and reference provenance.
+
+**Transfer** is a fixed cross-domain and robustness evaluation over 1,046 clean,
+knowable decisions. Its item-level mean spans Emotion, PAWS, QNLI, TweetEval,
+MMLU, MMLU-Pro, SciQ, and four robustness slices. **JevBench** is accuracy across
+all 231 public development items, not the sealed leaderboard score. NLL, Brier,
+and ECE in the main table are Transfer metrics; every run covers every item.
+
+| Model | Transfer ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
+|---|---:|---:|---:|---:|---:|
+| Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
+| Kev-27B (`01b8199`) | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
+| Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
+| Laya (`55cf4c4`) | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
+| **JevAny releases** |  |  |  |  |  |
+| Gemma 4B LoRA | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
+| Qwen3.5 4B LoRA | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
+| Qwen3.5 4B Direct-Token LoRA | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
+| Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
+| **Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
+
+### Transfer breakdown
+
+Columns are dataset or robustness-slice accuracy. Sample counts are respectively
+80 / 80 / 80 / 80 / 80 / 200 / 80 / 80 / 96 / 80 / 110.
+
+| Model | Emo | PAWS | QNLI | Tweet | MMLU | M-Pro | SciQ | Buried | Comp. | Policy | Ctrl. | Mean |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Baselines** |  |  |  |  |  |  |  |  |  |  |  |  |
+| Kev-4B | 53.75 | 73.75 | 92.50 | 73.75 | 70.00 | 50.00 | **98.75** | 66.25 | 92.71 | 77.50 | 92.73 | 74.19 |
+| Kev-27B | 60.00 | 78.75 | **95.00** | 80.00 | 83.75 | 66.00 | 97.50 | 76.25 | 89.58 | 96.25 | **99.09** | 82.31 |
+| Jev 1.13.0 | 58.75 | 80.00 | 91.25 | 81.25 | **90.00** | **84.00** | **98.75** | 70.00 | 90.62 | 97.50 | 94.55 | 85.37 |
+| Laya | 61.25 | 77.50 | 83.75 | 75.00 | 33.75 | 11.00 | 87.50 | 58.75 | 51.04 | 52.50 | 47.27 | 52.29 |
+| **JevAny (Ours)** |  |  |  |  |  |  |  |  |  |  |  |  |
+| Gemma 4B | 75.00 | 80.00 | 91.25 | 80.00 | 65.00 | 38.50 | 97.50 | 70.00 | 67.71 | 77.50 | 81.82 | 70.84 |
+| Qwen 4B P | 86.25 | 75.00 | 93.75 | 81.25 | 77.50 | 58.50 | 97.50 | 77.50 | 87.50 | 76.25 | 81.82 | 78.68 |
+| Qwen 4B DT | 85.00 | 77.50 | **95.00** | 81.25 | 75.00 | 52.50 | **98.75** | 78.75 | 86.46 | 83.75 | 81.82 | 78.20 |
+| Muse 30B | 81.25 | 77.50 | 92.50 | **83.75** | 83.75 | 61.00 | **98.75** | **82.50** | **95.83** | **98.75** | 90.91 | 83.46 |
+| **Qwen 27B** | **90.00** | **86.25** | **95.00** | **83.75** | 86.25 | 68.00 | 97.50 | 78.75 | 90.62 | 97.50 | 92.73 | **85.76** |
+
+`Buried` tests hidden instructions; `Comp.` tests AND/OR/conditional composition;
+`Policy` contrasts authorization/deadline rules; `Ctrl.` contains 11 knowable
+policy controls. Values are percentages.
+
+### JevBench breakdown
+
+| Model | Easy | Original | Hard | Score |
+|---|---:|---:|---:|---:|
+| **Baselines** |  |  |  |  |
+| Kev-4B | **100.00%** | 94.44% | 52.25% | 75.32% |
+| Kev-27B | **100.00%** | **100.00%** | 69.37% | 85.28% |
+| Jev 1.13.0 | **100.00%** | 98.61% | 72.97% | 86.58% |
+| Laya | 95.83% | 70.83% | 33.33% | 58.01% |
+| **JevAny (Ours)** |  |  |  |  |
+| Gemma 4B | **100.00%** | 95.83% | 55.86% | 77.49% |
+| Qwen 4B P | **100.00%** | 95.83% | 61.26% | 80.09% |
+| Qwen 4B DT | **100.00%** | 98.61% | 61.26% | 80.95% |
+| Muse 30B | **100.00%** | 97.22% | 75.68% | 87.45% |
+| **Qwen 27B** | **100.00%** | 98.61% | **81.08%** | **90.48%** |
+
+The direct-token 4B model leads the released 4B models on JevBench, while the
+pointer 4B model is slightly better on Transfer. Kev and Laya use complete local
+public-checkpoint runs (Kev-27B pinned to `01b8199`, Laya to `55cf4c4`); Jev uses
+a complete local API Transfer run and JevBench's published per-tier accuracy.
+
+### What we ablated
+
+- **Pointer structure:** linear, MLP, and zero-initialized residual heads; the
+  residual head won the controlled screen on development NLL and calibration.
+- **Representation readout:** decision-token, query-mean, option-mean, and
+  combined variants. Query-mean led the early screen; the release recipe uses
+  decision-marker / option-close after the full model-family run.
+- **Loss:** cross-entropy, pure InfoNCE, and mixed objectives; CE gave the best
+  Transfer accuracy in the loss sweep, while small contrastive terms mainly
+  improved calibration. The released checkpoints use CE.
+- **Readout family:** at 4B, direct-token improves JevBench (80.95% vs 80.09%),
+  while pointer is slightly stronger on Transfer (78.68% vs 78.20%).
+
+### Reproducibility
+
+Transfer reports 1,046 scored decisions with no missing examples; JevBench reports
+all 231 public development items. Exact suite hashes and unrounded metrics are in
+the machine-readable results. Release manifests, checkpoint-native reload reports,
+and GPU loader/reconstruction parity were checked before publishing.
+
+[Machine-readable release results](../results/model-family-v2.json) ·
+[Historical results](#earlier-releases-and-evaluations) ·
+[Method and ablation report](JEVANY_METHOD_AND_ABLATIONS.pdf)
+([LaTeX source](JEVANY_METHOD_AND_ABLATIONS.tex)).
+
+### Training compute
+
+| Model | Released step | Parallel GPUs | Wall time | GPU-hours |
+|---|---:|---:|---:|---:|
+| Gemma 4B LoRA | 2,771 | 32 H200 | ~3.28 h | ~104.9 |
+| Qwen3.5 4B LoRA | 13,850 | 32 H200 | 10.33 h | 330.6 |
+| Qwen3.5 4B Direct-Token LoRA | 9,695 | 32 H200 | 8.41 h | 269.1 |
+| Muse Glimmer 30B LoRA | 3,324 | 40 H200 | 2.88 h | 115.4 |
+| Qwen3.8 27B LoRA | 22,160 | 32 H200 | 18.83 h | 602.7 |
+
+The five released checkpoints represent approximately **1,423 H200 GPU-hours**
+of training, with at most 40 GPUs used in parallel within one run. GPU-hours are
+elapsed training time through the released checkpoint multiplied by the DDP
+world size; ablations, evaluation, and training after a selected checkpoint are
+excluded. Gemma uses run/checkpoint timestamps because its earlier checkpoint
+format did not store cumulative elapsed seconds; the other figures come from
+checkpoint or terminal trainer telemetry.
+
+## Earlier releases and evaluations
+
 The [JevBench and Kev comparison](EXTERNAL_EVALUATION.md) evaluates both released
 JevAny checkpoints and all 14 distinct released Kev checkpoints across 67 public
 panels. It includes complete result tables, published official Jev references,

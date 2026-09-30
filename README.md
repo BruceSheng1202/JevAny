@@ -16,47 +16,136 @@
 </p>
 
 <p align="center">
-  <strong>One decision API. Five open LoRA checkpoints. Any bounded choice.</strong><br>
-  Turn state, questions, and candidate answers into calibrated choices—without generating answer text.
+  <strong>Train and deploy decision models on open backbones.</strong><br>
+  Give JevAny a state, a question and candidate options. Get a choice and its probabilities through one API.
 </p>
+
+Use JevAny to route support tickets, select an agent's next tool, or choose a
+robot's next action. Start with a released model, then train on your own labelled
+examples. The model scores the supplied options without generating answer text.
 
 <p align="center">
-  <img src="docs/hero.png" alt="JevAny workflow: train a Jev model with multi-modal data and RLCR/SFT, then deploy through a unified API with test environments and practical examples" width="100%">
+  <img src="docs/hero.png" alt="Train a decision model on an open backbone, then deploy it through the same API in your applications" width="100%">
 </p>
 
-| 🤗 [Models](#pretrained-models) | 📊 [Results](#evaluation) | ⚡ [Serve](#inference--serving) | 🛠️ [Train](#training) |
-|---|---|---|---|
-| Gemma, Qwen, Muse | Transfer + JevBench | Python + HTTP | SFT + RLCR |
+[Quickstart](#quickstart) · [Demos](#demos) · [Models](#pretrained-models) · [Results](#evaluation) · [Training](#training) · [Docs](#documentation-and-contributing)
 
 ## Demos
 
-Examples recorded with an earlier compatible JevAny checkpoint:
+These 30 selected successful runs show JevAny choosing actions across robotics,
+browser, software, laboratory and mobility tasks. We recorded them with an
+earlier compatible checkpoint.
 
 [![JevAny choosing actions across robotics, browser, software, laboratory and mobility tasks](docs/demos/jevany-cases.gif)](docs/CASES.md)
 
-[Explore 30 selected successful runs](docs/CASES.md), or try your own model with the [examples and test environments](#examples--test-environments).
+[Explore the cases](docs/CASES.md), or open the playground below to inspect
+recorded actions and option probabilities.
 
-## Installation
+## Quickstart
 
-Use Python 3.12 or newer. Clone the repository and create an environment:
+### Try the playground
+
+Use Python 3.12 or newer. Clone the repository and install the lightweight package:
 
 ```bash
 git clone https://github.com/SimpleJev/JevAny.git
 cd JevAny
 python3.12 -m venv .venv
 source .venv/bin/activate
+python -m pip install -e .
+jevany demo
 ```
 
-Choose the dependencies for your use case:
+Open `http://127.0.0.1:8090` and choose **Replay** to watch a recorded run.
+The included replays need no GPU, model download or inference server; this
+installation does not install PyTorch. Press Ctrl+C in the terminal to stop.
 
-| Use case | Install |
-|---|---|
-| Call an existing HTTP server | `python -m pip install -e .` |
-| Train a text model | `python -m pip install -e '.[train]'` |
-| Run a text model locally or serve it over HTTP | `python -m pip install -e '.[serve]'` |
-| Run a released model with native media support | `python -m pip install -e '.[serve,multimodal]'` |
+Run the following commands from the repository root with this environment active.
 
-The client-only installation does not install PyTorch. For image/video training, use `.[train,multimodal]`. Run the commands below from the repository root; model-specific hardware requirements are listed under [Pretrained Models](#pretrained-models).
+### Route a support ticket
+
+To run a model yourself, install the serving dependencies and start the released
+Qwen 4B model. This example uses a CUDA GPU with enough memory for the base model
+and runtime; see the [hardware and loading guide](docs/DEPLOYMENT.md#checkpoints-and-hardware).
+
+```bash
+python -m pip install -e '.[serve,multimodal]'
+jevany serve --checkpoint tianxinwei/JevAny-Qwen3.5-4B-LoRA \
+  --device cuda --dtype bf16 --port 8008
+```
+
+Keep the server running. In a Python session using the same environment, send a
+ticket and the departments that can handle it:
+
+```python
+from jevany import Choice, JevClient
+
+jev = JevClient("http://127.0.0.1:8008")
+result = jev.system_one(
+    state={"ticket": "I was charged twice. Please help."},
+    questions={
+        "department": Choice(
+            instructions="Which team should handle this?",
+            criteria={"billing": "Payment problems", "shipping": "Delivery problems"},
+        ),
+    },
+)
+answer = result["answers"]["department"]
+print("Selected team:", answer["choice"])
+print("Probabilities:", answer["probabilities"])
+```
+
+`choice` is one of the department names; `probabilities` maps each name to its
+probability. Your application can use these fields to route the ticket or ask
+for review when the decision is uncertain.
+
+Use `Noul` for yes/no questions, such as whether a ticket needs urgent review,
+and `Score` for ordered levels, such as low, normal and high priority.
+See the [API reference](docs/API.md) for all three question types, or
+[load a model in your Python process](docs/DEPLOYMENT.md#python) to use the same
+interface without an HTTP server. Image and video inputs require the
+[media setup](docs/DEPLOYMENT.md#native-media-and-limits).
+
+## Examples & Test Environments
+
+The playground includes the three environments below. These GIFs show accelerated
+replays from an earlier compatible checkpoint, preserving its actual choices
+and original option probabilities.
+
+### [Robot peg insertion](examples/README.md#robot-peg-insertion)
+
+Use a Franka gripper to grasp, align and insert a peg, checked by PyBullet contact physics.
+
+![Robot browser replay showing the Franka arm inserting a peg, recorded model probabilities and physical success checks](docs/demos/playground-arm.gif)
+
+### [Doom corridor · 3D](examples/README.md#doom-corridor-3d)
+
+Clear the final room by defeating the enemies on the left and right, then move
+forward. Uses ViZDoom and the included Freedoom assets.
+
+![Doom checkpoint replay: kill both enemies, then advance](docs/demos/playground-doom.gif)
+
+### [Crafter survival · 2D](examples/README.md#crafter-survival-2d)
+
+Gather wood, craft tools and mine stone while managing health and supplies.
+
+![Crafter browser replay showing resource gathering, crafting actions and progress through four goal milestones](docs/demos/playground-crafter.gif)
+
+### Run your model in the playground
+
+Stop the replay-only playground and keep your model server running. Install the
+optional game engines, then restart the playground with the server address:
+
+```bash
+python -m pip install -e '.[demo]'
+jevany demo --base-url http://127.0.0.1:8008 --text-only
+```
+
+Choose **Run model** in the browser, or **Play yourself** to control the game.
+Live model runs currently use text state. Robot control needs the separate
+`.[robotics]` extra. See the [playground guide](examples/README.md) for platform
+requirements and environment APIs, or [integrations](docs/INTEGRATIONS.md) to
+combine JevAny decisions with an LLM planner.
 
 ## Pretrained Models
 
@@ -73,55 +162,22 @@ its license and access terms apply. Allow roughly twice the base parameter count
 in bytes for BF16 weights, plus runtime memory. See the
 [hardware and loading guide](docs/DEPLOYMENT.md#checkpoints-and-hardware).
 
-### Training compute
-
-| Model | Released step | Parallel GPUs | Wall time | GPU-hours |
-|---|---:|---:|---:|---:|
-| Gemma 4B LoRA | 2,771 | 32 H200 | ~3.28 h | ~104.9 |
-| Qwen3.5 4B LoRA | 13,850 | 32 H200 | 10.33 h | 330.6 |
-| Qwen3.5 4B Direct-Token LoRA | 9,695 | 32 H200 | 8.41 h | 269.1 |
-| Muse Glimmer 30B LoRA | 3,324 | 40 H200 | 2.88 h | 115.4 |
-| Qwen3.8 27B LoRA | 22,160 | 32 H200 | 18.83 h | 602.7 |
-
-The five released checkpoints represent approximately **1,423 H200 GPU-hours**
-of training, with at most 40 GPUs used in parallel within one run. GPU-hours are
-elapsed training time through the released checkpoint multiplied by the DDP
-world size; ablations, evaluation, and training after a selected checkpoint are
-excluded. Gemma uses run/checkpoint timestamps because its earlier checkpoint
-format did not store cumulative elapsed seconds; the other figures come from
-checkpoint or terminal trainer telemetry.
-
-### Pointer vs direct-token
-
-- **Pointer:** a compact learned head scores the decision marker against option
-  representations. It trains efficiently and supports more than 255 choices,
-  subject to the context window.
-- **Direct-token:** the base LM head scores 255 fixed single-token option labels.
-  It leads the released 4B models on JevBench, but full-vocabulary training is
-  slower and requests are limited to 255 choices.
-- **Inference:** both use one backbone prefill and no answer generation, so
-  latency should be similar for comparable inputs.
-
-### Release roadmap
-
-- **Now:** five verified LoRA checkpoints.
-- **Next:** full-parameter SFT.
-- **Later:** improved post-training and hyperparameter-optimized variants.
+Pointer and direct-token models share the same API. Pointer supports up to
+4,096 options within the context limit; direct-token supports up to 255.
+See [readout choices](docs/TRAINING.md#pointer-and-direct-token-readouts) for
+training and accuracy tradeoffs.
 
 ## Evaluation
 
-**Transfer** is a fixed cross-domain and robustness evaluation over 1,046 clean,
-knowable decisions. Its item-level mean spans Emotion, PAWS, QNLI, TweetEval,
-MMLU, MMLU-Pro, SciQ, and four robustness slices. **JevBench** is accuracy across
-all 231 public development items, not the sealed leaderboard score. NLL, Brier,
-and ECE in the main table are Transfer metrics; every run covers every item.
+Qwen3.8 27B has the highest accuracy in this comparison. Among the released 4B
+models, direct-token leads on JevBench and pointer leads on Transfer.
 
 | Model | Transfer ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
 |---|---:|---:|---:|---:|---:|
 | Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
-| Kev-27B (`01b8199`) | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
+| Kev-27B | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
 | Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
-| Laya (`55cf4c4`) | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
+| Laya | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
 | **JevAny releases** |  |  |  |  |  |
 | Gemma 4B LoRA | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
 | Qwen3.5 4B LoRA | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
@@ -129,202 +185,61 @@ and ECE in the main table are Transfer metrics; every run covers every item.
 | Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
 | **Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
-### Transfer breakdown
+**Transfer** covers 1,046 scored decisions across classification, question
+answering and robustness tasks. **JevBench** covers all 231 public development
+items; these are not sealed leaderboard scores. Transfer also informed model
+development, so treat these results as a diagnostic comparison.
 
-Columns are dataset or robustness-slice accuracy. Sample counts are respectively
-80 / 80 / 80 / 80 / 80 / 200 / 80 / 80 / 96 / 80 / 110.
+NLL, Brier and ECE assess prediction probabilities on Transfer; lower is better.
+Kev and Laya results come from complete public-checkpoint runs. Jev combines a
+complete API Transfer run with published JevBench results.
 
-| Model | Emo | PAWS | QNLI | Tweet | MMLU | M-Pro | SciQ | Buried | Comp. | Policy | Ctrl. | Mean |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| **Baselines** |  |  |  |  |  |  |  |  |  |  |  |  |
-| Kev-4B | 53.75 | 73.75 | 92.50 | 73.75 | 70.00 | 50.00 | 98.75 | 66.25 | 92.71 | 77.50 | 92.73 | 74.19 |
-| Kev-27B | 60.00 | 78.75 | 95.00 | 80.00 | 83.75 | 66.00 | 97.50 | 76.25 | 89.58 | 96.25 | 99.09 | 82.31 |
-| Jev 1.13.0 | 58.75 | 80.00 | 91.25 | 81.25 | 90.00 | 84.00 | 98.75 | 70.00 | 90.62 | 97.50 | 94.55 | 85.37 |
-| Laya | 61.25 | 77.50 | 83.75 | 75.00 | 33.75 | 11.00 | 87.50 | 58.75 | 51.04 | 52.50 | 47.27 | 52.29 |
-| **JevAny (Ours)** |  |  |  |  |  |  |  |  |  |  |  |  |
-| Gemma 4B | 75.00 | 80.00 | 91.25 | 80.00 | 65.00 | 38.50 | 97.50 | 70.00 | 67.71 | 77.50 | 81.82 | 70.84 |
-| Qwen 4B P | 86.25 | 75.00 | 93.75 | 81.25 | 77.50 | 58.50 | 97.50 | 77.50 | 87.50 | 76.25 | 81.82 | 78.68 |
-| Qwen 4B DT | 85.00 | 77.50 | 95.00 | 81.25 | 75.00 | 52.50 | 98.75 | 78.75 | 86.46 | 83.75 | 81.82 | 78.20 |
-| Muse 30B | 81.25 | 77.50 | 92.50 | 83.75 | 83.75 | 61.00 | 98.75 | 82.50 | 95.83 | 98.75 | 90.91 | 83.46 |
-| **Qwen 27B** | **90.00** | **86.25** | **95.00** | **83.75** | **86.25** | **68.00** | **97.50** | **78.75** | **90.62** | **97.50** | **92.73** | **85.76** |
-
-`Buried` tests hidden instructions; `Comp.` tests AND/OR/conditional composition;
-`Policy` contrasts authorization/deadline rules; `Ctrl.` contains 11 knowable
-policy controls. Values are percentages.
-
-### JevBench breakdown
-
-| Model | Easy | Original | Hard | Score |
-|---|---:|---:|---:|---:|
-| **Baselines** |  |  |  |  |
-| Kev-4B | 100.00% | 94.44% | 52.25% | 75.32% |
-| Kev-27B | 100.00% | 100.00% | 69.37% | 85.28% |
-| Jev 1.13.0 | 100.00% | 98.61% | 72.97% | 86.58% |
-| Laya | 95.83% | 70.83% | 33.33% | 58.01% |
-| **JevAny (Ours)** |  |  |  |  |
-| Gemma 4B | 100.00% | 95.83% | 55.86% | 77.49% |
-| Qwen 4B P | 100.00% | 95.83% | 61.26% | 80.09% |
-| Qwen 4B DT | 100.00% | 98.61% | 61.26% | 80.95% |
-| Muse 30B | 100.00% | 97.22% | 75.68% | 87.45% |
-| **Qwen 27B** | **100.00%** | **98.61%** | **81.08%** | **90.48%** |
-
-The direct-token 4B model leads the released 4B models on JevBench, while the
-pointer 4B model is slightly better on Transfer. Kev and Laya use complete local
-public-checkpoint runs (Kev-27B pinned to `01b8199`, Laya to `55cf4c4`); Jev uses
-a complete local API Transfer run and JevBench's published per-tier accuracy.
-
-### What we ablated
-
-- **Pointer structure:** linear, MLP, and zero-initialized residual heads; the
-  residual head won the controlled screen on development NLL and calibration.
-- **Representation readout:** decision-token, query-mean, option-mean, and
-  combined variants. Query-mean led the early screen; the release recipe uses
-  decision-marker / option-close after the full model-family run.
-- **Loss:** cross-entropy, pure InfoNCE, and mixed objectives; CE gave the best
-  Transfer accuracy in the loss sweep, while small contrastive terms mainly
-  improved calibration. The released checkpoints use CE.
-- **Readout family:** at 4B, direct-token improves JevBench (80.95% vs 80.09%),
-  while pointer is slightly stronger on Transfer (78.68% vs 78.20%).
-
-### Reproducibility
-
-Transfer reports 1,046 scored decisions with no missing examples; JevBench reports
-all 231 public development items. Exact suite hashes and unrounded metrics are in
-the machine-readable results. Release manifests, checkpoint-native reload reports,
-and GPU loader/reconstruction parity were checked before publishing.
-
-[Machine-readable release results](results/model-family-v2.json) ·
-[Evaluation protocols and historical results](docs/EVALUATION.md) ·
+[Full results and protocols](docs/EVALUATION.md#model-family-v2) ·
+[Machine-readable results](results/model-family-v2.json) ·
 [Method and ablation report](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
-([LaTeX source](docs/JEVANY_METHOD_AND_ABLATIONS.tex)).
-
-## Inference & Serving
-
-### Python API
-
-With an [HTTP server](#http-server) running, send a state and a question with named options. The answer contains the selected option and each option's probability:
-
-```python
-from jevany import Choice, JevClient
-
-state = {"ticket": "I was charged twice. Please help."}
-questions = {
-    "department": Choice(
-        instructions="Which team should handle this?",
-        criteria={"billing": "Payment problems", "shipping": "Delivery problems"},
-    ),
-}
-
-jev = JevClient("http://127.0.0.1:8008")
-result = jev.system_one(state=state, questions=questions)
-answer = result["answers"]["department"]
-print(answer["choice"])
-print(answer["probabilities"])
-```
-
-Use `Noul` for binary questions and `Score` for ordered levels. The [API reference](docs/API.md) describes all three question types and the Jev-compatible request/answer format.
-
-### HTTP Server
-
-For the default released model, install `.[serve,multimodal]` and use hardware that meets the [27B requirements](#pretrained-models):
-
-```bash
-jevany serve --checkpoint tianxinwei/JevAny-Qwen3.8-27B-LoRA \
-  --device cuda --dtype bf16 --port 8008
-```
-
-To serve the smaller model from the SFT example instead:
-
-```bash
-jevany serve --checkpoint runs/my-jev --model-name my-jev --port 8008
-```
-
-### In-Process Inference
-
-Load a checkpoint once in your application and reuse `state` and `questions` from the example above:
-
-```python
-from jevany import JevModel
-
-jev = JevModel.from_pretrained("runs/my-jev", model_name="my-jev")
-result = jev.system_one(state=state, questions=questions)
-```
-
-See the [deployment guide](docs/DEPLOYMENT.md) for more ways to call a model and [media setup](docs/DEPLOYMENT.md#native-media-and-limits) for image and video inputs.
-
-## Examples & Test Environments
-
-Open the playground in your local browser. The included replays need no GPU, model download, or inference server:
-
-```bash
-python -m pip install -e .
-jevany demo
-```
-
-These GIFs show accelerated replays from an earlier compatible JevAny checkpoint. Each replay preserves the model's actual choices and original option probabilities.
-
-### [Robot peg insertion](examples/README.md#robot-peg-insertion)
-
-Use a Franka gripper to grasp, align and insert a peg, checked by PyBullet contact physics.
-
-![Robot browser replay showing the Franka arm inserting a peg, recorded model probabilities and physical success checks](docs/demos/playground-arm.gif)
-
-### [Doom corridor · 3D](examples/README.md#doom-corridor-3d)
-
-Start in the final room, kill the enemies on the left and right, then move forward through the cleared room. Uses ViZDoom and the included Freedoom assets.
-
-![Doom checkpoint replay: kill both enemies, then advance](docs/demos/playground-doom.gif)
-
-### [Crafter survival · 2D](examples/README.md#crafter-survival-2d)
-
-Gather wood, craft tools and mine stone while managing health and supplies.
-
-![Crafter browser replay showing resource gathering, crafting actions and progress through four goal milestones](docs/demos/playground-crafter.gif)
-
-### Live control
-
-Install the optional game engines to play yourself, or connect a [running model server](#http-server) and choose **Run model** in the browser:
-
-```bash
-python -m pip install -e '.[demo]'
-jevany demo --base-url http://127.0.0.1:8008 --text-only
-```
-
-Live model runs currently use text state. Robot control uses the separate `.[robotics]` extra. See the [playground guide](examples/README.md) for setup, platform requirements and environment APIs, or [integrations](docs/INTEGRATIONS.md) to combine Jev decisions with an LLM planner.
 
 ## Training
 
-The current family was trained on **1,772,725 text records / 2,180,242 labelled
-decisions** spanning preference, agent/tool decisions, reasoning, classification,
-and safety.
+Train on the same `state` and `questions` you send at inference, with a label
+for each question. The bundled synthetic support tickets demonstrate the
+workflow; use your own labelled data to train for your application.
 
-Prepare the included starter data:
+The starter recipe uses Qwen3.5-0.8B on CUDA with BF16 and writes `runs/my-jev`:
 
 ```bash
+python -m pip install -e '.[train]'
 jevany data init --out data/starter
 jevany data validate data/starter/train.jsonl
-```
-
-### SFT
-
-```bash
 jevany train --config recipes/sft.toml --dry-run
 jevany train --config recipes/sft.toml
 ```
 
-Use your own JSONL with `--data`, or continue a released model with
-[`recipes/finetune.toml`](recipes/finetune.toml).
+After training, try the checkpoint on the included ticket request:
 
-### RLCR
+```bash
+jevany decide examples/request.json --checkpoint runs/my-jev
+```
 
-Continue an SFT checkpoint with correctness-and-calibration rewards:
+Pass `--data` to train on your own JSONL, or use
+[`recipes/finetune.toml`](recipes/finetune.toml) to adapt the released 27B model.
+See the [training guide](docs/TRAINING.md) for CPU settings, multimodal data and
+standard `torchrun` launches. For image/video training, install `.[train,multimodal]`.
+
+### Experiment with RLCR
+
+After SFT, you can continue training with rewards for correctness and probability
+calibration. RLCR is experimental:
 
 ```bash
 jevany train --config recipes/rlcr.toml
 ```
 
-[Training guide](docs/TRAINING.md) · [Data format](docs/DATA.md) ·
-[RLCR objective](docs/ALGORITHM.md#rlcr)
+The released family uses LoRA SFT, trained on 1,772,725 text records containing
+2,180,242 labelled decisions. Full-parameter SFT and further post-training
+improvements are planned.
+
+[Data format](docs/DATA.md) · [RLCR objective](docs/ALGORITHM.md#rlcr) ·
+[Training compute and experiments](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
 
 ## Supported Model Families
 
@@ -334,6 +249,11 @@ jevany train --config recipes/rlcr.toml
 
 ## Documentation and Contributing
 
-[Training](docs/TRAINING.md) · [Deployment](docs/DEPLOYMENT.md) · [API compatibility](docs/API.md) · [Data](docs/DATA.md) · [Evaluation](docs/EVALUATION.md) · [Contributing](CONTRIBUTING.md)
+[Training](docs/TRAINING.md) · [Deployment](docs/DEPLOYMENT.md) · [API](docs/API.md) · [Data](docs/DATA.md) · [Evaluation](docs/EVALUATION.md) · [Contributing](CONTRIBUTING.md)
+
+To contribute a model adapter, evaluation or application example, start with the
+[contribution guide](CONTRIBUTING.md). The
+[method report](docs/JEVANY_METHOD_AND_ABLATIONS.pdf) and its
+[LaTeX source](docs/JEVANY_METHOD_AND_ABLATIONS.tex) describe the model design and experiments.
 
 JevAny is independent of Jev and TypeSafe and includes no Jev weights or private implementation. It includes infrastructure adapted from [Kev](https://github.com/jaredpalmer/kev); see [NOTICE](NOTICE) and [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md). Code and starter data are Apache-2.0. Base models and upstream datasets retain their own terms.

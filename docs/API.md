@@ -82,11 +82,15 @@ weights, predictions, calibration, or hosted service behavior.
 | Model IDs | Deployment-specific identity; one checkpoint per server |
 | Authentication | None on the local server; optional at a gateway |
 | State | Text or structured JSON; additionally accepts top-level scalar/null values |
-| Choice | 1–255 options |
-| Score | 2–255 levels; stay within 2–10 for the documented hosted API contract |
+| Choice | 1–4,096 options for pointer checkpoints; 1–255 for direct-token |
+| Score | 2–4,096 levels for pointer checkpoints; 2–255 for direct-token |
 | Media | JevAny-specific `media: [{type, uri}]` local-file extension |
 | Confidence | Computed locally from the option distribution; exact hosted formulas are not guaranteed |
 | Usage | Local token accounting, not hosted billing parity |
+
+These option counts are API limits; the complete request must also fit the
+checkpoint's context and configured token limits. To stay within the documented
+hosted Jev API contract, use at most 255 choices and 2–10 score levels.
 
 Choice confidence is `(max_probability - 1/K) / (1 - 1/K)`, or 1 for a single
 option. Score confidence is `1 - E[abs(level - mode)] / (L - 1)`. Use raw
