@@ -110,7 +110,7 @@ def draw(models: list[dict]):
     text(48, 154, "#", 16, MUTED)
     text(90, 154, "Model", 17, weight="bold")
     text(508, 154, "Mean accuracy (%)", 17, weight="bold")
-    text(1190, 148, "Transfer", 18, weight="bold", ha="center")
+    text(1190, 148, "Kev Transfer-v9", 16, weight="bold", ha="center")
     text(1330, 148, "JevBench", 18, weight="bold", ha="center")
     text(1190, 174, "1,046 decisions", 13, MUTED, ha="center")
     text(1330, 174, "231 public-dev items", 13, MUTED, ha="center")
@@ -141,7 +141,7 @@ def draw(models: list[dict]):
                  weight="bold" if best else "normal", ha="center")
 
     line(48, 755, 1392, 755)
-    text(48, 788, "Mean = 50% Transfer + 50% JevBench. Higher is better.", 18)
+    text(48, 788, "Mean = 50% Kev Transfer-v9 + 50% JevBench. Higher is better.", 18)
     text(
         48, 820,
         "Draft summary of the evaluated models. JevBench uses public development items; "
@@ -164,7 +164,7 @@ def main() -> None:
     fig = draw(models)
     description = (
         "All models in results/model-family-v2.json, ranked by the equal-weight "
-        "mean of Transfer and JevBench public-development accuracy. "
+        "mean of Kev Transfer-v9 and JevBench public-development accuracy. "
         + " ".join(f'{m["label"]} ({m["detail"]}): {m["mean"]:.2f}.' for m in models)
     )
     fig.savefig(

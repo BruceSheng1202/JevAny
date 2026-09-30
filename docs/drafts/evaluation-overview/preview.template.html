@@ -52,7 +52,7 @@
   <h1>让读者看清每个 checkpoint 的位置</h1>
   <p class="muted">按两套评测的平均准确率排序；青绿色代表 JevAny，灰色代表基线。包含当前 README 的全部九个模型。</p>
   <div class="figure">
-    <img src="overview.svg" alt="按 Transfer 与 JevBench 平均准确率排序的模型对比。青绿色为 JevAny checkpoint，灰色为基线；右侧列出分项准确率。完整数值也可在下方互动排名中阅读。">
+    <img src="overview.svg" alt="按 Kev Transfer-v9 与 JevBench 平均准确率排序的模型对比。青绿色为 JevAny checkpoint，灰色为基线；右侧列出分项准确率。完整数值也可在下方互动排名中阅读。">
   </div>
   <nav class="links" aria-label="配图下载">
     <a href="overview.png">PNG 高清图</a>
@@ -65,9 +65,9 @@
     <summary>试调综合分的权重</summary>
     <p class="muted">上方导出的配图固定为 50/50。下方可比较不同权重下的排序；这是草稿讨论工具，不会修改原始结果或导出的图。</p>
     <div class="controls">
-      <label for="weight">Transfer 权重</label>
+      <label for="weight">Kev Transfer-v9 权重</label>
       <input id="weight" type="range" min="0" max="100" step="1" value="50">
-      <output id="weights" for="weight">Transfer 50% · JevBench 50%</output>
+      <output id="weights" for="weight">Kev Transfer-v9 50% · JevBench 50%</output>
       <button id="reset" type="button">两套等权</button>
       <button id="pooled" type="button">每题等权</button>
     </div>
@@ -77,11 +77,11 @@
   </details>
   <div class="notes">
     <h2>综合分的口径</h2>
-    <p>默认采用 <strong>0.5 × Transfer accuracy + 0.5 × JevBench accuracy</strong>，计算使用发布结果中的未四舍五入数值。Transfer 内部沿用原有的逐题平均；整个 Transfer 套件和整个 JevBench 套件各占一半。</p>
+    <p>默认采用 <strong>0.5 × Kev Transfer-v9 accuracy + 0.5 × JevBench accuracy</strong>，计算使用发布结果中的未四舍五入数值。Kev Transfer-v9 内部沿用原有的逐题平均；整个 Kev Transfer-v9 套件和整个 JevBench 套件各占一半。</p>
     <ul>
       <li>这个数值是两套准确率的草稿汇总，不是 Artificial Analysis Intelligence Index，也不代表通用智能或所有模型的全球排名。</li>
       <li>NLL、Brier、ECE 保留在原表中。将准确率、概率质量和校准误差混成单一总分，需要另行定义归一化和权重。</li>
-      <li>JevBench 使用 231 个公开开发题；Jev 1.13.0 的 JevBench 值来自已发布结果，Transfer 值来自本地 API 评测。</li>
+      <li>JevBench 使用 231 个公开开发题；Jev 1.13.0 的 JevBench 值来自已发布结果，Kev Transfer-v9 值来自本地 API 评测。</li>
       <li>4B pointer 与 direct-token 的差距较小；两套等权时 direct-token 在前，每题等权时 pointer 在前。当前汇总文件不足以计算模型间差异的配对置信区间，排序不表示统计显著性。</li>
     </ul>
     <h2>参考的设计</h2>
@@ -99,10 +99,10 @@
   const ranking = document.querySelector("#ranking");
   function render(transferWeight, pooled = false) {
     const percent = value => `${value.toFixed(pooled ? 2 : 0)}%`;
-    weights.textContent = `Transfer ${percent(100 * transferWeight)} · JevBench ${percent(100 * (1 - transferWeight))}`;
+    weights.textContent = `Kev Transfer-v9 ${percent(100 * transferWeight)} · JevBench ${percent(100 * (1 - transferWeight))}`;
     method.textContent = pooled
-      ? "每题等权：(1,046 × Transfer + 231 × JevBench) / 1,277。"
-      : `综合分 = ${transferWeight.toFixed(2)} × Transfer + ${(1 - transferWeight).toFixed(2)} × JevBench。柱长范围为 0–100。`;
+      ? "每题等权：(1,046 × Kev Transfer-v9 + 231 × JevBench) / 1,277。"
+      : `综合分 = ${transferWeight.toFixed(2)} × Kev Transfer-v9 + ${(1 - transferWeight).toFixed(2)} × JevBench。柱长范围为 0–100。`;
     const ordered = models.map(model => ({
       ...model, score: transferWeight * model.transfer + (1 - transferWeight) * model.jevbench
     })).sort((a, b) => b.score - a.score);
@@ -117,7 +117,7 @@
       label.className = "model";
       label.append(document.createTextNode(model.label));
       const detail = document.createElement("small");
-      detail.textContent = `${model.detail} · Transfer ${model.transfer.toFixed(2)} · JevBench ${model.jevbench.toFixed(2)}`;
+      detail.textContent = `${model.detail} · Kev Transfer-v9 ${model.transfer.toFixed(2)} · JevBench ${model.jevbench.toFixed(2)}`;
       label.append(detail);
       const track = document.createElement("div");
       track.className = "bartrack";

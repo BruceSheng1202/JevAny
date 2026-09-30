@@ -170,9 +170,9 @@ training and accuracy tradeoffs.
 ## Evaluation
 
 Qwen3.8 27B has the highest accuracy in this comparison. Among the released 4B
-models, direct-token leads on JevBench and pointer leads on Transfer.
+models, direct-token leads on JevBench and pointer leads on Kev Transfer-v9.
 
-| Model | Transfer ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
+| Model | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
 |---|---:|---:|---:|---:|---:|
 | Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
 | Kev-27B | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
@@ -185,14 +185,14 @@ models, direct-token leads on JevBench and pointer leads on Transfer.
 | Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
 | **Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
-**Transfer** covers 1,046 scored decisions across classification, question
+**Kev Transfer-v9** covers 1,046 scored decisions across classification, question
 answering and robustness tasks. **JevBench** covers all 231 public development
-items; these are not sealed leaderboard scores. Transfer also informed model
+items; these are not sealed leaderboard scores. Kev Transfer-v9 also informed model
 development, so treat these results as a diagnostic comparison.
 
-NLL, Brier and ECE assess prediction probabilities on Transfer; lower is better.
+NLL, Brier and ECE assess prediction probabilities on Kev Transfer-v9; lower is better.
 Kev and Laya results come from complete public-checkpoint runs. Jev combines a
-complete API Transfer run with published JevBench results.
+complete Kev Transfer-v9 API run with published JevBench results.
 
 [Full results and protocols](docs/EVALUATION.md#model-family-v2) ·
 [Machine-readable results](results/model-family-v2.json) ·
