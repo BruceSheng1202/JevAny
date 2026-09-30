@@ -118,6 +118,11 @@ jevany serve --checkpoint SimpleJev/JevAny-Qwen3.5-4B-LoRA \
   --device cuda --dtype bf16 --port 8008
 ```
 
+The default path favors reproducibility. CUDA deployments can opt into BF16
+LoRA merging, SDPA and `torch.compile`; the useful settings differ between 4B
+and 27B. See the [inference acceleration guide](docs/DEPLOYMENT.md#optional-cuda-acceleration)
+for commands, H200 measurements and accuracy caveats.
+
 To serve your training output, replace the checkpoint ID with `runs/my-jev`.
 Keep the server running. In a Python session using the same environment, send
 a ticket and the departments that can handle it:

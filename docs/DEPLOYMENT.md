@@ -137,6 +137,33 @@ evaluation.
 
 ### Optional CUDA acceleration
 
+The serving controls below are independent. Published benchmark scores use the
+exact checkpoint path unless their report says otherwise.
+
+| Control | Values | 4B recommendation | 27B recommendation | What it changes |
+|---|---|---|---|---|
+| `--dtype` / `JEVANY_DTYPE` | `fp32`, `fp16`, `bf16` | `bf16` | `bf16` | Backbone arithmetic and memory use |
+| `JEVANY_MERGE_BF16` | `0`, `1` | Usually unnecessary | `1` for serving | Permits an approximate BF16 LoRA merge |
+| `JEVANY_ATTN` | `sdpa`, `eager` | `sdpa` | `sdpa` | Backend for the full-attention layers |
+| `JEVANY_COMPILE` | `0`, `default`, `reduce-overhead`, `max-autotune`, `max-autotune-no-cudagraphs` | `reduce-overhead` only for a persistent service with recurring shapes | `0` | Optional `torch.compile`; `reduce-overhead` may capture compatible graph segments |
+
+Qwen3.5 and Qwen3.8 mix full-attention layers with Gated DeltaNet layers.
+`JEVANY_ATTN` controls only the full-attention layers. Install
+`flash-linear-attention` to accelerate the DeltaNet layers. Transformers detects
+it automatically and otherwise uses its slower PyTorch implementation.
+`causal-conv1d` is also detected automatically, but an H200 prefill test did not
+find a latency benefit from it.
+
+```bash
+python -m pip install flash-linear-attention causal-conv1d
+```
+
+On an H200 with a BF16 Qwen3.5-4B backbone, batch size 1 and SDPA, FLA reduced
+long-request GPU p90 from 82.81 ms to 47.62 ms. Short-request p90 changed from
+51.35 ms to 47.88 ms. Adding `causal-conv1d` to FLA added about 1 ms in that
+prefill-only test. SDPA was about 2% faster than eager. These are warmed GPU
+forward measurements, not HTTP latency.
+
 The exact BF16 path keeps LoRA weights separate. For latency-sensitive serving,
 merge them into the BF16 backbone at load time:
 
@@ -165,6 +192,22 @@ H200 measurements it improved warmed 4B forwards by roughly 15–21%, but did no
 materially improve 27B latency. Use it for a persistent 4B service with recurring
 shapes, not for short evaluation jobs. Set `JEVANY_COMPILE=default` to compile
 without requesting CUDA Graphs, or `JEVANY_COMPILE=0` to disable compilation.
+
+A separate native CUDA Graph microbenchmark measured fixed 96-token and
+512-token 4B forwards at 8.91 ms and 16.44 ms, compared with eager execution at
+47.03 ms and 46.08 ms. Capture took about 1.1 seconds per shape and retained
+about 64 MiB per graph. The inputs, tensor addresses and shapes were fixed, and
+the measurement excluded tokenization, transfers and HTTP work. JevAny does not
+currently expose this direct capture path as a serving option. Do not use those
+numbers as dynamic request latency.
+
+For a latency-oriented 27B deployment, keep compilation off:
+
+```bash
+JEVANY_MERGE_BF16=1 JEVANY_ATTN=sdpa JEVANY_COMPILE=0 \
+  jevany serve --checkpoint SimpleJev/JevAny-Qwen3.8-27B-LoRA \
+  --device cuda --dtype bf16
+```
 
 ## A lightweight HTTP client
 

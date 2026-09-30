@@ -112,6 +112,10 @@ jevany serve --checkpoint SimpleJev/JevAny-Qwen3.5-4B-LoRA \
   --device cuda --dtype bf16 --port 8008
 ```
 
+默认路径优先保证结果可复现。CUDA 部署可选择 BF16 LoRA 融合、SDPA 和
+`torch.compile`，4B 与 27B 的推荐配置不同。具体命令、H200 实测数据和精度说明见
+[推理加速指南](docs/DEPLOYMENT.md#optional-cuda-acceleration)。
+
 部署自己的训练结果时，将 checkpoint ID 替换为 `runs/my-jev`。
 保持服务运行，在使用相同虚拟环境的 Python 会话中，发送工单和候选处理部门：
 
