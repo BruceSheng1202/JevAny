@@ -5,7 +5,7 @@
 This is the one place that knows the layout of `head.pt` and how a checkpoint becomes a `DecisionModel`:
 `jevany.serve`, `jevany.benchmark` and `jevany.train --init_from` all go through it.
 
-    ck = Checkpoint("tianxinwei/JevAny-Qwen3.8-27B-LoRA")  # or a local run directory; `@tag` pins a Hub revision
+    ck = Checkpoint("SimpleJev/JevAny-Qwen3.8-27B-LoRA")  # or a local run directory; `@tag` pins a Hub revision
     tok, model = ck.load("mps", LoadOptions.from_env())
     ck.meta.temperature                             # the calibration the checkpoint carries
 """
@@ -28,7 +28,7 @@ def is_hub_id(run):
 
 
 def resolve_run(run):
-    """Local run directory or a Hub ID such as tianxinwei/JevAny-Qwen3.8-27B-LoRA, optionally pinned."""
+    """Local run directory or a Hub ID such as SimpleJev/JevAny-Qwen3.8-27B-LoRA, optionally pinned."""
     if os.path.isdir(run):
         if not (Path(run) / "head.pt").is_file():
             raise ValueError(f"{run}: missing head.pt; pass a trained JevAny checkpoint, not base weights")

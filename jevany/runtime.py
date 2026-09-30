@@ -14,7 +14,7 @@ from .device import default_device, sync
 from .inference import InferenceOptions
 from .model import DecisionModel
 
-DEFAULT_CHECKPOINT = "tianxinwei/JevAny-Qwen3.8-27B-LoRA"
+DEFAULT_CHECKPOINT = "SimpleJev/JevAny-Qwen3.8-27B-LoRA"
 
 
 @dataclass
