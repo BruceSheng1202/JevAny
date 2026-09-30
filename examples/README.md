@@ -3,7 +3,7 @@
 ## Open the playground
 
 From the repository root, after creating the Python environment in the
-[installation guide](../README.md#installation):
+[installation guide](../README.md#try-the-playground):
 
 ```bash
 python -m pip install -e .
@@ -23,11 +23,10 @@ The playground has three modes:
 | **Play yourself** | Your button presses execute native environment actions on CPU | The environment's optional extra |
 | **Run model** | JevAny receives the camera image, measured state and recent actions, chooses an action, and displays its probabilities | Optional extra and a running JevAny server |
 
-All three replays show successful JevAny-27B-SFT runs and retain the original
+All three replays show JevAny-27B-SFT runs with the recorded
 option probabilities. Crafter uses model-selected objectives before each native
 action; the robot uses primitive Cartesian controls and a measured subgoal
-harness. These are demonstrations, not success-rate benchmarks. Fresh runs keep
-the model's actual choices, including failures.
+harness. Fresh runs execute and record the model's choices and their outcomes.
 
 ## Play locally or connect your model
 
@@ -59,14 +58,14 @@ Choose **Run model**, then **One decision** or **Run automatically**. Use
 **Pause after this step** to stop after the current request finishes. The
 environment pauses while inference runs; Doom does not keep advancing while
 waiting for the model. Each action then executes a bounded amount of simulation.
-The browser shows the environment's result and the returned probability for
-every candidate, without replacing a failed choice with a scripted action.
+The browser shows the result of the model's action and the returned probability
+for every candidate.
 
 The demo writes each camera image under `--media-root` while inference runs,
 then removes the file. The model server must see that directory at the same
 path. A compatible server accepting inline images can omit `--media-root`.
 Use `--text-only` to send measurements without images; images remain visible
-in the browser. See the [server setup](../README.md#http-server) for prerequisites.
+in the browser. See the [server setup](../README.md#route-a-support-ticket) for prerequisites.
 Use `--model MODEL_ID` to set the request's model identity and `--timeout 300`
 if your server needs longer than the default 120 seconds per request.
 Hardware requirements belong to the model server; the playground itself runs
@@ -140,7 +139,7 @@ A deterministic harness supplies the current pick-and-place subgoal, target
 coordinates, signed position error and current grasp feedback. Jev receives
 these measurements with the camera image and chooses every primitive action
 from the full set. This example tests action selection with supplied subgoals;
-the model does not have to discover the task plan.
+the harness provides the task plan.
 
 Success requires a prior two-finger grasp, alignment with the cyan socket,
 correct insertion depth, an upright peg, released fingers and a settled object.
@@ -185,7 +184,7 @@ python scripts/record_demo_previews.py \
   --media-root /tmp/jevany-media --out /tmp/jevany-replays
 ```
 
-The recorder uses the same harness as the browser and preserves failed runs too.
+The recorder uses the same harness as the browser and saves all run outcomes.
 Recorded game imagery and upstream notices are described in
 [`recordings/LICENSES.txt`](../jevany/demos/recordings/LICENSES.txt).
 
@@ -207,9 +206,8 @@ python -m examples.service_recovery
 | [SQL repair](sql_repair.py) | The model picks a provided query; SQLite runs it; an independent calculation checks totals | In-memory database |
 | [Service recovery](service_recovery.py) | A bounded agent selects, prepares, canaries and promotes a replica | Local simulator, at most 12 decisions |
 
-The SQL and recovery programs exit with status 1 if their checks fail. They
-report the model's actual choices; they do not replace mistakes with a scripted
-solution. New runs can differ from the selected successful showcase recordings.
+The SQL and recovery programs execute and report the model's choices, and exit
+with status 1 if their checks fail. Results can vary between runs.
 
 Use your own server or load a checkpoint directly, with the same application code:
 

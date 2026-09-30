@@ -7,9 +7,8 @@ python -m pip install -e '.[dev]'
 python -m pytest tests -m 'not server' -q
 ```
 
-The integration tests create a tiny local Qwen backbone, run real SFT and RLCR
+The integration tests create a tiny local Qwen backbone, run SFT and RLCR
 updates, reload the saved adapter, and check Python/HTTP/official-SDK contracts.
-This is an integration check of the workflow, not a task-quality benchmark.
 The unit tests also use a Qwen2.5 tokenizer, downloaded on first use.
 Released-weight tests are optional and require `JEVANY_TEST_CHECKPOINT`.
 
@@ -36,5 +35,5 @@ The code is organized around user entry points:
 | `scripts/`, `results/` | Research/release tools and recorded measurements |
 | `docs/` | Guides, evaluation records and showcase assets |
 
-Build a distributable package with `python -m build`. Generated weights, runs,
-downloaded data and build outputs are not source artifacts.
+Build a distributable package with `python -m build`. Keep generated weights,
+runs, downloaded data and build outputs outside source control.

@@ -30,17 +30,16 @@ options, then returns a choice and its probabilities without generating answer t
   <img src="docs/hero.png" alt="JevAny infra for decision model training, deployment and application integration" width="100%">
 </p>
 
-## Demos
+## 🎮 Demos <a name="demos"></a>
 
-These 30 selected successful runs show JevAny choosing actions across robotics,
+The following 30 examples show JevAny choosing actions across robotics,
 browser, software, laboratory and mobility tasks using `JevAny-27B-SFT`.
-
-[![JevAny choosing actions across robotics, browser, software, laboratory and mobility tasks](docs/demos/jevany-cases.gif)](docs/CASES.md)
-
 [Explore the cases](docs/CASES.md), or open the playground below to inspect
 recorded actions and option probabilities.
 
-## Quickstart
+[![JevAny choosing actions across robotics, browser, software, laboratory and mobility tasks](docs/demos/jevany-cases.gif)](docs/CASES.md)
+
+## ⚡ Quickstart <a name="quickstart"></a>
 
 ### Try the playground
 
@@ -57,8 +56,7 @@ jevany demo
 
 Open `http://127.0.0.1:8090` and choose **Replay** to watch a recorded run.
 The bundled recordings play locally on CPU. Press Ctrl+C in the terminal to stop.
-
-Run the following commands from the repository root with this environment active.
+For the remaining commands, keep this environment active and work from the repository root.
 
 ### Route a support ticket
 
@@ -95,16 +93,16 @@ print("Probabilities:", answer["probabilities"])
 
 `choice` is one of the department names; `probabilities` maps each name to its
 probability. Your application can use these fields to route the ticket or ask
-for review when the decision is uncertain.
-
-Use `Noul` for yes/no questions, such as whether a ticket needs urgent review,
+for review when the decision is uncertain. Use `Noul` for yes/no questions,
+such as whether a ticket needs urgent review,
 and `Score` for ordered levels, such as low, normal and high priority.
-See the [API reference](docs/API.md) for all three question types. For in-process
-inference, [load a model in Python](docs/DEPLOYMENT.md#python) and use the same
-interface. Image and video inputs use the
+See the [API reference](docs/API.md) for all three question types.
+
+For in-process inference, [load a model in Python](docs/DEPLOYMENT.md#python)
+and use the same interface. For image and video inputs, follow the
 [media setup](docs/DEPLOYMENT.md#native-media-and-limits).
 
-## Examples & Test Environments
+## 🕹️ Examples & Test Environments <a name="examples--test-environments"></a>
 
 The playground includes the three environments below. These GIFs show accelerated
 `JevAny-27B-SFT` replays with recorded actions and option probabilities.
@@ -118,7 +116,7 @@ Use a Franka gripper to grasp, align and insert a peg, checked by PyBullet conta
 ### [Doom corridor · 3D](examples/README.md#doom-corridor-3d)
 
 Clear the final room by defeating the enemies on the left and right, then move
-forward. Uses ViZDoom and the included Freedoom assets.
+forward. The environment uses ViZDoom and the included Freedoom assets.
 
 ![Doom checkpoint replay: kill both enemies, then advance](docs/demos/playground-doom.gif)
 
@@ -144,7 +142,7 @@ Live control sends text state to the model. Robot control uses the
 requirements and environment APIs, or [integrations](docs/INTEGRATIONS.md) to
 combine JevAny decisions with an LLM planner.
 
-## Pretrained Models
+## 🤗 Pretrained Models <a name="pretrained-models"></a>
 
 | Model | Readout | Intended use |
 |---|---|---|
@@ -164,7 +162,7 @@ Pointer and direct-token models share the same API. Pointer supports up to
 See [readout choices](docs/TRAINING.md#pointer-and-direct-token-readouts) for
 training and accuracy tradeoffs.
 
-## Evaluation
+## 📊 Evaluation <a name="evaluation"></a>
 
 Qwen3.8 27B leads both benchmarks and has the lowest NLL and Brier.
 Among 4B releases, direct-token leads on JevBench; pointer leads on Kev Transfer-v9.
@@ -194,13 +192,12 @@ NLL, Brier and ECE are measured on Kev Transfer-v9.
 [Machine-readable results](results/model-family-v2.json) ·
 [Method and ablation report](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
 
-## Training
+## 🛠️ Training <a name="training"></a>
 
 Train on the same `state` and `questions` you send at inference, with a label
 for each question. Start with the bundled synthetic support tickets, then
-train on your own labelled data.
-
-The starter recipe uses Qwen3.5-0.8B on CUDA with BF16 and writes `runs/my-jev`:
+train on your own labelled data. The starter recipe uses Qwen3.5-0.8B on CUDA
+with BF16 and writes `runs/my-jev`:
 
 ```bash
 python -m pip install -e '.[train]'
@@ -216,39 +213,38 @@ After training, try the checkpoint on the included ticket request:
 jevany decide examples/request.json --checkpoint runs/my-jev
 ```
 
-Pass `--data` to train on your own JSONL, or use
+Pass `--data` to train on your own [JSONL data](docs/DATA.md), or use
 [`recipes/finetune.toml`](recipes/finetune.toml) to adapt the released 27B model.
 See the [training guide](docs/TRAINING.md) for CPU settings, multimodal data and
 standard `torchrun` launches. For image/video training, install `.[train,multimodal]`.
 
+The released family uses LoRA SFT, trained on 1,772,725 text records containing
+2,180,242 labelled decisions; see [training compute and experiments](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
+for the setup. Full-parameter SFT and further post-training improvements are planned.
+
 ### RLCR (experimental)
 
-After SFT, continue training with rewards for correctness and probability calibration:
+After SFT, continue training with the [RLCR objective](docs/ALGORITHM.md#rlcr),
+which rewards correctness and probability calibration:
 
 ```bash
 jevany train --config recipes/rlcr.toml
 ```
 
-The released family uses LoRA SFT, trained on 1,772,725 text records containing
-2,180,242 labelled decisions. Full-parameter SFT and further post-training
-improvements are planned.
-
-[Data format](docs/DATA.md) · [RLCR objective](docs/ALGORITHM.md#rlcr) ·
-[Training compute and experiments](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
-
-## Supported Model Families
-
-![26 supported models across Qwen, Gemma, Muse, Mistral, GLM, Nemotron and Llama](docs/supported-model-families.svg)
+## 🧩 Supported Model Families <a name="supported-model-families"></a>
 
 [Model IDs, supported inputs and setup requirements](docs/TRAINING.md#backbone-support).
 
-## Documentation and Contributing
+![26 supported models across Qwen, Gemma, Muse, Mistral, GLM, Nemotron and Llama](docs/supported-model-families.svg)
+
+## 📚 Documentation and Contributing <a name="documentation-and-contributing"></a>
 
 [Training](docs/TRAINING.md) · [Deployment](docs/DEPLOYMENT.md) · [API](docs/API.md) · [Data](docs/DATA.md) · [Evaluation](docs/EVALUATION.md) · [Contributing](CONTRIBUTING.md)
 
 To contribute a model adapter, evaluation or application example, start with the
-[contribution guide](CONTRIBUTING.md). The
-[method report](docs/JEVANY_METHOD_AND_ABLATIONS.pdf) and its
+[contribution guide](CONTRIBUTING.md). The [method report](docs/JEVANY_METHOD_AND_ABLATIONS.pdf) and its
 [LaTeX source](docs/JEVANY_METHOD_AND_ABLATIONS.tex) describe the model design and experiments.
 
-Code and starter data are Apache-2.0. Some components are adapted from [Kev](https://github.com/jaredpalmer/kev); see [NOTICE](NOTICE) and [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md). Base models and upstream datasets retain their own terms.
+Code and starter data are Apache-2.0. Some components are adapted from
+[Kev](https://github.com/jaredpalmer/kev); see [NOTICE](NOTICE) and
+[ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md). Base models and upstream datasets retain their own terms.

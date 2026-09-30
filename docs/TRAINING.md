@@ -17,8 +17,7 @@ jevany train --config recipes/sft.toml
 ```
 
 The starter has 24 original synthetic training tickets and 8 separate development
-tickets, each covering `choice`, `noul`, and `score`. It teaches the workflow; it
-is too small to train a general-purpose decision model.
+tickets, each covering `choice`, `noul`, and `score`, to demonstrate the workflow.
 
 The recipe uses `Qwen/Qwen3.5-0.8B`, BF16 CUDA weights, LoRA rank 16 and three epochs.
 Replace `data` with your own labelled JSONL and choose a backbone that fits your
@@ -29,10 +28,9 @@ jevany train --config recipes/sft.toml \
   --device cpu --dtype fp32 --weights-dtype fp32 --out runs/cpu-jev
 ```
 
-CPU training is practical for small experiments, and can be slow. The full frozen
-backbone, adapters, activations and optimizer memory must fit on each device.
-The distributed implementation is DDP: adding devices increases throughput; it
-does not split one backbone across GPUs.
+CPU training is practical for small experiments, and can be slow. The full frozen backbone,
+adapters, activations and optimizer memory must fit on each device. DDP keeps
+a full model copy on each GPU and increases throughput by distributing records.
 
 ## Recipes and overrides
 
@@ -57,7 +55,7 @@ jevany train --config recipes/finetune.toml \
 ```
 
 `init_from` restores the adapter and head into a new training run, with a new
-optimizer and schedule. It is not an interrupted-job resume. The base revision,
+optimizer and schedule. The base revision,
 LoRA rank and targets, head dimension, and multimodal settings must match.
 The released checkpoint uses the native vision path even for text requests.
 
@@ -138,11 +136,10 @@ Keep the GPU visibility assigned by the scheduler.
 The launcher defaults to all visible GPUs and prints the process topology.
 Each worker reports its rank, world size, CUDA device and visible device mask.
 When using fewer processes, set `PROCESSES_PER_HOST` and `GPU_SHORTFALL_REASON`.
-Check these logs against the scheduler allocation; visibility alone does not
-prove that every reserved GPU is active.
+Check each worker's device binding against the scheduler allocation.
 
-This launcher delegates allocation to your workstation or scheduler. It does
-not create cloud resources. Select SFT or RLCR with the same
+Allocate resources on your workstation or scheduler before running the launcher.
+Select SFT or RLCR with the same
 [`recipes`](#recipes-and-overrides) used for a single GPU.
 
 ## Evaluation and checkpoints
@@ -150,8 +147,8 @@ not create cloud resources. Select SFT or RLCR with the same
 Training supports held-out suite evaluation, periodic checkpoints, early stopping,
 and optional W&B logging. For example, add `--eval-suite data/eval-suite
 --eval-every-steps 100 --checkpoint-every-steps 100` to a run. The evaluation suite
-needs a manifest plus calibration and development splits; a plain JSONL file
-is not a suite. Use `--wandb-project` only when you want W&B logging.
+needs a manifest plus calibration and development splits. Use `--wandb-project`
+to enable W&B logging.
 
 The final directory contains the adapter, tokenizer, `head.pt`,
 `training_config.json`, and `training_metrics.json`. If early stopping selects a
@@ -170,12 +167,12 @@ the base component of a Transformers causal language model, adds a pointer head,
 and trains LoRA plus any newly added decision-token embeddings. The same trainer,
 checkpoint format and serving API apply across model families.
 
-The [model catalog](supported-models.json) pins the 26 selected official
+The [model catalog](supported-models.json) pins 26 official
 checkpoints across seven families. It records each repository, revision, series,
 size and native image/video support. Base, Thinking and quantized variants are
 not additional entries in this catalog.
 
-| Family | Selected models | Checkpoints |
+| Family | Models | Checkpoints |
 |---|---|---:|
 | Qwen | Qwen3.8-27B; Qwen3.6-27B; Qwen3.6-35B-A3B; Qwen3.5-0.8B; Qwen3.5-2B; Qwen3.5-4B; Qwen3.5-9B; Qwen3.5-27B; Qwen3.5-35B-A3B | 9 |
 | Gemma | gemma-4-E4B-it; gemma-4-12B-it; gemma-4-31B-it | 3 |
@@ -191,20 +188,19 @@ serving API. Choose a publisher repository or a local weights directory with
 `config.json`, so local snapshots work without depending on repository names.
 Gemma 4 Unified and GLM 4.6V use their native Transformers models and processors.
 
-Every GPU holds the full base, including all MoE experts; active parameter counts
-do not describe the required weight memory. The small starter remains
+Every GPU holds the full base, including all MoE experts. Estimate weight memory
+from total parameter count. The small starter remains
 `Qwen/Qwen3.5-0.8B`. Gated repositories require the publisher's license acceptance
 and Hugging Face access before downloading; local snapshots need no account.
 
 Phi, Qwen 2.5/3/3-VL/3-Coder, Gemma 3/3n, Pixtral and older Mistral/Magistral releases are outside
 the maintained scope. The Phi conversion utilities and legacy media adapter names
-have been removed. The generic text adapter and custom adapter interface remain
-available for other architectures, without a compatibility claim.
+have been removed. The generic text adapter and custom adapter interface are
+available for experimenting with other architectures.
 
 The released JevAny adapters identify `Qwen/Qwen3.8-27B` in their release manifest
 and adapter configuration. Its Transformers architecture is `qwen3_5`.
-Architecture compatibility does not make different base revisions interchangeable:
-load each adapter with its recorded base and revision.
+Load each adapter with its recorded base and revision.
 
 Select the base in the existing recipe or on the command line:
 
@@ -355,9 +351,7 @@ attempts. Most SFT checks use 12 steps, followed by two RLCR steps. The Gemma 4
 
 The catalog contract test checks that every maintained checkpoint has matching
 revision, modality, SFT, RLCR, reload and Python/HTTP serving evidence. Media
-checks include mixed text records. These short runs establish compatibility;
-they do not establish task quality, production throughput or every distributed
-topology.
+checks include mixed text records.
 
 The offline tests use real, tiny Transformers architectures for the selected
 families, plus a GPT-2 fixture for the generic custom-backbone contract. They
@@ -370,7 +364,7 @@ python -m pytest tests/test_model_support.py tests/test_backbones.py -q
 python -m pytest tests/test_multimodal_backbones.py tests/test_serving.py tests/test_smoke_backbone.py -q
 ```
 
-To check pretrained weights without completing a training run:
+To run a short pretrained-weight check:
 
 ```bash
 python -m pip install -e '.[dev]'
@@ -398,8 +392,8 @@ prefix-cache parity where supported and explicit rejection elsewhere.
 It writes `smoke.json`, per-rank GPU identity, and the trainer's evaluation
 history. A passing SFT run requires finite adapter weights, updated LoRA weights,
 lower final NLL, and successful prediction checks. Its small evaluation probe
-intentionally reuses training examples; this is an optimization and compatibility
-test, not an accuracy benchmark. The probe covers all eight training rows,
+reuses training examples to check optimization and compatibility.
+The probe covers all eight training rows,
 including both media and text rows when `--mixed-text` is enabled. Media probes
 score each row in both choice orders, matching the trainer's option permutation.
 

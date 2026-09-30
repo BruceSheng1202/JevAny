@@ -2,7 +2,6 @@
 
 `JevClient`, `JevModel`, and `POST /v1/systemone` share a request/answer envelope.
 Training data adds a label and optionally a soft target to each question.
-JevAny is an independent implementation of Jev-style decision models.
 
 ## Request and response
 
@@ -74,8 +73,8 @@ The reference is TypeSafe's [HTTP API](https://docs.typesafe.ai/api) and
 2026. Contract tests exercise the official SDK against JevAny's local server.
 
 Compatibility covers the text JSON envelope, three question types, option keys,
-probability fields, and zero-based scores. It does not imply the same model
-weights, predictions, calibration, or hosted service behavior.
+probability fields, and zero-based scores. Model weights, predictions,
+calibration and service behavior are specific to each implementation.
 
 | Detail | JevAny behavior |
 |---|---|
@@ -85,8 +84,8 @@ weights, predictions, calibration, or hosted service behavior.
 | Choice | 1–4,096 options for pointer checkpoints; 1–255 for direct-token |
 | Score | 2–4,096 levels for pointer checkpoints; 2–255 for direct-token |
 | Media | JevAny-specific `media: [{type, uri}]` local-file extension |
-| Confidence | Computed locally from the option distribution; exact hosted formulas are not guaranteed |
-| Usage | Local token accounting, not hosted billing parity |
+| Confidence | Computed locally from the option distribution using the formulas below |
+| Usage | Local token accounting |
 
 These option counts are API limits; the complete request must also fit the
 checkpoint's context and configured token limits. To stay within the documented

@@ -89,7 +89,7 @@ Attach native image or video evidence at the request level. A multimodal request
 }
 ```
 
-Training and frozen suites resolve relative paths against the JSONL directory. The HTTP server is stricter: media is disabled unless the operator sets `JEVANY_MEDIA_ROOT`, only local files contained by that root are accepted, and network URLs are rejected. File bytes, total request bytes, pixels, and declared video frames have configurable caps; videos without a declared frame count are rejected. Treat the media root as an upload quarantine, not a general filesystem directory.
+Training and frozen suites resolve relative paths against the JSONL directory. The HTTP server requires `JEVANY_MEDIA_ROOT` to enable media and accepts only local files inside that directory. Network URLs are rejected. File bytes, total request bytes, pixels, and declared video frames have configurable caps; videos without a declared frame count are rejected. Use a dedicated upload directory as the media root.
 
 ## Full Record
 
@@ -137,12 +137,12 @@ The selected RLCR mixture contains exactly 40,000 records and 46,044 questions:
 
 The mixture includes 5,000 HelpSteer3 rows, 6,000 eight-option QASC rows, 4,000 AQuA-RAT rows, 4,000 MedMCQA rows, and broad replay to limit drift. It has zero normalized-text-hash overlap with the `transfer-v9` evaluation panel.
 
-The selected VideoFeedback `real` configuration is single-class in this conversion: every one of its five score dimensions maps to level 3. Those rows exercise the native video data and model path but do not form a meaningful accuracy benchmark. Release headline development metrics exclude the 100-question VideoFeedback slice. Video capability is evaluated separately on [MVBench with blank and shuffled-media controls](EVALUATION.md#native-image-and-video-decisions).
+The VideoFeedback `real` configuration maps all five score dimensions to level 3 in this conversion. We use these rows to exercise the native video path and exclude their 100 development questions from headline metrics. Video accuracy is evaluated on [MVBench with blank and shuffled-media controls](EVALUATION.md#native-image-and-video-decisions).
 
-The repository publishes mixture builders, not redistributed third-party datasets. Review each upstream license before downloading, training, or redistributing converted records. Build SFT data with [`scripts/build_v2_data.py`](../scripts/build_v2_data.py) and RL data with [`scripts/build_v2_rlcr_mix.py`](../scripts/build_v2_rlcr_mix.py).
+The repository provides builders that download and convert upstream datasets. Review each upstream license before downloading, training, or redistributing converted records. Build SFT data with [`scripts/build_v2_data.py`](../scripts/build_v2_data.py) and RL data with [`scripts/build_v2_rlcr_mix.py`](../scripts/build_v2_rlcr_mix.py).
 
 ## Test-Time Data
 
-Jev-Test removes every `label` and `target` before inference. It samples the parent decision 16 times at temperature 0.8, accepts only a strict majority, and rejects ties. The adapted checkpoint never sees ground truth. Gold labels remain in the immutable source suite and are opened once after both SFT and RL adaptations finish.
+Jev-Test removes every `label` and `target` before inference. It samples the parent decision 16 times at temperature 0.8, accepts only a strict majority, and rejects ties. Gold labels remain in the immutable source suite and are opened once after both SFT and RL adaptations finish.
 
 This protocol accepted 153 of 200 MMLU-Pro inputs and 732 of 756 MuSR inputs. The exact hashes and settings are recorded in [`results/ttt-protocol-v1.json`](../results/ttt-protocol-v1.json).

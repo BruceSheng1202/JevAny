@@ -1,6 +1,6 @@
 # Harness and symbolic control
 
-Jev-Harness uses an external LLM only as a task compiler. The planner sees an evidence schema by default, produces typed questions, and cannot replace the caller-owned state. JevAny then makes the bounded decision.
+Jev-Harness uses an external LLM to compile tasks into typed questions. The planner sees an evidence schema by default. The caller retains control of the state, which passes unchanged to JevAny for the bounded decision.
 
 With the JevAny server running, install the Bedrock adapter:
 

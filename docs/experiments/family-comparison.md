@@ -1,8 +1,8 @@
 # Model family comparison
 
-This experiment is prepared but has not started training. It requires the
-original v0.2 frozen data and benchmark assets, which are not distributed with
-this repository. There are no new trained checkpoints or comparison scores yet.
+This experiment is prepared and awaiting training. It requires the original
+v0.2 frozen data and benchmark assets listed below, supplied separately from
+this repository. Checkpoints and comparison scores are pending.
 
 ## Models
 
@@ -22,10 +22,9 @@ retraining Qwen.
 | Llama | `meta-llama/Llama-3.2-11B-Vision-Instruct` | Image | 11B |
 
 Use the revisions in [the catalog](../supported-models.json). Both MoE bases
-activate approximately 3B parameters, but each GPU loads all experts. This is
-a comparison of usable model families, not an equal-parameter architecture
-ablation. The newer Nemotron Lightning is chosen over Nano; recency and
-popularity do not necessarily identify the same checkpoint.
+activate approximately 3B parameters, and each GPU loads all experts. The
+comparison spans model families with different architectures and parameter
+counts. Nemotron uses Lightning in preference to Nano based on recency.
 
 ## Training protocol
 
@@ -59,8 +58,7 @@ checkpointing, a 1,024-token state limit, and a 2,048-token branch/packed limit.
 Use independent causal rows across families. The exact trainable modules still
 depend on the adapter: GLM uses attention LoRA, fused expert tensors stay frozen,
 and non-Qwen decision token embeddings are trained. Record resolved targets,
-trainable parameter counts, precision, and any stability changes. Do not call
-those differences weight-matched training.
+trainable parameter counts, precision, and any stability changes.
 
 Run the complete epoch budgets and select the lowest calibrated development
 NLL among saved checkpoints, excluding the single-class VideoFeedback slice.
@@ -68,9 +66,8 @@ Break ties by the earlier step. Fit temperature only on calibration records.
 RLCR starts from that selected SFT's uncalibrated training weights. Transfer and
 benchmark scores do not select checkpoints or learning rates.
 
-The release selected SFT step 13,000 and RLCR step 1,000. These are provenance,
-not stopping steps for different datasets or architectures. A short
-compatibility check is not a completed training run.
+The reference release selected SFT step 13,000 and RLCR step 1,000. For each
+new family, complete the epoch budget above before selecting its checkpoint.
 
 ## Data required before submission
 
@@ -86,10 +83,9 @@ The release records identify these original artifacts:
 
 Verify the manifests, partitions and referenced media before creating derived
 views. Preserve original record IDs and split membership. Keep the same text
-records for every family and retain media records only where the base supports
-every required modality. Do not remove media from a visual question and treat
-the result as an equivalent text example. Do not duplicate text to compensate
-for excluded media.
+records for every family. Retain media records, including their media, where
+the base supports every required modality, and leave text counts unchanged when
+excluding media.
 
 Before tokenizer admission, the expected SFT view sizes are 107,278 for
 image/video, 87,708 for image, and 65,496 for text. RLCR sizes are 40,000,
@@ -99,10 +95,9 @@ Admission must check every family tokenizer and processor, including SFT
 augmentations; explicitly report exclusions and keep the common text panel
 identical across families.
 
-The public builders alone do not reconstruct the original core data or
-`transfer-v9`. Rebuilding data would require a separately identified experiment
-and fresh Qwen evaluation on its new panels. Do not attach the old scores to
-newly sampled benchmark subsets.
+Reproducing this comparison requires the original core data and `transfer-v9`
+artifacts. If you rebuild them, assign a new experiment ID and reevaluate Qwen
+on the new panels.
 
 ## Quality and latency
 
@@ -120,7 +115,7 @@ bootstrap intervals for differences.
 Unsupported modalities are N/A. Keep the existing MMStar/MVBench full, blank
 and shuffled controls. Compare only identical panel IDs with the same media
 assets and option order. If a model cannot encode a record, resolve admission
-before comparing; do not silently shrink its denominator.
+before comparing and report any denominator changes.
 
 Use the same GPU type and loading settings for all latency measurements,
 including the published Qwen baselines. Run one serial inference process per
@@ -138,6 +133,6 @@ JEVANY_MERGE=0 python -m scripts.benchmark_latency \
 Repeat on the same image/video panels where supported. This script reports
 median and p95 forward latency, local end-to-end latency including preprocessing,
 input token counts, and peak allocated CUDA memory. It excludes model loading,
-warmup and network time. Its serial requests/second is not saturated serving
-throughput. Preserve its raw samples and panel hashes alongside quality results.
-No latency ranking is available until those measurements run.
+warmup and network time. Requests/second measures serial inference. Preserve
+the raw samples and panel hashes alongside quality results. Latency measurements
+are pending.

@@ -193,8 +193,8 @@ compatibility and the fields specific to JevAny.
 | `tianxinwei/JevAny-Muse-Glimmer-30B-LoRA` | Muse Glimmer 30B pointer LoRA |
 | A training output directory | Your own adapter and decision-readout metadata |
 
-An adapter is not a standalone copy of the base weights. First loading downloads
-both the adapter and its separately distributed base, unless already cached.
+First loading downloads both the adapter and its separately distributed base,
+unless already cached.
 Use `owner/repo@revision` to pin an adapter. For offline deployment, prepopulate
 the Hugging Face cache and set `HF_HUB_OFFLINE=1`. `JEVANY_BASE_LOAD_PATH` can point
 to a local base mirror while retaining the checkpoint's canonical provenance.
@@ -221,8 +221,8 @@ JEVANY_MEDIA_ROOT="$PWD/media" jevany serve \
 
 See [DATA.md](DATA.md#native-media) for the request format and
 `GET /v1/models` for the active limits and capabilities. The default packed limit is 8,192 tokens;
-the validated training window is 2,048. Longer inputs are not an evaluated
-capability. Confidence thresholds may need recalibration on your domain.
+evaluation covers the 2,048-token training window.
+Confidence thresholds may need recalibration on your domain.
 
 ## Extend backbone support
 
@@ -257,7 +257,7 @@ and MoE text models, Gemma 4 Unified and GLM native vision checkpoints, plus a
 GPT-2 fixture for the generic adapter contract and a custom
 adapter without cache support. They use tiny real architectures and native
 processors to check Python/HTTP parity, media, cache behavior, limits and
-lifecycle handling. They do not establish full-size model quality or GPU capacity.
+lifecycle handling.
 
 ```bash
 python -m pytest tests/test_serving.py -q

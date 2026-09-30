@@ -29,7 +29,7 @@ where `d_p=256` in the released checkpoints. Temperature scaling divides `z` by 
 
 ## Supervised Fine-Tuning
 
-For a hard target `y`, SFT minimizes `-log p_y`. A row may instead carry a normalized soft target `t`, in which case the loss is `-Σ t_i log p_i`. Soft targets represent ambiguity or missing information without inventing a single correct label.
+For a hard target `y`, SFT minimizes `-log p_y`. A row may instead carry a normalized soft target `t`, in which case the loss is `-Σ t_i log p_i`. Soft targets represent ambiguity or missing information as a distribution over the options.
 
 The current model-family releases use LoRA rank 8 over each backbone's supported
 linear projections. Pointer checkpoints train the residual head with the adapter;
@@ -65,7 +65,7 @@ The sum is over option dimensions. Averaging over options would make the policy 
 
 The selected experimental run decays exploration standard deviation from `0.4` to `0.2`, weights the policy term by `0.25`, and weights the supervised anchor by `0.5`.
 
-This implementation borrows the calibration reward and group-relative baseline, but it is not the paper's generated-reasoning setup and is not standard token-level GRPO. There are no reasoning rollouts, confidence tokens, critic, or reference-model KL term. The policy is the distribution over perturbed pointer logits.
+JevAny applies the paper's calibration reward and group-relative baseline to a policy over perturbed pointer logits. Optimization operates on these logits, without reasoning rollouts, confidence tokens, a critic, or a reference-model KL term.
 
 ## Training Data Strategy
 
@@ -77,4 +77,4 @@ SFT is broad and deliberately diverse across preference, agent, visual, video, r
 - preference, image-derived, and video-derived cases;
 - broad replay to limit forgetting.
 
-This makes RLCR a calibration and hard-case refinement stage, not a second full SFT pass. The current result improves development NLL slightly but does not improve overall transfer accuracy, so it remains experimental. See [DATA.md](DATA.md) for exact counts.
+RLCR refines calibration and hard-case decisions. The current result improves development NLL slightly but does not improve overall transfer accuracy, so it remains experimental. See [DATA.md](DATA.md) for exact counts.

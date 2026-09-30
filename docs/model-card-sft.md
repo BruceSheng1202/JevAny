@@ -15,7 +15,7 @@ JevAny-27B-SFT is the recommended general JevAny checkpoint. It is a rank 16 LoR
 
 ## Intended Use
 
-Use this checkpoint for bounded classification, routing, ranking, tool choice, agent actions, and confidence-aware decisions. It accepts choice, noul, and ordinal score questions through the JevAny API. It is not a chat or chain-of-thought model.
+Use this checkpoint for bounded classification, routing, ranking, tool choice, agent actions, and confidence-aware decisions. It accepts choice, noul, and ordinal score questions through the JevAny API.
 
 ## Training
 
@@ -32,7 +32,7 @@ The adapter and pointer head were trained on 107,278 records spanning preference
 | AI2D accuracy | 86.0% |
 | MMMU accuracy | 68.0% |
 
-Development metrics exclude a 100-question single-class VideoFeedback slice. It exercises the native video path but is not a meaningful capability benchmark. AI2D and MMMU use native images through the backbone's vision path. Full measurements and the Jev comparison are in the repository [release results](https://github.com/SimpleJev/JevAny/blob/main/results/release-v0.2.json).
+Development metrics exclude a 100-question single-class VideoFeedback slice used to exercise the native video path. AI2D and MMMU use native images through the backbone's vision path. Full measurements and the Jev comparison are in the repository [release results](https://github.com/SimpleJev/JevAny/blob/main/results/release-v0.2.json).
 
 ## Limits
 

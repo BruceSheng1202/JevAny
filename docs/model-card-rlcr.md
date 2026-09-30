@@ -19,7 +19,7 @@ Use this checkpoint to study calibration-reward training for bounded decisions. 
 
 ## Training
 
-The 40,000-record RL mixture emphasizes hard reasoning, many-choice questions, agent actions, preferences, mathematical and medical decisions, and image-derived and video-derived cases. The objective combines group-relative calibration reward with a supervised anchor. It is decision-only RL, not token-level GRPO, and it generates neither reasoning traces nor confidence tokens.
+The 40,000-record RL mixture emphasizes hard reasoning, many-choice questions, agent actions, preferences, mathematical and medical decisions, and image-derived and video-derived cases. The objective combines group-relative calibration reward with a supervised anchor. This decision-only RL operates on pointer logits, without generating reasoning traces or confidence tokens.
 
 ## Evaluation
 

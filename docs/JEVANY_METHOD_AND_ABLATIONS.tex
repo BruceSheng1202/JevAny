@@ -99,15 +99,14 @@ readout. The strongest released model, Qwen3.8 27B LoRA, reaches
 The release family spans Gemma 4B, Qwen3.5 4B, Qwen3.8 27B, and Muse Glimmer
 30B. The training corpus contains \textbf{1,772,725 text records} and
 \textbf{2,180,242 labelled decisions} across preference, agent/tool decision,
-reasoning, classification, and safety tasks. This report describes aggregate
-scale and task families only.
+reasoning, classification, and safety tasks. This report describes the corpus
+scale and task families.
 
-The ablation program did not treat one short sweep as a universal truth. It used
+The ablation program used
 fixed-step screens, held-out calibration, paired record-group bootstrap intervals,
-explicit promotion gates, and full-run confirmation. Several locally attractive
-ideas---pure InfoNCE, supervised Brier regularization, RLCR variants, targeted
-mixture changes, and dual-tower alternatives---were not promoted when their
-predeclared gates failed.
+explicit promotion gates, and full-run confirmation. Pure InfoNCE, supervised
+Brier regularization, RLCR variants, targeted mixture changes, and dual-tower
+alternatives failed their predeclared promotion gates.
 
 \section{Problem formulation}
 
@@ -116,7 +115,6 @@ $\mathcal{C}=\{c_1,\ldots,c_K\}$, JevAny predicts
 \[
   p(y=i\mid s,q,\mathcal{C}), \qquad i\in\{1,\ldots,K\}.
 \]
-Unlike a chat model, it does not generate a free-form answer and then parse it.
 The candidate set is part of the model input, and the output is already a
 probability simplex suitable for ranking, confidence thresholds, or downstream
 control.
@@ -231,8 +229,8 @@ $q=\operatorname{softmax}(z')_a$, correctness is $c=t_a$, and reward is
   r(c,q)=c-(q-c)^2.
 \]
 A group-relative advantage multiplies the Gaussian location score, while a CE
-anchor limits decision drift. This is policy optimization over perturbed decision
-logits; it is not token-level GRPO and does not generate reasoning rollouts.
+anchor limits decision drift. Policy optimization operates directly on perturbed
+decision logits, without generating reasoning rollouts.
 
 \subsection{Production release recipe}
 
@@ -262,8 +260,7 @@ architecture. The release data scale is fixed at 1,772,725 text records and
   cross-domain datasets and four robustness slices. Every reported run covers all
   1,046 scored items.
   \item \textbf{JevBench} contains all 231 items in the frozen public development
-  conversion. These numbers are public-development scores, not sealed leaderboard
-  results.
+  conversion, yielding public-development scores.
 \end{itemize}
 
 Transfer accuracy is an item-level mean. NLL, multiclass Brier score, and
@@ -296,10 +293,10 @@ Unrounded values and suite hashes live in
 
 \section{Ablation program}
 
-\subsection{Process and safeguards}
+\subsection{Ablation procedure}
 
-The ablation program used a funnel rather than repeatedly tuning on a final
-headline number:
+The ablation program screened candidates at fixed budgets and confirmed them
+at full scale:
 
 \begin{enumerate}
   \item \textbf{Register} the arm, frozen inputs, causal comparison step, metrics,
@@ -312,18 +309,18 @@ headline number:
   temperature on Transfer or JevBench.
   \item \textbf{Compare paired rows} with group bootstrap intervals and reject an
   arm if either accuracy non-inferiority or calibration improvement fails.
-  \item \textbf{Confirm at scale}; a short-screen winner does not automatically
-  become the release recipe.
+  \item \textbf{Confirm at scale} before promoting a screen winner to the
+  release recipe.
 \end{enumerate}
 
-This distinction matters: the early 4B sweep favored rank 32, query-mean, and a
+The early 4B sweep favored rank 32, query-mean, and a
 small contrastive weight by aggregate rank at its fixed causal checkpoint. The
 separate full model-family runs use rank 8, decision-marker/option-close, and CE,
 which is the configuration recorded by the published checkpoints.
 
-\subsection{Integrity-only outcomes}
+\subsection{Run validity and metric corrections}
 
-Not every execution became scientific evidence. One CE-path isolation run was
+One CE-path isolation run was
 marked invalid after its parity audit and is excluded from all conclusions.
 Capacity probes, failed launches, and telemetry-recovery jobs likewise do not
 enter the result tables. A post-terminal audit also found that two early reviews
@@ -370,13 +367,11 @@ Combined means & 73.34 & 0.6322 & 0.3709 & 0.0628 \\
 \end{tabular}
 
 Query-mean led this early screen. Full family training later retained
-decision-marker / option-close because it was the stable cross-backbone recipe;
-the result is therefore evidence about the screen, not a claim that query-mean
-universally dominates.
+decision-marker / option-close as the stable cross-backbone recipe.
 
 \subsection{LoRA rank}
 
-Two studies addressed different questions and should not be pooled.
+The two studies below use different bases, budgets, and selection rules.
 
 \textbf{Qwen 4B early screen.} At the fixed causal checkpoint, aggregate ranking
 over development and diagnostic Transfer metrics selected rank 32.
@@ -397,8 +392,7 @@ Rank & Accuracy & NLL & Accuracy & NLL \\
 \textbf{27B base-start gate.} A separate 250-step, single-seed study compared
 ranks 8, 16, 32, and 64. Rank 16 was the registered control and the only eligible
 arm after multiplicity-corrected gates; rank 8 had better point estimates but did
-not pass the adjusted promotion rule. This is a useful warning against choosing
-capacity solely from a single point estimate.
+not pass the adjusted promotion rule.
 
 \begin{tabular}{p{.20\linewidth}rrrr}
 \toprule
@@ -412,8 +406,7 @@ Rank & Dev. accuracy $\uparrow$ & Dev. NLL $\downarrow$ & Dev. Brier $\downarrow
 \end{tabular}
 
 The production family ultimately uses rank 8 based on its separate full-run
-cost/quality trade-off. The two screens have different bases, budgets, and
-selection rules and are not contradictory replications.
+cost/quality trade-off.
 
 \subsection{Loss and calibration objectives}
 
@@ -456,8 +449,7 @@ budget fixed. They are reported only at the aggregate level here.
   intervention were compared with their frozen control. Neither passed all
   registered gates, so no candidate was selected.
   \item A proposed dose study was stopped before training because no eligible
-  fresh selection panel was available. This is recorded as a stopped protocol,
-  not a negative model result.
+  fresh selection panel was available. Its status is a stopped protocol.
 \end{itemize}
 
 \subsection{Alternative decision architectures}
@@ -480,14 +472,14 @@ The cross-joint package beat the original dual tower, and the expressive scratch
 dual improved substantially over the scalar dual. Nevertheless, the complete
 registered gates failed: one dual comparator did not establish learning, and the
 rescued variants did not jointly pass learning and cross-comparison conditions.
-No architecture was promoted. These one-seed packages differ from the released
-LoRA system and do not establish a universal cross-encoder advantage.
+No architecture was promoted. These single-seed comparisons used packages
+that differ from the released LoRA system.
 
 A separate LM-token package compared the official next-token objective,
 InfoNCE-soft, and hard/soft SoftCE variants. SoftCE-soft was promoted within that
 local screen (43.69\% accuracy, 1.2627 NLL, 0.6501 Brier after calibration), but
 the preregistration labels its comparison with JevAny as a same-benchmark system
-comparison rather than a controlled training-method ablation.
+comparison.
 
 \subsection{Readout family and backbone scale}
 
@@ -499,8 +491,8 @@ points, supports more choices, and trains faster over a full trajectory.
 
 Across released pointer models, scaling/backbone choice matters substantially:
 Gemma 4B reaches 70.84\% Transfer, Qwen 4B 78.68\%, Muse 30B 83.46\%, and Qwen
-27B 85.76\%. Because architecture and parameter count change together, this is a
-family comparison rather than a controlled scaling-law estimate.
+27B 85.76\%. This family comparison varies architecture and parameter count
+together.
 
 \subsection{Ablation ledger}
 
@@ -548,7 +540,8 @@ timestamp. Direct-token, Qwen 27B, and Muse use checkpoint-native elapsed time;
 Qwen 4B pointer uses terminal trainer telemetry because the released checkpoint
 is the completed step 13,850 run. Peak within-run parallelism was 40 GPUs.
 
-\section{Reproducibility and claim boundaries}
+\clearpage
+\section{Reproducibility and evaluation scope}
 
 \begin{summarybox}
 \textbf{Release checks.} Base revisions are pinned. Every public artifact carries
@@ -559,18 +552,17 @@ publication. Transfer covers 1,046/1,046 scored decisions and JevBench covers
 \end{summarybox}
 
 \begin{itemize}
-  \item Short screens are single-seed exploratory evidence unless stated
-  otherwise. Their point estimates do not measure training-seed uncertainty.
-  \item Transfer was used diagnostically in several research stages. The release
-  table is a transparent benchmark comparison, not a claim of untouched-test
-  generalization.
-  \item Different backbone families are not weight-matched and may differ in
-  architecture, tokenizer, and native media machinery.
-  \item GPU-hours report selected-checkpoint training only, not total research
-  spend or inference cost.
+  \item Short screens use a single training seed unless stated otherwise.
+  Measuring training-seed uncertainty requires repeated runs.
+  \item Transfer served as a development diagnostic in several research stages
+  and is reported on that basis in the release comparison.
+  \item Backbone families differ in weights and may differ in architecture,
+  tokenizer, and native media machinery.
+  \item GPU-hours cover training through each selected checkpoint. Total research
+  spend and inference cost are outside this accounting.
   \item The current release contains LoRA SFT checkpoints. Full-parameter SFT,
   improved post-training, and hyperparameter-optimized variants are roadmap
-  items, not completed results.
+  items.
 \end{itemize}
 
 \section{Release map}
@@ -591,7 +583,7 @@ Evaluation guide & \texttt{docs/EVALUATION.md} \\
 \vfill
 \begin{center}
 \color{muted}\small
-JevAny is independent of Jev and TypeSafe. Infrastructure adapted from Kev is
+Infrastructure adapted from Kev is
 credited in the repository NOTICE and acknowledgements. Code is Apache-2.0;
 base models and upstream datasets retain their own terms.
 \end{center}

@@ -3,14 +3,13 @@
 ## Model family v2
 
 This section contains the full results for the five current LoRA SFT releases.
-Kev Transfer-v9 also informed model development; interpret it as a diagnostic comparison.
-The tables below retain the release's evaluation scope and reference provenance.
+Kev Transfer-v9 also informed model development and serves as a diagnostic comparison.
 
 **Kev Transfer-v9** uses [Kev's frozen `transfer-v9` suite](https://github.com/jaredpalmer/kev/blob/main/kev/transfer_v9.py)
 for cross-domain and robustness evaluation over 1,046 clean, knowable decisions.
 Its item-level mean spans Emotion, PAWS, QNLI, TweetEval,
 MMLU, MMLU-Pro, SciQ, and four robustness slices. **JevBench** is accuracy across
-all 231 public development items, not the sealed leaderboard score. NLL, Brier,
+all 231 public development items. NLL, Brier,
 and ECE in the main table are Kev Transfer-v9 metrics; every run covers every item.
 
 | Model | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
@@ -85,7 +84,7 @@ a complete local Kev Transfer-v9 API run and JevBench's published per-tier accur
 
 ### Reproducibility
 
-Kev Transfer-v9 reports 1,046 scored decisions with no missing examples; JevBench reports
+Kev Transfer-v9 reports all 1,046 scored decisions; JevBench reports
 all 231 public development items. Exact suite hashes and unrounded metrics are in
 the machine-readable results. Release manifests, checkpoint-native reload reports,
 and GPU loader/reconstruction parity were checked before publishing.
@@ -93,8 +92,8 @@ and GPU loader/reconstruction parity were checked before publishing.
 The [README comparison figure](evaluation-overview.svg) ranks models by the
 equal-weight mean of Kev Transfer-v9 and JevBench accuracy, using unrounded values.
 The ordering depends on these weights: at 4B, direct-token leads with equal suite
-weights, while pointer leads with equal item weights. The ranking does not imply
-statistical significance. Model icons and their sources are in
+weights, while pointer leads with equal item weights. Ranks reflect these point
+estimates. Model icons and their sources are in
 [`model-logos/`](model-logos/checkpoint-sources.json).
 
 Regenerate the figure from the repository root with matplotlib and cairosvg installed:
@@ -144,13 +143,13 @@ The [v0.2 release record](../results/release-v0.2.json) reports results on 1,004
 | JevAny-27B-RLCR v2 | 89.74% | **0.260** | 82.31% | **73.5%** | **87.0%** | 63.0% |
 | Jev | n/a | n/a | 85.37% | 84.0% | n/a | n/a |
 
-RLCR changed transfer accuracy by `-0.10` percentage points against SFT, with 3 fixes and 4 regressions. The paired 95% bootstrap interval is `[-0.58, 0.39]` points. The small development NLL gain did not survive independent calibration. Jev is a different hosted system evaluated through the same decision suite, not a weight-matched ablation.
+RLCR changed transfer accuracy by `-0.10` percentage points against SFT, with 3 fixes and 4 regressions. The paired 95% bootstrap interval is `[-0.58, 0.39]` points. The small development NLL gain did not survive independent calibration. Jev provides a hosted-system comparison on the same decision suite, using different model weights.
 
-Development accuracy and NLL exclude 100 VideoFeedback questions whose labels are all the same highest score. Those questions did exercise the video path, but a slice with one label cannot show temporal understanding, so we do not report it as a capability score. AI2D and MMMU use native images through the backbone's vision path. The training set also contains native A-OKVQA and ScienceQA images.
+Development accuracy and NLL exclude 100 VideoFeedback questions whose labels are all the same highest score. These questions exercise the video path; the video accuracy evaluation uses MVBench below. AI2D and MMMU use native images through the backbone's vision path. The training set also contains native A-OKVQA and ScienceQA images.
 
 ### Native image and video decisions
 
-We evaluated the released SFT checkpoint with the real media, a neutral blank asset, and media shuffled between questions within each task. We shuffle by unique media group, so questions that share one image or video receive the same replacement. The media sensitivity gate requires full-media accuracy to exceed the stronger control by at least five points, with a positive paired media-group bootstrap interval. Passing the gate shows that the model reads the media; task accuracy is a separate question.
+We evaluated the released SFT checkpoint with the real media, a neutral blank asset, and media shuffled between questions within each task. We shuffle by unique media group, so questions that share one image or video receive the same replacement. The media sensitivity gate requires full-media accuracy to exceed the stronger control by at least five points, with a positive paired media-group bootstrap interval. Passing the gate indicates media use. The tables also report task accuracy.
 
 | Panel | Questions | Full media | Blank | Shuffled | Gain over strongest control |
 |---|---:|---:|---:|---:|---:|
@@ -167,7 +166,7 @@ From the image panel we dropped invalid choices and every item that matched the 
 
 Full metrics, per-task intervals, dataset revisions, checkpoint hashes, and control provenance are in [the image report](../results/multimodal-image-v1.json) and [the video report](../results/multimodal-video-v1.json). The internal evaluation checkpoint and public SFT release have identical LoRA and pointer-head tensors; [the equivalence record](../results/release-equivalence-v0.2.json) accounts for the embedded release temperature. Upstream terms keep us from redistributing the benchmark media.
 
-The examples below use synthetic media we made and released with this repository. Both cases per modality come from a predeclared set of three, and [the selection record](demos/multimodal-demo.json) lists every probability. The two video cases put the same question to different clips, so only the motion separates the answers.
+The examples below use synthetic media we created and released with this repository. Each modality shows two cases from a predeclared set of three; [the selection record](demos/multimodal-demo.json) lists every probability. The two video cases ask the same question about different clips, with motion determining the answer.
 
 <table>
   <tr>

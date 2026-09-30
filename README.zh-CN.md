@@ -29,16 +29,15 @@
   <img src="docs/hero.png" alt="JevAny infra：决策模型训练、部署与应用集成" width="100%">
 </p>
 
-## 演示
+## 🎮 演示 <a name="演示"></a>
 
-以下 30 个精选成功案例展示了 JevAny 在机器人、浏览器、软件、实验室和出行任务中的动作选择。
-演示使用的模型是 `JevAny-27B-SFT`。
+以下 30 个案例展示了 JevAny 在机器人、浏览器、软件、实验室和出行任务中的动作选择。
+演示使用的模型是 `JevAny-27B-SFT`。[查看全部案例](docs/CASES.md)，
+或按下面的步骤打开演示，查看记录的动作和选项概率。
 
 [![JevAny 在机器人、浏览器、软件、实验室和出行任务中选择动作](docs/demos/jevany-cases.gif)](docs/CASES.md)
 
-[查看全部案例](docs/CASES.md)，或按下面的步骤打开演示，查看记录的动作和选项概率。
-
-## 快速上手
+## ⚡ 快速上手 <a name="快速上手"></a>
 
 ### 打开交互演示
 
@@ -55,7 +54,6 @@ jevany demo
 
 打开 `http://127.0.0.1:8090`，点击 **Replay** 观看录制的运行过程。
 只需 CPU 即可播放内置录制内容。在终端按 Ctrl+C 停止演示。
-
 以下命令均在仓库根目录运行，并使用上述虚拟环境。
 
 ### 给客服工单选择处理部门
@@ -91,13 +89,13 @@ print("Probabilities:", answer["probabilities"])
 
 `choice` 返回一个候选部门名称，`probabilities` 返回各部门的概率。
 你可以据此分配工单，也可以在结果不确定时转交人工审核。
-
 二分类问题使用 `Noul`，例如判断工单是否需要紧急处理；有序评分使用 `Score`，
 例如低、普通、高三个优先级。三类问题的完整格式见 [API 文档](docs/API.md)。
+
 进程内推理可以[在 Python 中加载模型](docs/DEPLOYMENT.md#python)，通过相同接口调用。
 图片和视频输入见[媒体配置](docs/DEPLOYMENT.md#native-media-and-limits)。
 
-## 示例与测试环境
+## 🕹️ 示例与测试环境 <a name="示例与测试环境"></a>
 
 交互演示包含以下三个环境。动图展示 `JevAny-27B-SFT` 的加速回放，以及记录的动作和选项概率。
 
@@ -133,7 +131,7 @@ jevany demo --base-url http://127.0.0.1:8008 --text-only
 平台要求与环境接口见[演示指南](examples/README.md)，结合 LLM 规划器使用
 JevAny 决策可参考[集成文档](docs/INTEGRATIONS.md)。
 
-## 预训练模型
+## 🤗 预训练模型 <a name="预训练模型"></a>
 
 | 模型 | Readout | 用途 |
 |---|---|---|
@@ -151,7 +149,7 @@ Pointer 和 direct-token 模型使用相同 API。Pointer 在上下文允许的�
 4,096 个选项，direct-token 最多支持 255 个。
 训练与准确率的取舍见[输出方式说明](docs/TRAINING.md#pointer-and-direct-token-readouts)。
 
-## 评测
+## 📊 评测 <a name="评测"></a>
 
 Qwen3.8 27B 在两项评测中准确率最高，NLL 和 Brier 也最低。
 4B 版本中，direct-token 的 JevBench 准确率最高，Pointer 的 Kev Transfer-v9 准确率最高。
@@ -181,12 +179,11 @@ NLL、Brier 和 ECE 均在 Kev Transfer-v9 上计算。
 [机器可读结果](results/model-family-v2.json) ·
 [方法与消融实验报告](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
 
-## 训练
+## 🛠️ 训练 <a name="训练"></a>
 
 训练数据沿用推理时的 `state` 和 `questions`，为每个问题增加标签。
-先用随包提供的合成客服工单开始训练，再换成自己的标注数据。
-
-入门配置在 CUDA 上以 BF16 训练 Qwen3.5-0.8B，结果写入 `runs/my-jev`：
+先用随包提供的合成客服工单开始训练，再换成自己的标注数据。入门配置在 CUDA 上
+以 BF16 训练 Qwen3.5-0.8B，结果写入 `runs/my-jev`：
 
 ```bash
 python -m pip install -e '.[train]'
@@ -202,37 +199,37 @@ jevany train --config recipes/sft.toml
 jevany decide examples/request.json --checkpoint runs/my-jev
 ```
 
-通过 `--data` 指定自己的 JSONL，或用
+通过 `--data` 指定自己的 [JSONL 数据](docs/DATA.md)，或用
 [`recipes/finetune.toml`](recipes/finetune.toml) 微调已发布的 27B 模型。
 CPU 配置、多模态数据和标准 `torchrun` 启动方式见[训练指南](docs/TRAINING.md)。
 训练图片或视频模型时，安装 `.[train,multimodal]`。
 
+当前发布系列采用 LoRA SFT，训练数据包含 1,772,725 条文本记录和 2,180,242 个有标签决策，
+配置见[训练算力与实验说明](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)。
+全参数 SFT 与进一步的后训练改进仍在计划中。
+
 ### RLCR（实验功能）
 
-完成 SFT 后，可以继续使用兼顾正确率与概率校准的奖励训练：
+完成 SFT 后，可用 [RLCR](docs/ALGORITHM.md#rlcr) 继续训练，其奖励兼顾正确率与概率校准：
 
 ```bash
 jevany train --config recipes/rlcr.toml
 ```
 
-当前发布系列采用 LoRA SFT，训练数据包含 1,772,725 条文本记录和 2,180,242 个有标签决策。
-全参数 SFT 与进一步的后训练改进仍在计划中。
-
-[数据格式](docs/DATA.md) · [RLCR 目标](docs/ALGORITHM.md#rlcr) ·
-[训练算力与实验说明](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
-
-## 支持的模型系列
-
-![支持的 26 个模型，涵盖 Qwen、Gemma、Muse、Mistral、GLM、Nemotron 和 Llama](docs/supported-model-families.svg)
+## 🧩 支持的模型系列 <a name="支持的模型系列"></a>
 
 [模型 ID、支持的输入与运行要求](docs/TRAINING.md#backbone-support)。
 
-## 文档与贡献
+![支持的 26 个模型，涵盖 Qwen、Gemma、Muse、Mistral、GLM、Nemotron 和 Llama](docs/supported-model-families.svg)
+
+## 📚 文档与贡献 <a name="文档与贡献"></a>
 
 [训练](docs/TRAINING.md) · [部署](docs/DEPLOYMENT.md) · [API](docs/API.md) · [数据](docs/DATA.md) · [评测](docs/EVALUATION.md) · [贡献指南](CONTRIBUTING.md)
 
 欢迎贡献模型适配、评测或应用示例，开发步骤见[贡献指南](CONTRIBUTING.md)。
-[方法报告](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)及其
-[LaTeX 源文件](docs/JEVANY_METHOD_AND_ABLATIONS.tex)介绍了模型设计与实验。
+[方法报告](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)及其 [LaTeX 源文件](docs/JEVANY_METHOD_AND_ABLATIONS.tex)
+介绍了模型设计与实验。
 
-代码和入门数据采用 Apache-2.0。部分组件改编自 [Kev](https://github.com/jaredpalmer/kev)，归属说明见 [NOTICE](NOTICE) 和 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)。基座模型与上游数据集保留各自条款。
+代码和入门数据采用 Apache-2.0。部分组件改编自 [Kev](https://github.com/jaredpalmer/kev)，
+归属说明见 [NOTICE](NOTICE) 和 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)。
+基座模型与上游数据集保留各自条款。

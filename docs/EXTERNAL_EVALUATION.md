@@ -9,21 +9,21 @@ The evaluation includes all public nonempty Kev development and test partitions,
 the external SemIf, scienthoon, WANLI, TypeSafe, and ekzhang MMLU-Pro panels,
 binding diagnostics, and JevBench's public easy, original, and hard tiers.
 Historical versions retain separate reports. Training and calibration partitions
-are excluded. Night-2 diagnostics are included with an explicit warning that
-later Kev checkpoints trained on them.
+are excluded. Night-2 panels are included as training diagnostics for the later
+Kev checkpoints that trained on them.
 
 Some Kev evaluation partitions are deliberately private. Their names, expected
 counts, hashes, and mirror revisions remain in `manifest.json` under
-`unavailable`; they cannot be reproduced from the public repository. JevBench's
-231 public decisions do not include its sealed items. Public scores are not its
-full leaderboard composite.
+`unavailable`; reproducing them requires access to those private partitions.
+JevBench results cover its 231 public decisions; its sealed leaderboard composite
+is outside this public evaluation.
 
 ## Results — September 27, 2026
 
 The completed public matrix contains 16 checkpoints × 67 panels. Each model
 attempted all 22,219 unique requests, representing 56,677 original panel
-records. Identical requests are reused across historical panels; these counts
-are not a count of independent test examples.
+records. Historical panels share identical requests, which are counted once in
+the unique-request total.
 Fourteen partitions across eleven private Kev suites remain unavailable.
 
 Download the [full accuracy matrix](../results/decision-evaluation-v1/accuracy.csv),
@@ -55,10 +55,9 @@ JevBench public accuracy uses all 48 easy, 72 original, and 111 hard items:
 | Kev-9B / v7-base | 100.00% | 90.28% | 55.86% |
 | Jev 1.13.0 / published reference | 100.00% | 98.61% | 72.97% |
 
-These are public-tier results, not JevBench's sealed leaderboard composite.
 The official Jev row is copied from JevBench's published per-item outcomes;
-it was not rerun through an API. Kev's published Jev reports are retained
-separately in [the reference archive](../results/decision-evaluation-v1/official-jev-references.json).
+Kev's published Jev reports are retained separately in
+[the reference archive](../results/decision-evaluation-v1/official-jev-references.json).
 
 Selected external panels for the current main checkpoints are below.
 MMLU-Pro here is the separate 1,000-question ekzhang panel. Transfer-v9
@@ -149,12 +148,13 @@ The output includes detailed JSON reports, `scores.csv` with one row per
 model/panel and explicit metric names, and a wide `accuracy.csv`. Incomplete
 panels have empty accuracy cells in both tables. Published official Jev
 baselines have separate model IDs and a source column. Local model latency is
-reported separately from the predictor's wall time; hosted reference latencies
-are not copied into local timing columns.
+reported separately from the predictor's wall time. Local timing columns contain
+measurements from local runs.
 
 ## What the scores mean
 
-Requests contain no labels or reference distributions. Identical ordered
+Labels and reference distributions are reserved for scoring. Inference receives
+the question inputs. Identical ordered
 requests with identical context limits share inference, while each original
 panel keeps its own labels, membership, and denominator. Option permutations
 remain distinct. Context limits come from each Kev manifest; JevBench uses the
@@ -181,7 +181,7 @@ JevBench also uses its pinned native scorer, including its probability-sum
 tolerance, lexicographic tie rule, ordinal metrics, and family summaries.
 TypeSafe reports equal-case modal agreement and total-variation distance to the
 reference distribution, with both all-row and answered-row values in `scores.csv`.
-These metrics should not be replaced by ordinary question-weighted accuracy.
+Each case has equal weight in these metrics.
 
 Published official Jev results are copied from Kev's committed reports with
 their source paths, hashes, API model identity, and measurement dates. They are
@@ -189,14 +189,14 @@ marked `published_by_Kev_not_rerun`. Matching normally requires an original
 manifest hash; historical aliases require identical partition bytes and context.
 Scienthoon's converted rows instead verify every question ID, ordered option
 list, and label, with this weaker match recorded explicitly. The API alias may
-not expose a provider revision. Unmatched results remain references, rather
-than being assigned to a different panel.
+not expose a provider revision. Unmatched results remain separate references.
 
 JevBench also publishes Jev 1.13.0's per-item public outcomes. Those provide a
 separate public-tier accuracy reference, marked `published_by_JevBench_not_rerun`.
-They contain no probability distributions, so no calibration metrics are
-invented from them.
+These outcomes provide accuracy counts; calibration metrics require probability
+distributions, which this source does not include.
 
-Latency is local model time on the recorded hardware; cloud price and the
-JevBench speed/cost composite are not inferred. Existing JevAny multimodal and
+Latency measures local model time on the recorded hardware. Cloud price and
+the JevBench speed/cost composite are outside this evaluation's scope.
+Existing JevAny multimodal and
 interactive results remain documented in [EVALUATION.md](EVALUATION.md).

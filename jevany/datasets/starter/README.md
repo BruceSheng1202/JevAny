@@ -10,7 +10,6 @@ example, duplicate charges require urgent review, while a request for an invoice
 does not. Metadata records the source, split, license, and provenance.
 
 Use these files to learn the format and verify a training/deployment workflow.
-The development tickets are separate from training, but use the same task and
-policy. They do not measure general decision quality or reproduce the released
-27B checkpoint's training mixture. Replace them with representative, reviewed
-domain data before evaluating your application.
+The development tickets are separate from training and use the same task and
+policy. The released 27B checkpoint uses a different training mixture. For
+application evaluation, use representative, reviewed data from your domain.
