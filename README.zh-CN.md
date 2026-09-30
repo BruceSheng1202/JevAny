@@ -87,6 +87,92 @@ source .venv/bin/activate
 - **下一步：**Full-parameter SFT。
 - **后续：**改进的 post-training 与超参优化版本。
 
+## 评测
+
+我们将 **Transfer** 作为固定的跨领域与鲁棒性评测，包含 1,046 个
+clean、knowable 决策，覆盖 Emotion、PAWS、QNLI、TweetEval、MMLU、
+MMLU-Pro、SciQ 和四类鲁棒性切片。**JevBench** 是全部 231 个公开
+development 项的准确率，不是 sealed 榜单分数。主表中的 NLL、Brier
+和 ECE 均来自 Transfer；每次评测都完整覆盖所有样本。
+
+| 模型 | Transfer ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
+|---|---:|---:|---:|---:|---:|
+| Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
+| Kev-27B (`01b8199`) | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
+| Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
+| Laya (`55cf4c4`) | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
+| **JevAny Releases** |  |  |  |  |  |
+| Gemma 4B LoRA | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
+| Qwen3.5 4B LoRA | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
+| Qwen3.5 4B Direct-Token LoRA | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
+| Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
+| **Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
+
+### Transfer 分项
+
+各列为数据集或鲁棒性切片准确率，样本数依次为
+80 / 80 / 80 / 80 / 80 / 200 / 80 / 80 / 96 / 80 / 110。
+
+| 模型 | Emo | PAWS | QNLI | Tweet | MMLU | M-Pro | SciQ | Buried | Comp. | Policy | Ctrl. | Mean |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Baselines** |  |  |  |  |  |  |  |  |  |  |  |  |
+| Kev-4B | 53.75 | 73.75 | 92.50 | 73.75 | 70.00 | 50.00 | 98.75 | 66.25 | 92.71 | 77.50 | 92.73 | 74.19 |
+| Kev-27B | 60.00 | 78.75 | 95.00 | 80.00 | 83.75 | 66.00 | 97.50 | 76.25 | 89.58 | 96.25 | 99.09 | 82.31 |
+| Jev 1.13.0 | 58.75 | 80.00 | 91.25 | 81.25 | 90.00 | 84.00 | 98.75 | 70.00 | 90.62 | 97.50 | 94.55 | 85.37 |
+| Laya | 61.25 | 77.50 | 83.75 | 75.00 | 33.75 | 11.00 | 87.50 | 58.75 | 51.04 | 52.50 | 47.27 | 52.29 |
+| **Ours** |  |  |  |  |  |  |  |  |  |  |  |  |
+| Gemma 4B | 75.00 | 80.00 | 91.25 | 80.00 | 65.00 | 38.50 | 97.50 | 70.00 | 67.71 | 77.50 | 81.82 | 70.84 |
+| Qwen 4B P | 86.25 | 75.00 | 93.75 | 81.25 | 77.50 | 58.50 | 97.50 | 77.50 | 87.50 | 76.25 | 81.82 | 78.68 |
+| Qwen 4B DT | 85.00 | 77.50 | 95.00 | 81.25 | 75.00 | 52.50 | 98.75 | 78.75 | 86.46 | 83.75 | 81.82 | 78.20 |
+| Muse 30B | 81.25 | 77.50 | 92.50 | 83.75 | 83.75 | 61.00 | 98.75 | 82.50 | 95.83 | 98.75 | 90.91 | 83.46 |
+| **Qwen 27B** | **90.00** | **86.25** | **95.00** | **83.75** | **86.25** | **68.00** | **97.50** | **78.75** | **90.62** | **97.50** | **92.73** | **85.76** |
+
+`Buried` 测试隐藏指令；`Comp.` 测试 AND/OR/conditional 组合；
+`Policy` 对比 authorization/deadline 规则；`Ctrl.` 包含 11 类
+knowable policy control。数值均为百分比。
+
+### JevBench 分项
+
+| 模型 | Easy | Original | Hard | Score |
+|---|---:|---:|---:|---:|
+| **Baselines** |  |  |  |  |
+| Kev-4B | 100.00% | 94.44% | 52.25% | 75.32% |
+| Kev-27B | 100.00% | 100.00% | 69.37% | 85.28% |
+| Jev 1.13.0 | 100.00% | 98.61% | 72.97% | 86.58% |
+| Laya | 95.83% | 70.83% | 33.33% | 58.01% |
+| **Ours** |  |  |  |  |
+| Gemma 4B | 100.00% | 95.83% | 55.86% | 77.49% |
+| Qwen 4B P | 100.00% | 95.83% | 61.26% | 80.09% |
+| Qwen 4B DT | 100.00% | 98.61% | 61.26% | 80.95% |
+| Muse 30B | 100.00% | 97.22% | 75.68% | 87.45% |
+| **Qwen 27B** | **100.00%** | **98.61%** | **81.08%** | **90.48%** |
+
+Direct-token 4B 在已发布 4B 模型中取得更高的 JevBench 准确率，Pointer
+4B 则在 Transfer 上略高。Kev 与 Laya 来自完整的本地公开
+checkpoint 评测（Kev-27B 固定到 `01b8199`，Laya 固定到 `55cf4c4`）；Jev 采用
+完整的本地 API Transfer 结果与 JevBench 公布的分难度准确率。
+
+### Ablation 摘要
+
+- **Pointer 结构：**比较 linear、MLP 和 zero-initialized residual head；
+  residual 在受控实验中取得更好的 development NLL 与校准表现。
+- **表示 readout：**比较 decision token、query mean、option mean 和 combined；
+  query-mean 在早期筛选中领先，完整模型系列最终采用 decision-marker / option-close。
+- **Loss：**比较 cross-entropy、纯 InfoNCE 和混合目标；CE 在 loss sweep 中
+  Transfer 准确率最高，小权重 contrastive 项主要改善校准。本次发布使用 CE。
+- **Readout family：**4B direct-token 的 JevBench 更高（80.95% vs 80.09%），
+  pointer 的 Transfer 略高（78.68% vs 78.20%）。
+
+### 可复现性
+
+Transfer 报告 1,046 个计分决策，无缺失样本；JevBench 报告全部
+231 个公开 development 项。完整 suite hash 和未舍入指标记录在机器可读
+结果中。发布前已核对 release manifest、checkpoint 自带 reload report，
+并完成 GPU loader/reconstruction logits 等价测试。
+
+[本次发布的机器可读结果](results/model-family-v2.json) ·
+[评测协议与历史结果](docs/EVALUATION.md)。
+
 ## 推理与部署
 
 ### Python API
@@ -180,82 +266,6 @@ jevany demo --base-url http://127.0.0.1:8008 --text-only
 ```
 
 实时模型决策目前使用文本状态。机械臂控制使用单独的 `.[robotics]` 依赖。安装步骤、平台要求和环境接口见[演示指南](examples/README.md)，结合 LLM 规划器使用 Jev 决策可参考[集成文档](docs/INTEGRATIONS.md)。
-
-## 评测
-
-统一报告两个固定协议：Transfer-v9 的 1,046 个 clean、knowable 决策，以及
-JevBench 全部 231 个公开 development 项。每次评测均完整覆盖全部样本。
-JevBench public 是开发集诊断结果，不是 sealed 榜单分数。
-
-| 模型 | 类型 | T-v9 Acc ↑ | T-v9 NLL ↓ | T-v9 Brier ↓ | T-v9 ECE ↓ | JB Acc ↑ | JB NLL ↓ | JB Brier ↓ | JB ECE ↓ |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Kev-4B | 参考模型 | 74.19% | 0.858 | 0.380 | 0.125 | 75.32% | 0.537 | 0.310 | **0.021** |
-| Kev-27B (`01b8199`) | 参考模型 | 82.31% | 0.533 | 0.265 | 0.050 | 85.28% | 0.367 | 0.201 | 0.056 |
-| Jev 1.13.0 | 参考模型 | 85.37% | 0.644 | 0.212 | 0.033 | 86.58% | —¹ | —¹ | —¹ |
-| Laya (`55cf4c4`) | 参考模型 | 52.29% | 1.264 | 0.615 | 0.127 | 58.01% | 0.927 | 0.533 | 0.095 |
-| **JevAny Releases** |  |  |  |  |  |  |  |  |  |
-| Gemma 4B LoRA | Pointer | 70.84% | 0.706 | 0.369 | 0.056 | 77.49% | 0.536 | 0.309 | 0.043 |
-| Qwen3.5 4B LoRA | Pointer | 78.68% | 0.587 | 0.297 | 0.035 | 80.09% | 0.455 | 0.259 | 0.037 |
-| Qwen3.5 4B Direct-Token LoRA | Direct-token | 78.20% | 0.564 | 0.291 | **0.029** | 80.95% | 0.433 | 0.256 | 0.051 |
-| Muse Glimmer 30B LoRA | Pointer | 83.46% | 0.464 | 0.229 | 0.032 | 87.45% | 0.316 | 0.174 | 0.027 |
-| **Qwen3.8 27B LoRA** | **Pointer** | **85.76%** | **0.392** | **0.200** | 0.030 | **90.48%** | **0.270** | **0.145** | 0.036 |
-
-¹ JevBench 对 Jev 1.13 只公布了各难度分组的正确数，未公布预测概率，
-因此无法计算该模型的 JevBench NLL、Brier 和 ECE。
-
-### Transfer-v9 分项
-
-| 数据集 / 鲁棒性切片 | n | Kev 4B | Kev 27B | Jev | Laya | Gemma 4B | Qwen 4B P | Qwen 4B DT | Muse 30B | Qwen 27B |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Emotion | 80 | 53.75% | 60.00% | 58.75% | 61.25% | 75.00% | 86.25% | 85.00% | 81.25% | 90.00% |
-| PAWS | 80 | 73.75% | 78.75% | 80.00% | 77.50% | 80.00% | 75.00% | 77.50% | 77.50% | 86.25% |
-| QNLI | 80 | 92.50% | 95.00% | 91.25% | 83.75% | 91.25% | 93.75% | 95.00% | 92.50% | 95.00% |
-| TweetEval offensive | 80 | 73.75% | 80.00% | 81.25% | 75.00% | 80.00% | 81.25% | 81.25% | 83.75% | 83.75% |
-| MMLU | 80 | 70.00% | 83.75% | 90.00% | 33.75% | 65.00% | 77.50% | 75.00% | 83.75% | 86.25% |
-| MMLU-Pro | 200 | 50.00% | 66.00% | 84.00% | 11.00% | 38.50% | 58.50% | 52.50% | 61.00% | 68.00% |
-| SciQ | 80 | 98.75% | 97.50% | 98.75% | 87.50% | 97.50% | 97.50% | 98.75% | 98.75% | 97.50% |
-| Buried instruction（Emotion/PAWS/QNLI/TweetEval） | 80 | 66.25% | 76.25% | 70.00% | 58.75% | 70.00% | 77.50% | 78.75% | 82.50% | 78.75% |
-| Compositional holdouts（AND/OR/conditional） | 96 | 92.71% | 89.58% | 90.62% | 51.04% | 67.71% | 87.50% | 86.46% | 95.83% | 90.62% |
-| Contrastive policy（authorization/deadline） | 80 | 77.50% | 96.25% | 97.50% | 52.50% | 77.50% | 76.25% | 83.75% | 98.75% | 97.50% |
-| Knowable controls（11 类 policy 任务） | 110 | 92.73% | 99.09% | 94.55% | 47.27% | 81.82% | 81.82% | 81.82% | 90.91% | 92.73% |
-| **总计** | **1,046** | **74.19%** | **82.31%** | **85.37%** | **52.29%** | **70.84%** | **78.68%** | **78.20%** | **83.46%** | **85.76%** |
-
-### JevBench 分项
-
-| 难度 | n | Kev 4B | Kev 27B | Jev | Laya | Gemma 4B | Qwen 4B P | Qwen 4B DT | Muse 30B | Qwen 27B |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Easy | 48 | 100.00% | 100.00% | 100.00% | 95.83% | 100.00% | 100.00% | 100.00% | 100.00% | 100.00% |
-| Original | 72 | 94.44% | 100.00% | 98.61% | 70.83% | 95.83% | 95.83% | 98.61% | 97.22% | 98.61% |
-| Hard | 111 | 52.25% | 69.37% | 72.97% | 33.33% | 55.86% | 61.26% | 61.26% | 75.68% | 81.08% |
-| **总计** | **231** | **75.32%** | **85.28%** | **86.58%** | **58.01%** | **77.49%** | **80.09%** | **80.95%** | **87.45%** | **90.48%** |
-
-Direct-token 4B 在已发布 4B 模型中取得更高的 JevBench 准确率，Pointer
-4B 则在 Transfer-v9 上略高。Kev 与 Laya 来自完整的本地公开
-checkpoint 评测（Kev-27B 固定到 `01b8199`，Laya 固定到 `55cf4c4`）；Jev 采用完整的本地 API
-Transfer-v9 结果与 JevBench 公布的分难度准确率。不混用不可用的
-sealed 测试分数。
-
-### Ablation 摘要
-
-- **Pointer 结构：**比较 linear、MLP 和 zero-initialized residual head；
-  residual 在受控实验中取得更好的 development NLL 与校准表现。
-- **表示 readout：**比较 decision token、query mean、option mean 和 combined；
-  query-mean 在早期筛选中领先，完整模型系列最终采用 decision-marker / option-close。
-- **Loss：**比较 cross-entropy、纯 InfoNCE 和混合目标；CE 在 loss sweep 中
-  Transfer 准确率最高，小权重 contrastive 项主要改善校准。本次发布使用 CE。
-- **Readout family：**4B direct-token 的 JevBench 更高（80.95% vs 80.09%），
-  pointer 的 Transfer-v9 略高（78.68% vs 78.20%）。
-
-### 可复现性
-
-五次 Transfer-v9 运行均覆盖 1,264/1,264 个请求，headline 使用固定的 1,046
-个 clean、knowable 样本。JevBench 固定为 `jevbench-public-v1.4.2.2`，共 231
-项；完整 suite hash 与未舍入 headline 指标记录在机器可读结果中。发布前已核对 release
-manifest、checkpoint 自带 reload report，并完成 GPU loader/reconstruction
-logits 等价测试。
-
-[本次发布的机器可读结果](results/model-family-v2.json) ·
-[评测协议与历史结果](docs/EVALUATION.md)。
 
 ## 训练
 

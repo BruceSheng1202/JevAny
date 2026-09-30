@@ -90,6 +90,94 @@ in bytes for BF16 weights, plus runtime memory. See the
 - **Next:** full-parameter SFT.
 - **Later:** improved post-training and hyperparameter-optimized variants.
 
+## Evaluation
+
+**Transfer** is a fixed cross-domain and robustness evaluation over 1,046 clean,
+knowable decisions. Its item-level mean spans Emotion, PAWS, QNLI, TweetEval,
+MMLU, MMLU-Pro, SciQ, and four robustness slices. **JevBench** is accuracy across
+all 231 public development items, not the sealed leaderboard score. NLL, Brier,
+and ECE in the main table are Transfer metrics; every run covers every item.
+
+| Model | Transfer ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
+|---|---:|---:|---:|---:|---:|
+| Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
+| Kev-27B (`01b8199`) | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
+| Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
+| Laya (`55cf4c4`) | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
+| **JevAny releases** |  |  |  |  |  |
+| Gemma 4B LoRA | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
+| Qwen3.5 4B LoRA | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
+| Qwen3.5 4B Direct-Token LoRA | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
+| Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
+| **Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
+
+### Transfer breakdown
+
+Columns are dataset or robustness-slice accuracy. Sample counts are respectively
+80 / 80 / 80 / 80 / 80 / 200 / 80 / 80 / 96 / 80 / 110.
+
+| Model | Emo | PAWS | QNLI | Tweet | MMLU | M-Pro | SciQ | Buried | Comp. | Policy | Ctrl. | Mean |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Baselines** |  |  |  |  |  |  |  |  |  |  |  |  |
+| Kev-4B | 53.75 | 73.75 | 92.50 | 73.75 | 70.00 | 50.00 | 98.75 | 66.25 | 92.71 | 77.50 | 92.73 | 74.19 |
+| Kev-27B | 60.00 | 78.75 | 95.00 | 80.00 | 83.75 | 66.00 | 97.50 | 76.25 | 89.58 | 96.25 | 99.09 | 82.31 |
+| Jev 1.13.0 | 58.75 | 80.00 | 91.25 | 81.25 | 90.00 | 84.00 | 98.75 | 70.00 | 90.62 | 97.50 | 94.55 | 85.37 |
+| Laya | 61.25 | 77.50 | 83.75 | 75.00 | 33.75 | 11.00 | 87.50 | 58.75 | 51.04 | 52.50 | 47.27 | 52.29 |
+| **Ours** |  |  |  |  |  |  |  |  |  |  |  |  |
+| Gemma 4B | 75.00 | 80.00 | 91.25 | 80.00 | 65.00 | 38.50 | 97.50 | 70.00 | 67.71 | 77.50 | 81.82 | 70.84 |
+| Qwen 4B P | 86.25 | 75.00 | 93.75 | 81.25 | 77.50 | 58.50 | 97.50 | 77.50 | 87.50 | 76.25 | 81.82 | 78.68 |
+| Qwen 4B DT | 85.00 | 77.50 | 95.00 | 81.25 | 75.00 | 52.50 | 98.75 | 78.75 | 86.46 | 83.75 | 81.82 | 78.20 |
+| Muse 30B | 81.25 | 77.50 | 92.50 | 83.75 | 83.75 | 61.00 | 98.75 | 82.50 | 95.83 | 98.75 | 90.91 | 83.46 |
+| **Qwen 27B** | **90.00** | **86.25** | **95.00** | **83.75** | **86.25** | **68.00** | **97.50** | **78.75** | **90.62** | **97.50** | **92.73** | **85.76** |
+
+`Buried` tests hidden instructions; `Comp.` tests AND/OR/conditional composition;
+`Policy` contrasts authorization/deadline rules; `Ctrl.` contains 11 knowable
+policy controls. Values are percentages.
+
+### JevBench breakdown
+
+| Model | Easy | Original | Hard | Score |
+|---|---:|---:|---:|---:|
+| **Baselines** |  |  |  |  |
+| Kev-4B | 100.00% | 94.44% | 52.25% | 75.32% |
+| Kev-27B | 100.00% | 100.00% | 69.37% | 85.28% |
+| Jev 1.13.0 | 100.00% | 98.61% | 72.97% | 86.58% |
+| Laya | 95.83% | 70.83% | 33.33% | 58.01% |
+| **Ours** |  |  |  |  |
+| Gemma 4B | 100.00% | 95.83% | 55.86% | 77.49% |
+| Qwen 4B P | 100.00% | 95.83% | 61.26% | 80.09% |
+| Qwen 4B DT | 100.00% | 98.61% | 61.26% | 80.95% |
+| Muse 30B | 100.00% | 97.22% | 75.68% | 87.45% |
+| **Qwen 27B** | **100.00%** | **98.61%** | **81.08%** | **90.48%** |
+
+The direct-token 4B model leads the released 4B models on JevBench, while the
+pointer 4B model is slightly better on Transfer. Kev and Laya use complete local
+public-checkpoint runs (Kev-27B pinned to `01b8199`, Laya to `55cf4c4`); Jev uses
+a complete local API Transfer run and JevBench's published per-tier accuracy.
+
+### What we ablated
+
+- **Pointer structure:** linear, MLP, and zero-initialized residual heads; the
+  residual head won the controlled screen on development NLL and calibration.
+- **Representation readout:** decision-token, query-mean, option-mean, and
+  combined variants. Query-mean led the early screen; the release recipe uses
+  decision-marker / option-close after the full model-family run.
+- **Loss:** cross-entropy, pure InfoNCE, and mixed objectives; CE gave the best
+  Transfer accuracy in the loss sweep, while small contrastive terms mainly
+  improved calibration. The released checkpoints use CE.
+- **Readout family:** at 4B, direct-token improves JevBench (80.95% vs 80.09%),
+  while pointer is slightly stronger on Transfer (78.68% vs 78.20%).
+
+### Reproducibility
+
+Transfer reports 1,046 scored decisions with no missing examples; JevBench reports
+all 231 public development items. Exact suite hashes and unrounded metrics are in
+the machine-readable results. Release manifests, checkpoint-native reload reports,
+and GPU loader/reconstruction parity were checked before publishing.
+
+[Machine-readable release results](results/model-family-v2.json) ·
+[Evaluation protocols and historical results](docs/EVALUATION.md).
+
 ## Inference & Serving
 
 ### Python API
@@ -183,86 +271,6 @@ jevany demo --base-url http://127.0.0.1:8008 --text-only
 ```
 
 Live model runs currently use text state. Robot control uses the separate `.[robotics]` extra. See the [playground guide](examples/README.md) for setup, platform requirements and environment APIs, or [integrations](docs/INTEGRATIONS.md) to combine Jev decisions with an LLM planner.
-
-## Evaluation
-
-Accuracy uses two fixed protocols: Transfer-v9's 1,046 clean, knowable decisions
-and all 231 public JevBench development items. Every run covered every item.
-JevBench public is a development diagnostic, not the sealed leaderboard score.
-
-| Model | Type | T-v9 Acc ↑ | T-v9 NLL ↓ | T-v9 Brier ↓ | T-v9 ECE ↓ | JB Acc ↑ | JB NLL ↓ | JB Brier ↓ | JB ECE ↓ |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Kev-4B | Reference | 74.19% | 0.858 | 0.380 | 0.125 | 75.32% | 0.537 | 0.310 | **0.021** |
-| Kev-27B (`01b8199`) | Reference | 82.31% | 0.533 | 0.265 | 0.050 | 85.28% | 0.367 | 0.201 | 0.056 |
-| Jev 1.13.0 | Reference | 85.37% | 0.644 | 0.212 | 0.033 | 86.58% | —¹ | —¹ | —¹ |
-| Laya (`55cf4c4`) | Reference | 52.29% | 1.264 | 0.615 | 0.127 | 58.01% | 0.927 | 0.533 | 0.095 |
-| **JevAny releases** |  |  |  |  |  |  |  |  |  |
-| Gemma 4B LoRA | Pointer | 70.84% | 0.706 | 0.369 | 0.056 | 77.49% | 0.536 | 0.309 | 0.043 |
-| Qwen3.5 4B LoRA | Pointer | 78.68% | 0.587 | 0.297 | 0.035 | 80.09% | 0.455 | 0.259 | 0.037 |
-| Qwen3.5 4B Direct-Token LoRA | Direct-token | 78.20% | 0.564 | 0.291 | **0.029** | 80.95% | 0.433 | 0.256 | 0.051 |
-| Muse Glimmer 30B LoRA | Pointer | 83.46% | 0.464 | 0.229 | 0.032 | 87.45% | 0.316 | 0.174 | 0.027 |
-| **Qwen3.8 27B LoRA** | **Pointer** | **85.76%** | **0.392** | **0.200** | 0.030 | **90.48%** | **0.270** | **0.145** | 0.036 |
-
-¹ JevBench published only Jev 1.13's per-tier correct counts, not prediction
-probabilities, so its JevBench NLL, Brier, and ECE cannot be computed.
-
-### Transfer-v9 breakdown
-
-| Dataset / robustness slice | n | Kev 4B | Kev 27B | Jev | Laya | Gemma 4B | Qwen 4B P | Qwen 4B DT | Muse 30B | Qwen 27B |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Emotion | 80 | 53.75% | 60.00% | 58.75% | 61.25% | 75.00% | 86.25% | 85.00% | 81.25% | 90.00% |
-| PAWS | 80 | 73.75% | 78.75% | 80.00% | 77.50% | 80.00% | 75.00% | 77.50% | 77.50% | 86.25% |
-| QNLI | 80 | 92.50% | 95.00% | 91.25% | 83.75% | 91.25% | 93.75% | 95.00% | 92.50% | 95.00% |
-| TweetEval offensive | 80 | 73.75% | 80.00% | 81.25% | 75.00% | 80.00% | 81.25% | 81.25% | 83.75% | 83.75% |
-| MMLU | 80 | 70.00% | 83.75% | 90.00% | 33.75% | 65.00% | 77.50% | 75.00% | 83.75% | 86.25% |
-| MMLU-Pro | 200 | 50.00% | 66.00% | 84.00% | 11.00% | 38.50% | 58.50% | 52.50% | 61.00% | 68.00% |
-| SciQ | 80 | 98.75% | 97.50% | 98.75% | 87.50% | 97.50% | 97.50% | 98.75% | 98.75% | 97.50% |
-| Buried instruction (Emotion/PAWS/QNLI/TweetEval) | 80 | 66.25% | 76.25% | 70.00% | 58.75% | 70.00% | 77.50% | 78.75% | 82.50% | 78.75% |
-| Compositional holdouts (AND/OR/conditional) | 96 | 92.71% | 89.58% | 90.62% | 51.04% | 67.71% | 87.50% | 86.46% | 95.83% | 90.62% |
-| Contrastive policy (authorization/deadline) | 80 | 77.50% | 96.25% | 97.50% | 52.50% | 77.50% | 76.25% | 83.75% | 98.75% | 97.50% |
-| Knowable controls (11 policy tasks) | 110 | 92.73% | 99.09% | 94.55% | 47.27% | 81.82% | 81.82% | 81.82% | 90.91% | 92.73% |
-| **Overall** | **1,046** | **74.19%** | **82.31%** | **85.37%** | **52.29%** | **70.84%** | **78.68%** | **78.20%** | **83.46%** | **85.76%** |
-
-### JevBench breakdown
-
-| Tier | n | Kev 4B | Kev 27B | Jev | Laya | Gemma 4B | Qwen 4B P | Qwen 4B DT | Muse 30B | Qwen 27B |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Easy | 48 | 100.00% | 100.00% | 100.00% | 95.83% | 100.00% | 100.00% | 100.00% | 100.00% | 100.00% |
-| Original | 72 | 94.44% | 100.00% | 98.61% | 70.83% | 95.83% | 95.83% | 98.61% | 97.22% | 98.61% |
-| Hard | 111 | 52.25% | 69.37% | 72.97% | 33.33% | 55.86% | 61.26% | 61.26% | 75.68% | 81.08% |
-| **Overall** | **231** | **75.32%** | **85.28%** | **86.58%** | **58.01%** | **77.49%** | **80.09%** | **80.95%** | **87.45%** | **90.48%** |
-
-The direct-token 4B model leads the released 4B models on JevBench, while the
-pointer 4B model is slightly better on Transfer-v9. Kev and Laya use complete
-local public-checkpoint runs (Kev-27B pinned to `01b8199`, Laya to `55cf4c4`);
-Jev uses a complete
-local API Transfer-v9 run and JevBench's published per-tier accuracy reference.
-No unavailable sealed-test scores are mixed in.
-
-### What we ablated
-
-- **Pointer structure:** linear, MLP, and zero-initialized residual heads; the
-  residual head won the controlled screen on development NLL and calibration.
-- **Representation readout:** decision-token, query-mean, option-mean, and
-  combined variants. Query-mean led the early screen; the release recipe uses
-  decision-marker / option-close after the full model-family run.
-- **Loss:** cross-entropy, pure InfoNCE, and mixed objectives; CE gave the best
-  transfer accuracy in the loss sweep, while small contrastive terms mainly
-  improved calibration. The released checkpoints use CE.
-- **Readout family:** at 4B, direct-token improves JevBench (80.95% vs 80.09%),
-  while pointer is slightly stronger on Transfer-v9 (78.68% vs 78.20%).
-
-### Reproducibility
-
-The five Transfer-v9 reports cover 1,264/1,264 requests; the headline aggregate
-is the fixed 1,046-item clean, knowable subset. JevBench uses the frozen
-`jevbench-public-v1.4.2.2` conversion with 231 items. Exact suite hashes and
-unrounded headline metrics are recorded in the machine-readable results. Release
-manifests, checkpoint-native reload reports, and GPU loader/reconstruction
-parity were checked before publishing.
-
-[Machine-readable release results](results/model-family-v2.json) ·
-[Evaluation protocols and historical results](docs/EVALUATION.md).
 
 ## Training
 

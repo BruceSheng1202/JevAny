@@ -68,10 +68,10 @@ at the release revision linked from the [project repository](https://github.com/
 
 ## Evaluation
 
-All values below use the same frozen Transfer-v9 and public JevBench protocols.
+All values below use the same frozen Transfer and public JevBench protocols.
 They are accuracy, not the sealed JevBench leaderboard composite.
 
-| Transfer-v9 (1,046) | JevBench Easy (48) | Original (72) | Hard (111) | JevBench total (231) |
+| Transfer (1,046) | JevBench Easy (48) | Original (72) | Hard (111) | JevBench total (231) |
 |---:|---:|---:|---:|---:|
 | {args.transfer_accuracy:.2f}% | {args.jevbench_easy:.2f}% | {args.jevbench_original:.2f}% | {args.jevbench_hard:.2f}% | {args.jevbench_total:.2f}% |
 
