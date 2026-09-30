@@ -28,7 +28,7 @@ choose a robot's next action. One API takes the state, question and candidate
 options, then directly returns a choice and its probabilities.
 
 <p align="center">
-  <img src="docs/hero.png" alt="JevAny infra for decision model training, deployment and application integration" width="100%">
+  <img src="docs/hero.png" alt="JevAny infra for System 1 decision model training, deployment and application integration" width="100%">
 </p>
 
 ## 🎮 Demos <a name="demos"></a>
@@ -70,10 +70,10 @@ use a released checkpoint. For a preview on CPU, [try the playground](#try-the-p
 
 ### 🛠️ 1.1 JevAny Training <a name="training"></a>
 
-Train on the same `state` and `questions` you send at inference, with a label
-for each question. Start with the bundled synthetic support tickets, then
-train on your own labelled data. The starter recipe uses Qwen3.5-0.8B on CUDA
-with BF16 and writes `runs/my-jev`:
+Train your own System 1 model on the same `state` and `questions` you send at
+inference, with a label for each question. Start with the bundled synthetic
+support tickets, then train on your own labelled data. The starter recipe uses
+Qwen3.5-0.8B on CUDA with BF16 and writes `runs/my-jev`:
 
 ```bash
 python -m pip install -e '.[train]'

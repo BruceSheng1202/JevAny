@@ -26,7 +26,7 @@
 统一 API 接收状态、问题和候选选项，直接返回选择结果与各选项概率。
 
 <p align="center">
-  <img src="docs/hero.png" alt="JevAny infra：决策模型训练、部署与应用集成" width="100%">
+  <img src="docs/hero.png" alt="JevAny infra：System 1 决策模型训练、部署与应用集成" width="100%">
 </p>
 
 ## 🎮 演示 <a name="演示"></a>
@@ -67,7 +67,8 @@ python -m pip install -e .
 
 ### 🛠️ 1.1 JevAny 训练 <a name="训练"></a>
 
-训练数据沿用推理时的 `state` 和 `questions`，为每个问题增加标签。
+用标注决策数据训练自己的 System 1 模型：数据沿用推理时的 `state` 和 `questions`，
+为每个问题增加标签。
 先用随包提供的合成客服工单开始训练，再换成自己的标注数据。入门配置在 CUDA 上
 以 BF16 训练 Qwen3.5-0.8B，结果写入 `runs/my-jev`：
 
