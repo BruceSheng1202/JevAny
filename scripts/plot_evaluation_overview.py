@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the README comparison from the unrounded release results.
+"""Render the full and compact README comparisons from unrounded release results.
 
 Requires matplotlib and cairosvg. Run from the repository root with:
     python scripts/plot_evaluation_overview.py
@@ -17,12 +17,14 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
+from matplotlib.patches import Patch, Rectangle
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "results/model-family-v2.json"
 OUT = ROOT / "docs/evaluation-overview.svg"
+SUMMARY_OUT = ROOT / "docs/evaluation-summary.svg"
 LOGOS = ROOT / "docs/model-logos"
 INK, MUTED, RULE = "#213248", "#64748B", "#E4E9EF"
 OURS, BASELINE = "#278577", "#8493A6"
@@ -30,11 +32,11 @@ WIDTH, HEIGHT = 1440, 820
 LOGO_X, LOGO_SIZE = 86, 42
 FIRST_Y, ROW_STEP = 218, 57
 LABELS = {
-    "JevAny-Gemma-4B-LoRA": "JevAny · Gemma 4B",
-    "JevAny-Qwen3.5-4B-LoRA": "JevAny · Qwen3.5 4B",
-    "JevAny-Qwen3.5-4B-Direct-Token-LoRA": "JevAny · Qwen3.5 4B",
-    "JevAny-Qwen3.8-27B-LoRA": "JevAny · Qwen3.8 27B",
-    "JevAny-Muse-Glimmer-30B-LoRA": "JevAny · Muse Glimmer 30B",
+    "JevAny-Gemma-4B-LoRA": "JevAny-Gemma-4B",
+    "JevAny-Qwen3.5-4B-LoRA": "JevAny-Qwen3.5-4B",
+    "JevAny-Qwen3.5-4B-Direct-Token-LoRA": "JevAny-Qwen3.5-4B-Direct-Token",
+    "JevAny-Qwen3.8-27B-LoRA": "JevAny-Qwen3.8-27B",
+    "JevAny-Muse-Glimmer-30B-LoRA": "JevAny-Muse-Glimmer-30B",
 }
 MODEL_LOGOS = {
     "JevAny-Gemma-4B-LoRA": "jevany-gemma.svg",
@@ -46,6 +48,17 @@ MODEL_LOGOS = {
     "Kev-4B": "kev.svg",
     "Kev-27B": "kev.svg",
     "Laya": "laya.svg",
+}
+SUMMARY_LABELS = {
+    "JevAny-Gemma-4B-LoRA": "JevAny\nGemma\n4B",
+    "JevAny-Qwen3.5-4B-LoRA": "JevAny\nQwen3.5\n4B",
+    "JevAny-Qwen3.5-4B-Direct-Token-LoRA": "JevAny\nQwen3.5\n4B · DT",
+    "JevAny-Qwen3.8-27B-LoRA": "JevAny\nQwen3.8\n27B",
+    "JevAny-Muse-Glimmer-30B-LoRA": "JevAny\nMuse\n30B",
+    "Jev 1.13.0": "Jev\n1.13.0",
+    "Kev-4B": "Kev\n4B",
+    "Kev-27B": "Kev\n27B",
+    "Laya": "Laya",
 }
 
 
@@ -111,15 +124,25 @@ def load_models(source: Path = SOURCE) -> list[dict]:
                 "id": identifier,
                 "label": LABELS[identifier.split("/")[-1]] if ours else identifier,
                 "logo": MODEL_LOGOS[identifier.split("/")[-1]],
-                "detail": (
-                    f"LoRA · {'Direct-token' if record['readout'] == 'direct-token' else 'Pointer'}"
-                    if ours else ""
-                ),
+                "detail": record["readout"].capitalize() if ours else "",
                 "ours": ours,
                 **scores,
                 "mean": (scores["transfer"] + scores["jevbench"]) / 2,
             })
     return sorted(models, key=lambda model: -model["mean"])
+
+
+def load_logo_images(models: list[dict]) -> dict:
+    """Rasterize the existing model marks for Matplotlib."""
+    images = {}
+    for filename in {model["logo"] for model in models}:
+        path = LOGOS / filename
+        data = (
+            cairosvg.svg2png(url=str(path), output_width=144, output_height=144)
+            if path.suffix == ".svg" else path.read_bytes()
+        )
+        images[filename] = plt.imread(io.BytesIO(data), format="png")
+    return images
 
 
 def draw(models: list[dict]):
@@ -170,14 +193,7 @@ def draw(models: list[dict]):
         text(x, last_y + 53, str(tick), 14, MUTED, ha="center")
     line(1110, 137, 1110, last_y + 31)
 
-    images = {}
-    for filename in {model["logo"] for model in models}:
-        path = LOGOS / filename
-        data = (
-            cairosvg.svg2png(url=str(path), output_width=144, output_height=144)
-            if path.suffix == ".svg" else path.read_bytes()
-        )
-        images[filename] = plt.imread(io.BytesIO(data), format="png")
+    images = load_logo_images(models)
 
     for rank, model in enumerate(models, start=1):
         y = FIRST_Y + (rank - 1) * ROW_STEP
@@ -190,7 +206,7 @@ def draw(models: list[dict]):
             aspect="auto", interpolation="lanczos", zorder=3,
         )
         image.set_gid(f"model-logo-{rank}")
-        text(136, y - 9 if model["detail"] else y, model["label"], 20, weight=weight)
+        text(136, y - 9 if model["detail"] else y, model["label"], 19, weight=weight)
         if model["detail"]:
             text(136, y + 15, model["detail"], 14, MUTED)
         end = bar_x + bar_width * model["mean"] / 100
@@ -203,6 +219,72 @@ def draw(models: list[dict]):
 
     line(48, 755, 1392, 755)
     text(48, 788, "Mean = (Kev Transfer-v9 + JevBench) / 2", 18)
+    return fig
+
+
+def draw_summary(models: list[dict]):
+    """Rank each benchmark by its own accuracy, using zero-based axes."""
+    plt.rcParams.update({
+        "font.family": ["DejaVu Sans", "sans-serif"],
+        "svg.fonttype": "none",
+        "svg.hashsalt": "jevany-evaluation-summary",
+        "text.color": INK,
+    })
+    fig, axes = plt.subplots(1, 2, figsize=(16, 4.8), dpi=100, facecolor="white")
+    fig.subplots_adjust(left=0.04, right=0.99, bottom=0.27, top=0.76, wspace=0.11)
+    fig.text(0.04, 0.93, "Accuracy (%)", fontsize=16, weight="bold")
+    fig.legend(
+        handles=[
+            Patch(facecolor=OURS, label="JevAny"),
+            Patch(facecolor=BASELINE, label="Baselines"),
+        ],
+        loc="upper right", bbox_to_anchor=(0.99, 0.99), ncol=2,
+        frameon=False, fontsize=13, handlelength=1, handleheight=1,
+    )
+    images = load_logo_images(models)
+    for ax, (key, title, scope) in zip(axes, (
+        ("transfer", "Kev Transfer-v9", "1,046 decisions"),
+        ("jevbench", "JevBench", "231 public-dev items"),
+    )):
+        ranked = sorted(models, key=lambda model: -model[key])
+        labels = [SUMMARY_LABELS[model["id"].split("/")[-1]] for model in ranked]
+        colors = [OURS if model["ours"] else BASELINE for model in ranked]
+        ax.text(0, 1.17, title, transform=ax.transAxes, fontsize=18, weight="bold")
+        ax.text(1, 1.17, scope, transform=ax.transAxes,
+                fontsize=12, color=MUTED, ha="right")
+        ax.set_ylim(0, 100)
+        ax.set_xlim(-0.65, len(models) - 0.35)
+        ax.set_yticks([0, 50, 100])
+        ax.tick_params(axis="y", length=0, pad=6, labelsize=11, labelcolor=MUTED)
+        ax.set_xticks(range(len(models)), labels, fontsize=10.5, color=INK, va="bottom")
+        ax.tick_params(axis="x", length=0, pad=41)
+        ax.set_axisbelow(True)
+        ax.grid(axis="y", color=RULE, linewidth=0.8)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.axhline(0, color=RULE, linewidth=1)
+        values = [model[key] for model in ranked]
+        bars = ax.bar(range(len(models)), values, width=0.65, color=colors, zorder=3)
+        for index, (model, bar, value) in enumerate(zip(ranked, bars, values)):
+            best = value == max(values)
+            bar.set_gid(f"summary-{key}-{index + 1}")
+            ax.text(
+                bar.get_x() + bar.get_width() / 2, value + 2,
+                f"{value:.1f}", ha="center", va="bottom", fontsize=13,
+                color=INK, weight="bold" if best else "normal",
+            )
+            if model["ours"]:
+                ax.get_xticklabels()[index].set_weight("bold")
+            image = images[model["logo"]]
+            logo = AnnotationBbox(
+                OffsetImage(image, zoom=28 / image.shape[0], interpolation="lanczos"),
+                (index, 0), xycoords=ax.get_xaxis_transform(),
+                xybox=(0, -49), boxcoords="offset points",
+                box_alignment=(0.5, 1), frameon=False, pad=0,
+                annotation_clip=False,
+            )
+            logo.set_gid(f"summary-{key}-logo-{index + 1}")
+            ax.add_artist(logo)
     return fig
 
 
@@ -259,6 +341,21 @@ def main() -> None:
     )
     embed_vector_logos(OUT, models)
     OUT.write_text("\n".join(line.rstrip() for line in OUT.read_text().splitlines()) + "\n")
+    plt.close(fig)
+    fig = draw_summary(models)
+    fig.savefig(SUMMARY_OUT, metadata={
+        "Date": None,
+        "Title": "Kev Transfer-v9 and JevBench accuracy",
+        "Description": (
+            "All nine models from results/model-family-v2.json, ranked from left "
+            "to right by descending accuracy within each benchmark. Left: Kev "
+            "Transfer-v9. Right: JevBench public-development accuracy. "
+            "Both axes start at zero."
+        ),
+    })
+    SUMMARY_OUT.write_text(
+        "\n".join(line.rstrip() for line in SUMMARY_OUT.read_text().splitlines()) + "\n"
+    )
     plt.close(fig)
     for model in models:
         print(f'{model["mean"]:.2f}  {model["label"]} ({model["detail"]})')

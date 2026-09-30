@@ -19,11 +19,11 @@ and ECE in the main table are Kev Transfer-v9 metrics; every run covers every it
 | Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
 | Laya (`55cf4c4`) | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
 | **JevAny releases** |  |  |  |  |  |
-| Gemma 4B LoRA | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
-| Qwen3.5 4B LoRA | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
-| Qwen3.5 4B Direct-Token LoRA | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
-| Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
-| **Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
+| JevAny-Gemma-4B | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
+| JevAny-Qwen3.5-4B | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
+| JevAny-Qwen3.5-4B-Direct-Token | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
+| JevAny-Muse-Glimmer-30B | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
+| **JevAny-Qwen3.8-27B** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
 ### Kev Transfer-v9 breakdown
 
@@ -38,11 +38,11 @@ Columns are dataset or robustness-slice accuracy. Sample counts are respectively
 | Jev 1.13.0 | 58.75 | 80.00 | 91.25 | 81.25 | **90.00** | **84.00** | **98.75** | 70.00 | 90.62 | 97.50 | 94.55 | 85.37 |
 | Laya | 61.25 | 77.50 | 83.75 | 75.00 | 33.75 | 11.00 | 87.50 | 58.75 | 51.04 | 52.50 | 47.27 | 52.29 |
 | **JevAny (Ours)** |  |  |  |  |  |  |  |  |  |  |  |  |
-| Gemma 4B | 75.00 | 80.00 | 91.25 | 80.00 | 65.00 | 38.50 | 97.50 | 70.00 | 67.71 | 77.50 | 81.82 | 70.84 |
-| Qwen 4B P | 86.25 | 75.00 | 93.75 | 81.25 | 77.50 | 58.50 | 97.50 | 77.50 | 87.50 | 76.25 | 81.82 | 78.68 |
-| Qwen 4B DT | 85.00 | 77.50 | **95.00** | 81.25 | 75.00 | 52.50 | **98.75** | 78.75 | 86.46 | 83.75 | 81.82 | 78.20 |
-| Muse 30B | 81.25 | 77.50 | 92.50 | **83.75** | 83.75 | 61.00 | **98.75** | **82.50** | **95.83** | **98.75** | 90.91 | 83.46 |
-| **Qwen 27B** | **90.00** | **86.25** | **95.00** | **83.75** | 86.25 | 68.00 | 97.50 | 78.75 | 90.62 | 97.50 | 92.73 | **85.76** |
+| JevAny-Gemma-4B | 75.00 | 80.00 | 91.25 | 80.00 | 65.00 | 38.50 | 97.50 | 70.00 | 67.71 | 77.50 | 81.82 | 70.84 |
+| JevAny-Qwen3.5-4B | 86.25 | 75.00 | 93.75 | 81.25 | 77.50 | 58.50 | 97.50 | 77.50 | 87.50 | 76.25 | 81.82 | 78.68 |
+| JevAny-Qwen3.5-4B-Direct-Token | 85.00 | 77.50 | **95.00** | 81.25 | 75.00 | 52.50 | **98.75** | 78.75 | 86.46 | 83.75 | 81.82 | 78.20 |
+| JevAny-Muse-Glimmer-30B | 81.25 | 77.50 | 92.50 | **83.75** | 83.75 | 61.00 | **98.75** | **82.50** | **95.83** | **98.75** | 90.91 | 83.46 |
+| **JevAny-Qwen3.8-27B** | **90.00** | **86.25** | **95.00** | **83.75** | 86.25 | 68.00 | 97.50 | 78.75 | 90.62 | 97.50 | 92.73 | **85.76** |
 
 `Buried` tests hidden instructions; `Comp.` tests AND/OR/conditional composition;
 `Policy` contrasts authorization/deadline rules; `Ctrl.` contains 11 knowable
@@ -58,11 +58,11 @@ policy controls. Values are percentages.
 | Jev 1.13.0 | **100.00%** | 98.61% | 72.97% | 86.58% |
 | Laya | 95.83% | 70.83% | 33.33% | 58.01% |
 | **JevAny (Ours)** |  |  |  |  |
-| Gemma 4B | **100.00%** | 95.83% | 55.86% | 77.49% |
-| Qwen 4B P | **100.00%** | 95.83% | 61.26% | 80.09% |
-| Qwen 4B DT | **100.00%** | 98.61% | 61.26% | 80.95% |
-| Muse 30B | **100.00%** | 97.22% | 75.68% | 87.45% |
-| **Qwen 27B** | **100.00%** | 98.61% | **81.08%** | **90.48%** |
+| JevAny-Gemma-4B | **100.00%** | 95.83% | 55.86% | 77.49% |
+| JevAny-Qwen3.5-4B | **100.00%** | 95.83% | 61.26% | 80.09% |
+| JevAny-Qwen3.5-4B-Direct-Token | **100.00%** | 98.61% | 61.26% | 80.95% |
+| JevAny-Muse-Glimmer-30B | **100.00%** | 97.22% | 75.68% | 87.45% |
+| **JevAny-Qwen3.8-27B** | **100.00%** | 98.61% | **81.08%** | **90.48%** |
 
 The direct-token 4B model leads the released 4B models on JevBench, while the
 pointer 4B model is slightly better on Kev Transfer-v9. Kev and Laya use complete local
@@ -111,11 +111,11 @@ python scripts/plot_evaluation_overview.py
 
 | Model | Released step | Parallel GPUs | Wall time | GPU-hours |
 |---|---:|---:|---:|---:|
-| Gemma 4B LoRA | 2,771 | 32 H200 | ~3.28 h | ~104.9 |
-| Qwen3.5 4B LoRA | 13,850 | 32 H200 | 10.33 h | 330.6 |
-| Qwen3.5 4B Direct-Token LoRA | 9,695 | 32 H200 | 8.41 h | 269.1 |
-| Muse Glimmer 30B LoRA | 3,324 | 40 H200 | 2.88 h | 115.4 |
-| Qwen3.8 27B LoRA | 22,160 | 32 H200 | 18.83 h | 602.7 |
+| JevAny-Gemma-4B | 2,771 | 32 H200 | ~3.28 h | ~104.9 |
+| JevAny-Qwen3.5-4B | 13,850 | 32 H200 | 10.33 h | 330.6 |
+| JevAny-Qwen3.5-4B-Direct-Token | 9,695 | 32 H200 | 8.41 h | 269.1 |
+| JevAny-Muse-Glimmer-30B | 3,324 | 40 H200 | 2.88 h | 115.4 |
+| JevAny-Qwen3.8-27B | 22,160 | 32 H200 | 18.83 h | 602.7 |
 
 The five released checkpoints represent approximately **1,423 H200 GPU-hours**
 of training, with at most 40 GPUs used in parallel within one run. GPU-hours are

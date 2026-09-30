@@ -13,11 +13,10 @@
 
 <p align="center">
   <strong>🇺🇸 English</strong> | <a href="README.zh-CN.md">🇨🇳 简体中文</a><br>
-  <strong><a href="#quickstart">⚡ Quickstart</a> ·
-  <a href="#demos">🎮 Demos</a> ·
-  <a href="#pretrained-models">🤗 Models</a> ·
-  <a href="#evaluation">📊 Results</a> ·
-  <a href="#training">🛠️ Training</a> ·
+  <strong><a href="#results-and-demos">🎮 Results &amp; Demos</a> |
+  <a href="#quickstart">⚡ Quickstart</a> |
+  <a href="#pretrained-models">🤗 Models</a> |
+  <a href="#evaluation">📊 Benchmarks</a> |
   <a href="#documentation-and-contributing">📚 Docs</a></strong>
 </p>
 
@@ -31,7 +30,11 @@ options, then directly returns a choice and its probabilities.
   <img src="docs/hero.png" alt="JevAny infra for System 1 decision model training, deployment and application integration" width="100%">
 </p>
 
-## 🎮 Demos <a name="demos"></a>
+## 🎮 Results and Demos <a name="results-and-demos"></a><a name="demos"></a>
+
+[![JevAny checkpoints and baselines compared on Kev Transfer-v9 and JevBench in side-by-side bar charts](docs/evaluation-summary.svg)](#evaluation)
+
+[Full benchmark results and evaluation details](#evaluation).
 
 The following 30 examples show JevAny choosing actions across robotics,
 browser, software, laboratory and mobility tasks using `JevAny-27B-SFT`.
@@ -42,7 +45,7 @@ recorded actions and option probabilities.
 
 ## 📑 Table of Contents
 
-- [🎮 Demos](#demos)
+- [🎮 Results and Demos](#results-and-demos)
 - [⚡ 1. Quickstart](#quickstart)
   - [🛠️ 1.1 JevAny Training](#training)
   - [🚀 1.2 JevAny Deployment](#deployment)
@@ -150,11 +153,11 @@ and use the same interface. For image and video inputs, follow the
 
 | Model | Readout | Intended use |
 |---|---|---|
-| [<img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Gemma-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | Pointer | Compact Gemma release |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | Pointer | Compact, flexible choice count |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B-Direct-Token-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | Direct-token | Best released 4B JevBench accuracy |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.8-27B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | Default; highest released accuracy |
-| [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B-LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer alternative |
+| [<img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Gemma-4B](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | Pointer | Compact Gemma release |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | Pointer | Compact, flexible choice count |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B-Direct-Token](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | Direct-token | Best released 4B JevBench accuracy |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.8-27B](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | Default; highest released accuracy |
+| [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer alternative |
 
 These LoRA adapters were trained with SFT on 1,772,725 text records containing
 2,180,242 labelled decisions; see [training compute and experiments](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
@@ -172,7 +175,7 @@ training and accuracy tradeoffs.
 
 ## 📊 3. Benchmark Results <a name="evaluation"></a>
 
-Qwen3.8 27B leads both benchmarks and has the lowest NLL and Brier.
+JevAny-Qwen3.8-27B leads both benchmarks and has the lowest NLL and Brier.
 Among 4B releases, direct-token leads on JevBench; pointer leads on Kev Transfer-v9.
 
 [![JevAny checkpoints and baselines ranked by mean accuracy on Kev Transfer-v9 and JevBench](docs/evaluation-overview.svg)](docs/evaluation-overview.svg)
@@ -186,11 +189,11 @@ Among 4B releases, direct-token leads on JevBench; pointer leads on Kev Transfer
 | [<img src="docs/model-logos/typesafe.png" width="24" height="24" align="middle" alt="">&nbsp;Jev 1.13.0](https://docs.typesafe.ai/models) | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
 | [<img src="docs/model-logos/laya.svg" width="24" height="24" align="middle" alt="">&nbsp;Laya](https://huggingface.co/convaiinnovations/laya) | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
 | **JevAny releases** |  |  |  |  |  |
-| [<img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;Gemma 4B LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;Qwen3.5 4B LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;Qwen3.5 4B Direct-Token LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
-| [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;Muse Glimmer 30B LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**Qwen3.8 27B LoRA**](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
+| [<img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Gemma-4B](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B-Direct-Token](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
+| [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**JevAny-Qwen3.8-27B**](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
 NLL, Brier and ECE are measured on Kev Transfer-v9.
 

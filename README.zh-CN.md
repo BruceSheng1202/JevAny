@@ -13,11 +13,10 @@
 
 <p align="center">
   <a href="README.md">🇺🇸 English</a> | <strong>🇨🇳 简体中文</strong><br>
-  <strong><a href="#快速上手">⚡ 快速上手</a> ·
-  <a href="#演示">🎮 演示</a> ·
-  <a href="#预训练模型">🤗 模型</a> ·
-  <a href="#评测">📊 评测</a> ·
-  <a href="#训练">🛠️ 训练</a> ·
+  <strong><a href="#结果与演示">🎮 结果与演示</a> |
+  <a href="#快速上手">⚡ 快速上手</a> |
+  <a href="#预训练模型">🤗 模型</a> |
+  <a href="#评测">📊 评测</a> |
   <a href="#文档与贡献">📚 文档</a></strong>
 </p>
 
@@ -29,7 +28,11 @@
   <img src="docs/hero.png" alt="JevAny infra：System 1 决策模型训练、部署与应用集成" width="100%">
 </p>
 
-## 🎮 演示 <a name="演示"></a>
+## 🎮 结果与演示 <a name="结果与演示"></a><a name="演示"></a>
+
+[![左右并列柱状图：JevAny checkpoint 与基线模型在 Kev Transfer-v9 和 JevBench 上的准确率](docs/evaluation-summary.svg)](#评测)
+
+[完整基准测试结果与评测说明](#评测)。
 
 以下 30 个案例展示了 JevAny 在机器人、浏览器、软件、实验室和出行任务中的动作选择。
 演示使用的模型是 `JevAny-27B-SFT`。[查看全部案例](docs/CASES.md)，
@@ -39,7 +42,7 @@
 
 ## 📑 目录
 
-- [🎮 演示](#演示)
+- [🎮 结果与演示](#结果与演示)
 - [⚡ 1. 快速上手](#快速上手)
   - [🛠️ 1.1 JevAny 训练](#训练)
   - [🚀 1.2 JevAny 部署](#部署)
@@ -141,11 +144,11 @@ print("Probabilities:", answer["probabilities"])
 
 | 模型 | Readout | 用途 |
 |---|---|---|
-| [<img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Gemma-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | Pointer | 轻量 Gemma 版本 |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | Pointer | 轻量、支持灵活选项数 |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B-Direct-Token-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | Direct-token | 当前 4B JevBench 最优版本 |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.8-27B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | 默认模型；当前发布准确率最高 |
-| [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B-LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer 版本 |
+| [<img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Gemma-4B](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | Pointer | 轻量 Gemma 版本 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | Pointer | 轻量、支持灵活选项数 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B-Direct-Token](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | Direct-token | 当前 4B JevBench 最优版本 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.8-27B](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | 默认模型；当前发布准确率最高 |
+| [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer 版本 |
 
 这些 LoRA adapter 采用 SFT 训练，训练数据包含 1,772,725 条文本记录和 2,180,242 个有标签决策，
 配置见[训练算力与实验说明](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)。
@@ -160,7 +163,7 @@ Pointer 和 direct-token 模型使用相同 API。Pointer 在上下文允许的�
 
 ## 📊 3. 基准测试结果 <a name="评测"></a>
 
-Qwen3.8 27B 在两项评测中准确率最高，NLL 和 Brier 也最低。
+JevAny-Qwen3.8-27B 在两项评测中准确率最高，NLL 和 Brier 也最低。
 4B 版本中，direct-token 的 JevBench 准确率最高，Pointer 的 Kev Transfer-v9 准确率最高。
 
 [![JevAny checkpoint 与基线模型按 Kev Transfer-v9 和 JevBench 的平均准确率排序](docs/evaluation-overview.svg)](docs/evaluation-overview.svg)
@@ -174,11 +177,11 @@ Qwen3.8 27B 在两项评测中准确率最高，NLL 和 Brier 也最低。
 | [<img src="docs/model-logos/typesafe.png" width="24" height="24" align="middle" alt="">&nbsp;Jev 1.13.0](https://docs.typesafe.ai/models) | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
 | [<img src="docs/model-logos/laya.svg" width="24" height="24" align="middle" alt="">&nbsp;Laya](https://huggingface.co/convaiinnovations/laya) | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
 | **JevAny Releases** |  |  |  |  |  |
-| [<img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;Gemma 4B LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;Qwen3.5 4B LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;Qwen3.5 4B Direct-Token LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
-| [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;Muse Glimmer 30B LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
-| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**Qwen3.8 27B LoRA**](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
+| [<img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Gemma-4B](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Qwen3.5-4B-Direct-Token](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
+| [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
+| [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**JevAny-Qwen3.8-27B**](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
 NLL、Brier 和 ECE 均在 Kev Transfer-v9 上计算。
 
