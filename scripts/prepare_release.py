@@ -64,7 +64,7 @@ tags:
 
 Official JevAny LoRA checkpoint using the **{readout}** readout on
 [`{args.base}`](https://huggingface.co/{args.base}). It requires the JevAny code
-at the release revision linked from the [project repository](https://github.com/weitianxin/JevAny).
+at the release revision linked from the [project repository](https://github.com/SimpleJev/JevAny).
 
 ## Evaluation
 

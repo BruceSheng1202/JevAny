@@ -178,7 +178,7 @@ def draw(models: list[dict]):
     text(48, 154, "#", 16, MUTED)
     text(136, 154, "Model", 17, weight="bold")
     text(508, 154, "Mean accuracy (%)", 17, weight="bold")
-    text(1190, 148, "Kev Transfer-v9", 16, weight="bold", ha="center")
+    text(1190, 148, "Transfer", 16, weight="bold", ha="center")
     text(1330, 148, "JevBench", 18, weight="bold", ha="center")
     text(1190, 174, "1,046 decisions", 13, MUTED, ha="center")
     text(1330, 174, "231 public-dev items", 13, MUTED, ha="center")
@@ -218,7 +218,7 @@ def draw(models: list[dict]):
                  weight="bold" if best else "normal", ha="center")
 
     line(48, 755, 1392, 755)
-    text(48, 788, "Mean = (Kev Transfer-v9 + JevBench) / 2", 18)
+    text(48, 788, "Mean = (Transfer + JevBench) / 2", 18)
     return fig
 
 
@@ -243,7 +243,7 @@ def draw_summary(models: list[dict]):
     )
     images = load_logo_images(models)
     for ax, (key, title, scope) in zip(axes, (
-        ("transfer", "Kev Transfer-v9", "1,046 decisions"),
+        ("transfer", "Transfer", "1,046 decisions"),
         ("jevbench", "JevBench", "231 public-dev items"),
     )):
         ranked = sorted(models, key=lambda model: -model[key])
@@ -332,7 +332,7 @@ def main() -> None:
     fig = draw(models)
     description = (
         "All models in results/model-family-v2.json, ranked by the equal-weight "
-        "mean of Kev Transfer-v9 and JevBench public-development accuracy. "
+        "mean of Transfer and JevBench public-development accuracy. "
         + " ".join(f'{m["label"]} ({m["detail"]}): {m["mean"]:.2f}.' for m in models)
     )
     fig.savefig(
@@ -345,11 +345,11 @@ def main() -> None:
     fig = draw_summary(models)
     fig.savefig(SUMMARY_OUT, metadata={
         "Date": None,
-        "Title": "Kev Transfer-v9 and JevBench accuracy",
+        "Title": "Transfer and JevBench accuracy",
         "Description": (
             "All nine models from results/model-family-v2.json, ranked from left "
-            "to right by descending accuracy within each benchmark. Left: Kev "
-            "Transfer-v9. Right: JevBench public-development accuracy. "
+            "to right by descending accuracy within each benchmark. Left: "
+            "Transfer. Right: JevBench public-development accuracy. "
             "Both axes start at zero."
         ),
     })

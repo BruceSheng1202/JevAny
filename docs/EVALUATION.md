@@ -3,16 +3,17 @@
 ## Model family v2
 
 This section contains the full results for the five current LoRA SFT releases.
-Kev Transfer-v9 also informed model development and serves as a diagnostic comparison.
+Transfer also informed model development and serves as a diagnostic comparison.
 
-**Kev Transfer-v9** uses [Kev's frozen `transfer-v9` suite](https://github.com/jaredpalmer/kev/blob/main/kev/transfer_v9.py)
+**Transfer** is the cross-domain evaluation built from
+[Kev's frozen `transfer-v9` suite](https://github.com/jaredpalmer/kev/blob/main/kev/transfer_v9.py)
 for cross-domain and robustness evaluation over 1,046 clean, knowable decisions.
 Its item-level mean spans Emotion, PAWS, QNLI, TweetEval,
 MMLU, MMLU-Pro, SciQ, and four robustness slices. **JevBench** is accuracy across
 all 231 public development items. NLL, Brier,
-and ECE in the main table are Kev Transfer-v9 metrics; every run covers every item.
+and ECE in the main table are Transfer metrics; every run covers every item.
 
-| Model | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
+| Model | Transfer ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
 |---|---:|---:|---:|---:|---:|
 | Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
 | Kev-27B (`01b8199`) | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
@@ -25,7 +26,7 @@ and ECE in the main table are Kev Transfer-v9 metrics; every run covers every it
 | JevAny-Muse-Glimmer-30B | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
 | **JevAny-Qwen3.8-27B** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
-### Kev Transfer-v9 breakdown
+### Transfer breakdown
 
 Columns are dataset or robustness-slice accuracy. Sample counts are respectively
 80 / 80 / 80 / 80 / 80 / 200 / 80 / 80 / 96 / 80 / 110.
@@ -65,9 +66,9 @@ policy controls. Values are percentages.
 | **JevAny-Qwen3.8-27B** | **100.00%** | 98.61% | **81.08%** | **90.48%** |
 
 The direct-token 4B model leads the released 4B models on JevBench, while the
-pointer 4B model is slightly better on Kev Transfer-v9. Kev and Laya use complete local
+pointer 4B model is slightly better on Transfer. Kev and Laya use complete local
 public-checkpoint runs (Kev-27B pinned to `01b8199`, Laya to `55cf4c4`); Jev uses
-a complete local Kev Transfer-v9 API run and JevBench's published per-tier accuracy.
+a complete local Transfer API run and JevBench's published per-tier accuracy.
 
 ### What we ablated
 
@@ -77,20 +78,20 @@ a complete local Kev Transfer-v9 API run and JevBench's published per-tier accur
   combined variants. Query-mean led the early screen; the release recipe uses
   decision-marker / option-close after the full model-family run.
 - **Loss:** cross-entropy, pure InfoNCE, and mixed objectives; CE gave the best
-  Kev Transfer-v9 accuracy in the loss sweep, while small contrastive terms mainly
+  Transfer accuracy in the loss sweep, while small contrastive terms mainly
   improved calibration. The released checkpoints use CE.
 - **Readout family:** at 4B, direct-token improves JevBench (80.95% vs 80.09%),
-  while pointer is slightly stronger on Kev Transfer-v9 (78.68% vs 78.20%).
+  while pointer is slightly stronger on Transfer (78.68% vs 78.20%).
 
 ### Reproducibility
 
-Kev Transfer-v9 reports all 1,046 scored decisions; JevBench reports
+Transfer reports all 1,046 scored decisions; JevBench reports
 all 231 public development items. Exact suite hashes and unrounded metrics are in
 the machine-readable results. Release manifests, checkpoint-native reload reports,
 and GPU loader/reconstruction parity were checked before publishing.
 
 The [README comparison figure](evaluation-overview.svg) ranks models by the
-equal-weight mean of Kev Transfer-v9 and JevBench accuracy, using unrounded values.
+equal-weight mean of Transfer and JevBench accuracy, using unrounded values.
 The ordering depends on these weights: at 4B, direct-token leads with equal suite
 weights, while pointer leads with equal item weights. Ranks reflect these point
 estimates. Model icons and their sources are in
@@ -136,7 +137,7 @@ SFT is the default checkpoint. RLCR improved development NLL by 0.005 and did no
 
 The [v0.2 release record](../results/release-v0.2.json) reports results on 1,004 development questions and 1,046 transfer questions. NLL (negative log-likelihood) penalizes low probability on the correct answer; lower is better.
 
-| Model | Development accuracy | Development NLL ↓ | Kev Transfer-v9 accuracy | MMLU-Pro | AI2D | MMMU |
+| Model | Development accuracy | Development NLL ↓ | Transfer accuracy | MMLU-Pro | AI2D | MMMU |
 |---|---:|---:|---:|---:|---:|---:|
 | **JevAny-27B-SFT v2** | **90.34%** | 0.265 | **82.41%** | 73.0% | 86.0% | **68.0%** |
 | JevAny-27B-RLCR v2 | 89.74% | **0.260** | 82.31% | **73.5%** | **87.0%** | 63.0% |

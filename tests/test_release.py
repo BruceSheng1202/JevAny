@@ -1,10 +1,32 @@
 """Release staging keeps required weights while removing private provenance."""
 import json
+import re
+import tomllib
+from pathlib import Path
 
 import torch
 
 from scripts.prepare_release import main
 from scripts.verify_release import main as verify_release, sha256
+
+
+def test_release_metadata_uses_org_and_current_version():
+    root = Path(__file__).resolve().parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text())
+    citation = (root / "CITATION.cff").read_text()
+    package = (root / "jevany" / "__init__.py").read_text()
+    release_script = (root / "scripts" / "prepare_release.py").read_text()
+
+    version = project["project"]["version"]
+    assert project["project"]["urls"]["Repository"] == "https://github.com/SimpleJev/JevAny"
+    assert "repository-code: https://github.com/SimpleJev/JevAny" in citation
+    assert re.search(rf"^version: {re.escape(version)}$", citation, re.MULTILINE)
+    assert re.search(rf'^__version__ = "{re.escape(version)}"$', package, re.MULTILINE)
+    assert "https://github.com/SimpleJev/JevAny" in release_script
+
+    current_metadata = "\n".join((citation, package, release_script))
+    assert "github.com/weitianxin/JevAny" not in current_metadata
+    assert "github.com/tianxinwei/JevAny" not in current_metadata
 
 
 def test_prepare_release_sanitizes_checkpoint(tmp_path):

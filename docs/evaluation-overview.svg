@@ -6,7 +6,7 @@
    <ns2:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
     <dc:title>Overall decision accuracy</dc:title>
-    <dc:description>All models in results/model-family-v2.json, ranked by the equal-weight mean of Kev Transfer-v9 and JevBench public-development accuracy. JevAny-Qwen3.8-27B (Pointer): 88.12. Jev 1.13.0 (): 85.98. JevAny-Muse-Glimmer-30B (Pointer): 85.45. Kev-27B (): 83.80. JevAny-Qwen3.5-4B-Direct-Token (Direct-token): 79.58. JevAny-Qwen3.5-4B (Pointer): 79.38. Kev-4B (): 74.76. JevAny-Gemma-4B (Pointer): 74.17. Laya (): 55.15.</dc:description>
+    <dc:description>All models in results/model-family-v2.json, ranked by the equal-weight mean of Transfer and JevBench public-development accuracy. JevAny-Qwen3.8-27B (Pointer): 88.12. Jev 1.13.0 (): 85.98. JevAny-Muse-Glimmer-30B (Pointer): 85.45. Kev-27B (): 83.80. JevAny-Qwen3.5-4B-Direct-Token (Direct-token): 79.58. JevAny-Qwen3.5-4B (Pointer): 79.38. Kev-4B (): 74.76. JevAny-Gemma-4B (Pointer): 74.17. Laya (): 55.15.</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <ns2:Agent>
@@ -112,7 +112,7 @@
     <text style="font-weight: 700; font-size: 12.24px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #213248" x="365.76" y="114.059531" transform="rotate(-0 365.76 114.059531)">Mean accuracy (%)</text>
    </g>
    <g id="text_8">
-    <text style="font-weight: 700; font-size: 11.52px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #213248" x="856.8" y="109.55295" transform="rotate(-0 856.8 109.55295)">Kev Transfer-v9</text>
+    <text style="font-weight: 700; font-size: 11.52px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #213248" x="856.8" y="109.55295" transform="rotate(-0 856.8 109.55295)">Transfer</text>
    </g>
    <g id="text_9">
     <text style="font-weight: 700; font-size: 12.96px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #213248" x="957.6" y="109.927069" transform="rotate(-0 957.6 109.927069)">JevBench</text>
@@ -392,7 +392,7 @@
     <text style="font-size: 15.12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle; fill: #213248" x="957.6" y="489.207656" transform="rotate(-0 957.6 489.207656)">58.01</text>
    </g>
    <g id="text_68">
-    <text style="font-size: 12.96px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #213248" x="34.56" y="570.727069" transform="rotate(-0 34.56 570.727069)">Mean = (Kev Transfer-v9 + JevBench) / 2</text>
+    <text style="font-size: 12.96px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #213248" x="34.56" y="570.727069" transform="rotate(-0 34.56 570.727069)">Mean = (Transfer + JevBench) / 2</text>
    </g>
   </g>
  </g>

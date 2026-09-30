@@ -2,13 +2,13 @@
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1152pt" height="345.6pt" viewBox="0 0 1152 345.6" xmlns="http://www.w3.org/2000/svg" version="1.1">
- <title>Kev Transfer-v9 and JevBench accuracy</title>
+ <title>Transfer and JevBench accuracy</title>
  <metadata>
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:title>Kev Transfer-v9 and JevBench accuracy</dc:title>
-    <dc:description>All nine models from results/model-family-v2.json, ranked from left to right by descending accuracy within each benchmark. Left: Kev Transfer-v9. Right: JevBench public-development accuracy. Both axes start at zero.</dc:description>
+    <dc:title>Transfer and JevBench accuracy</dc:title>
+    <dc:description>All nine models from results/model-family-v2.json, ranked from left to right by descending accuracy within each benchmark. Left: Transfer. Right: JevBench public-development accuracy. Both axes start at zero.</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -149,7 +149,7 @@ L 564.752986 252.288
 " clip-path="url(#p323bfd146f)" style="fill: none; stroke: #e4e9ef; stroke-linecap: square"/>
    </g>
    <g id="text_13">
-    <text style="font-weight: 700; font-size: 18px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #213248" x="46.08" y="54.15552" transform="rotate(-0 46.08 54.15552)">Kev Transfer-v9</text>
+    <text style="font-weight: 700; font-size: 18px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #213248" x="46.08" y="54.15552" transform="rotate(-0 46.08 54.15552)">Transfer</text>
    </g>
    <g id="text_14">
     <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end; fill: #64748b" x="564.752986" y="54.15552" transform="rotate(-0 564.752986 54.15552)">1,046 decisions</text>

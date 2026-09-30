@@ -30,7 +30,7 @@
 
 ## 🎮 结果与演示 <a name="结果与演示"></a><a name="演示"></a>
 
-[![左右并列柱状图：JevAny checkpoint 与基线模型在 Kev Transfer-v9 和 JevBench 上的准确率](docs/evaluation-summary.svg)](#评测)
+[![左右并列柱状图：JevAny checkpoint 与基线模型在 Transfer 和 JevBench 上的准确率](docs/evaluation-summary.svg)](#评测)
 
 [完整基准测试结果与评测说明](#评测)。
 
@@ -165,13 +165,13 @@ Pointer 和 direct-token 模型使用相同 API。Pointer 在上下文允许的�
 ## 📊 3. 基准测试结果 <a name="评测"></a>
 
 JevAny-Qwen3.8-27B 在两项评测中准确率最高，NLL 和 Brier 也最低。
-4B 版本中，direct-token 的 JevBench 准确率最高，Pointer 的 Kev Transfer-v9 准确率最高。
+4B 版本中，direct-token 的 JevBench 准确率最高，Pointer 的 Transfer 准确率最高。
 
-[![JevAny checkpoint 与基线模型按 Kev Transfer-v9 和 JevBench 的平均准确率排序](docs/evaluation-overview.svg)](docs/evaluation-overview.svg)
+[![JevAny checkpoint 与基线模型按 Transfer 和 JevBench 的平均准确率排序](docs/evaluation-overview.svg)](docs/evaluation-overview.svg)
 
 <div align="center">
 
-| 模型 | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
+| 模型 | Transfer ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
 |:---|---:|---:|---:|---:|---:|
 | [<img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-4B](https://huggingface.co/jaredpalmer/kev-4b) | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
 | [<img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-27B](https://huggingface.co/jaredpalmer/kev-27b) | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
@@ -184,7 +184,7 @@ JevAny-Qwen3.8-27B 在两项评测中准确率最高，NLL 和 Brier 也最低�
 | [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B](https://huggingface.co/SimpleJev/JevAny-Muse-Glimmer-30B-LoRA) | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
 | [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**JevAny-Qwen3.8-27B**](https://huggingface.co/SimpleJev/JevAny-Qwen3.8-27B-LoRA) | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
-NLL、Brier 和 ECE 均在 Kev Transfer-v9 上计算。
+NLL、Brier 和 ECE 均在 Transfer 上计算。
 
 </div>
 

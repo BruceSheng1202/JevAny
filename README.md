@@ -32,7 +32,7 @@ options, then directly returns a choice and its probabilities.
 
 ## 🎮 Results and Demos <a name="results-and-demos"></a><a name="demos"></a>
 
-[![JevAny checkpoints and baselines compared on Kev Transfer-v9 and JevBench in side-by-side bar charts](docs/evaluation-summary.svg)](#evaluation)
+[![JevAny checkpoints and baselines compared on Transfer and JevBench in side-by-side bar charts](docs/evaluation-summary.svg)](#evaluation)
 
 [Full benchmark results and evaluation details](#evaluation).
 
@@ -177,13 +177,13 @@ training and accuracy tradeoffs.
 ## 📊 3. Benchmark Results <a name="evaluation"></a>
 
 JevAny-Qwen3.8-27B leads both benchmarks and has the lowest NLL and Brier.
-Among 4B releases, direct-token leads on JevBench; pointer leads on Kev Transfer-v9.
+Among 4B releases, direct-token leads on JevBench; pointer leads on Transfer.
 
-[![JevAny checkpoints and baselines ranked by mean accuracy on Kev Transfer-v9 and JevBench](docs/evaluation-overview.svg)](docs/evaluation-overview.svg)
+[![JevAny checkpoints and baselines ranked by mean accuracy on Transfer and JevBench](docs/evaluation-overview.svg)](docs/evaluation-overview.svg)
 
 <div align="center">
 
-| Model | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
+| Model | Transfer ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
 |:---|---:|---:|---:|---:|---:|
 | [<img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-4B](https://huggingface.co/jaredpalmer/kev-4b) | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
 | [<img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-27B](https://huggingface.co/jaredpalmer/kev-27b) | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
@@ -196,7 +196,7 @@ Among 4B releases, direct-token leads on JevBench; pointer leads on Kev Transfer
 | [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B](https://huggingface.co/SimpleJev/JevAny-Muse-Glimmer-30B-LoRA) | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
 | [<img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**JevAny-Qwen3.8-27B**](https://huggingface.co/SimpleJev/JevAny-Qwen3.8-27B-LoRA) | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
-NLL, Brier and ECE are measured on Kev Transfer-v9.
+NLL, Brier and ECE are measured on Transfer.
 
 </div>
 
