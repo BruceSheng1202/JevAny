@@ -248,8 +248,7 @@ JevAny 决策可参考[集成文档](docs/INTEGRATIONS.md)。
 [训练](docs/TRAINING.md) · [部署](docs/DEPLOYMENT.md) · [API](docs/API.md) · [数据](docs/DATA.md) · [评测](docs/EVALUATION.md) · [贡献指南](CONTRIBUTING.md)
 
 欢迎贡献模型适配、评测或应用示例，开发步骤见[贡献指南](CONTRIBUTING.md)。
-[方法报告](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)及其 [LaTeX 源文件](docs/JEVANY_METHOD_AND_ABLATIONS.tex)
-介绍了模型设计与实验。
+[技术报告](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)介绍了模型设计、多模态路径、实验与开放问题。
 
 代码和入门数据采用 Apache-2.0。部分组件改编自 [Kev](https://github.com/jaredpalmer/kev)，
 归属说明见 [NOTICE](NOTICE) 和 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)。

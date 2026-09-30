@@ -264,8 +264,8 @@ combine JevAny decisions with an LLM planner.
 [Training](docs/TRAINING.md) · [Deployment](docs/DEPLOYMENT.md) · [API](docs/API.md) · [Data](docs/DATA.md) · [Evaluation](docs/EVALUATION.md) · [Contributing](CONTRIBUTING.md)
 
 To contribute a model adapter, evaluation or application example, start with the
-[contribution guide](CONTRIBUTING.md). The [method report](docs/JEVANY_METHOD_AND_ABLATIONS.pdf) and its
-[LaTeX source](docs/JEVANY_METHOD_AND_ABLATIONS.tex) describe the model design and experiments.
+[contribution guide](CONTRIBUTING.md). The [technical report](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
+describes the model design, multimodal path, experiments and open questions.
 
 Code and starter data are Apache-2.0. Some components are adapted from
 [Kev](https://github.com/jaredpalmer/kev); see [NOTICE](NOTICE) and
