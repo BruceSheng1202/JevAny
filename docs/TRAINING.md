@@ -77,7 +77,7 @@ each option representation through a compact learned head. It supports more
 than 255 choices, with the practical limit set by the context window, and only
 computes logits for the supplied options.
 
-`--decision-mode lm-token` prefixes options with a frozen table of 255 distinct
+`--decision-mode lm_token` prefixes options with a frozen table of 255 distinct
 single-token labels and scores those labels through the base model's original
 frozen output head. It currently gives the strongest 4B result, but training is
 slower because cross-entropy is normalized over the full vocabulary. It supports
@@ -85,7 +85,7 @@ at most 255 choices. Both readouts use one backbone prefill without answer-token
 generation, so their inference speed should be similar for comparable inputs.
 
 ```bash
-jevany train --config recipes/sft.toml --decision-mode lm-token \
+jevany train --config recipes/sft.toml --decision-mode lm_token \
   --lora 8 --lora-dropout 0 --out runs/direct-token-jev
 ```
 
