@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JevAny · Evaluation 配图草稿</title>
+<style>
+  :root { color-scheme: light; --ink:#213248; --muted:#64748b; --ours:#278577; --baseline:#8493a6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#f5f7fa; color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+  main { max-width:1260px; margin:40px auto; padding:0 24px 48px; }
+  h1 { margin:0 0 8px; font-size:28px; letter-spacing:-.5px; }
+  h2 { font-size:21px; margin:0 0 8px; }
+  p { margin:8px 0 20px; }
+  a { color:#176f64; text-underline-offset:3px; }
+  .eyebrow { color:var(--ours); font-size:13px; letter-spacing:1px; margin-bottom:8px; }
+  .muted { color:var(--muted); }
+  .figure { margin:24px 0; padding:12px; background:white; border:1px solid #e1e6ed; border-radius:12px; }
+  .figure img { width:100%; display:block; }
+  .links { display:flex; gap:20px; flex-wrap:wrap; margin:12px 0 4px; font-size:14px; }
+  details { background:white; border:1px solid #e1e6ed; border-radius:12px; padding:18px 22px; }
+  summary { cursor:pointer; font-size:18px; font-weight:600; }
+  .controls { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin:20px 0; }
+  input[type=range] { width:240px; accent-color:var(--ours); }
+  button { background:#eef5f3; border:1px solid #c7ded8; color:#176f64; border-radius:6px; padding:7px 12px; cursor:pointer; }
+  button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visible { outline:3px solid #3b82f6; outline-offset:3px; }
+  .row { display:grid; grid-template-columns:26px minmax(220px,310px) minmax(160px,1fr) 60px; gap:12px; align-items:center; padding:12px 0; }
+  .row + .row { border-top:1px solid #edf0f4; }
+  .row small { display:block; color:var(--muted); }
+  .rank { color:var(--muted); font-variant-numeric:tabular-nums; }
+  .bartrack { background:#f0f3f7; height:22px; }
+  .bar { height:100%; background:var(--baseline); }
+  .ours .bar { background:var(--ours); }
+  .score { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+  .notes { max-width:960px; margin-top:28px; }
+  .notes li { margin:8px 0; }
+  @media(max-width:640px) {
+    main { margin:24px auto; padding:0 14px 28px; }
+    h1 { font-size:24px; }
+    .figure { padding:2px; border-radius:5px; }
+    details { padding:16px 12px; }
+    .row { grid-template-columns:22px minmax(0,1fr) 54px; gap:8px; }
+    .model { grid-column:2; }
+    .score { grid-column:3; grid-row:1 / span 2; }
+    .bartrack { grid-column:2; grid-row:2; height:14px; }
+    .row { position:relative; }
+    .controls { gap:10px; }
+    input[type=range] { width:100%; }
+  }
+</style>
+<main>
+  <div class="eyebrow">JEVANY / EVALUATION / DRAFT</div>
+  <h1>让读者看清每个 checkpoint 的位置</h1>
+  <p class="muted">按两套评测的平均准确率排序；青绿色代表 JevAny，灰色代表基线。包含当前 README 的全部九个模型。</p>
+  <div class="figure">
+    <img src="overview.svg" alt="按 Transfer 与 JevBench 平均准确率排序的模型对比。青绿色为 JevAny checkpoint，灰色为基线；右侧列出分项准确率。完整数值也可在下方互动排名中阅读。">
+  </div>
+  <nav class="links" aria-label="配图下载">
+    <a href="overview.png">PNG 高清图</a>
+    <a href="overview.svg">SVG 可编辑图</a>
+    <a href="overview.pdf">PDF</a>
+    <a href="../../../results/model-family-v2.json">原始结果</a>
+  </nav>
+  <p class="muted">建议放在 Evaluation 简短介绍之后、现有详细表格之前。图中分数为百分制，柱长从零起算。</p>
+  <details>
+    <summary>试调综合分的权重</summary>
+    <p class="muted">上方导出的配图固定为 50/50。下方可比较不同权重下的排序；这是草稿讨论工具，不会修改原始结果或导出的图。</p>
+    <div class="controls">
+      <label for="weight">Transfer 权重</label>
+      <input id="weight" type="range" min="0" max="100" step="1" value="50">
+      <output id="weights" for="weight">Transfer 50% · JevBench 50%</output>
+      <button id="reset" type="button">两套等权</button>
+      <button id="pooled" type="button">每题等权</button>
+    </div>
+    <p id="method" class="muted" aria-live="polite"></p>
+    <div id="ranking" aria-label="当前权重下的准确率排名"></div>
+    <noscript>互动排名需要 JavaScript；上方静态配图仍可使用。</noscript>
+  </details>
+  <div class="notes">
+    <h2>综合分的口径</h2>
+    <p>默认采用 <strong>0.5 × Transfer accuracy + 0.5 × JevBench accuracy</strong>，计算使用发布结果中的未四舍五入数值。Transfer 内部沿用原有的逐题平均；整个 Transfer 套件和整个 JevBench 套件各占一半。</p>
+    <ul>
+      <li>这个数值是两套准确率的草稿汇总，不是 Artificial Analysis Intelligence Index，也不代表通用智能或所有模型的全球排名。</li>
+      <li>NLL、Brier、ECE 保留在原表中。将准确率、概率质量和校准误差混成单一总分，需要另行定义归一化和权重。</li>
+      <li>JevBench 使用 231 个公开开发题；Jev 1.13.0 的 JevBench 值来自已发布结果，Transfer 值来自本地 API 评测。</li>
+      <li>4B pointer 与 direct-token 的差距较小；两套等权时 direct-token 在前，每题等权时 pointer 在前。当前汇总文件不足以计算模型间差异的配对置信区间，排序不表示统计显著性。</li>
+    </ul>
+    <h2>参考的设计</h2>
+    <p><a href="https://artificialanalysis.ai/">Artificial Analysis</a>：排序柱状图、直接标数、区分能力维度。
+      <a href="https://livebench.ai/">LiveBench</a>：总分旁保留分项。
+      <a href="https://arena.ai/leaderboard/text">Arena</a>：排名、模型身份与分数的阅读顺序。这里的分数全部来自 JevAny 发布结果。</p>
+  </div>
+</main>
+<script>
+  "use strict";
+  const models = [{"id": "tianxinwei/JevAny-Qwen3.8-27B-LoRA", "label": "JevAny · Qwen3.8 27B", "detail": "LoRA · Pointer", "ours": true, "transfer": 85.75525812619503, "jevbench": 90.47619047619048, "mean": 88.11572430119276}, {"id": "Jev 1.13.0", "label": "Jev 1.13.0", "detail": "Baseline", "ours": false, "transfer": 85.37284894837475, "jevbench": 86.58008658008657, "mean": 85.97646776423066}, {"id": "tianxinwei/JevAny-Muse-Glimmer-30B-LoRA", "label": "JevAny · Muse Glimmer 30B", "detail": "LoRA · Pointer", "ours": true, "transfer": 83.46080305927343, "jevbench": 87.44588744588745, "mean": 85.45334525258045}, {"id": "Kev-27B", "label": "Kev-27B", "detail": "Baseline", "ours": false, "transfer": 82.31357552581262, "jevbench": 85.28138528138528, "mean": 83.79748040359895}, {"id": "tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA", "label": "JevAny · Qwen3.5 4B", "detail": "LoRA · Direct-token", "ours": true, "transfer": 78.20267686424475, "jevbench": 80.95238095238095, "mean": 79.57752890831284}, {"id": "tianxinwei/JevAny-Qwen3.5-4B-LoRA", "label": "JevAny · Qwen3.5 4B", "detail": "LoRA · Pointer", "ours": true, "transfer": 78.68068833652008, "jevbench": 80.08658008658008, "mean": 79.38363421155009}, {"id": "Kev-4B", "label": "Kev-4B", "detail": "Baseline", "ours": false, "transfer": 74.18738049713193, "jevbench": 75.32467532467533, "mean": 74.75602791090363}, {"id": "tianxinwei/JevAny-Gemma-4B-LoRA", "label": "JevAny · Gemma 4B", "detail": "LoRA · Pointer", "ours": true, "transfer": 70.8413001912046, "jevbench": 77.48917748917748, "mean": 74.16523884019104}, {"id": "Laya", "label": "Laya", "detail": "Baseline", "ours": false, "transfer": 52.29445506692161, "jevbench": 58.00865800865801, "mean": 55.15155653778981}];
+  const weightInput = document.querySelector("#weight");
+  const weights = document.querySelector("#weights");
+  const method = document.querySelector("#method");
+  const ranking = document.querySelector("#ranking");
+  function render(transferWeight, pooled = false) {
+    const percent = value => `${value.toFixed(pooled ? 2 : 0)}%`;
+    weights.textContent = `Transfer ${percent(100 * transferWeight)} · JevBench ${percent(100 * (1 - transferWeight))}`;
+    method.textContent = pooled
+      ? "每题等权：(1,046 × Transfer + 231 × JevBench) / 1,277。"
+      : `综合分 = ${transferWeight.toFixed(2)} × Transfer + ${(1 - transferWeight).toFixed(2)} × JevBench。柱长范围为 0–100。`;
+    const ordered = models.map(model => ({
+      ...model, score: transferWeight * model.transfer + (1 - transferWeight) * model.jevbench
+    })).sort((a, b) => b.score - a.score);
+    ranking.replaceChildren(...ordered.map((model, i) => {
+      const row = document.createElement("div");
+      row.className = `row${model.ours ? " ours" : ""}`;
+      row.dataset.model = model.id;
+      const rank = document.createElement("span");
+      rank.className = "rank";
+      rank.textContent = i + 1;
+      const label = document.createElement("div");
+      label.className = "model";
+      label.append(document.createTextNode(model.label));
+      const detail = document.createElement("small");
+      detail.textContent = `${model.detail} · Transfer ${model.transfer.toFixed(2)} · JevBench ${model.jevbench.toFixed(2)}`;
+      label.append(detail);
+      const track = document.createElement("div");
+      track.className = "bartrack";
+      track.setAttribute("aria-hidden", "true");
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      bar.style.width = `${model.score}%`;
+      track.append(bar);
+      const score = document.createElement("span");
+      score.className = "score";
+      score.textContent = model.score.toFixed(2);
+      row.append(rank, label, track, score);
+      return row;
+    }));
+  }
+  weightInput.addEventListener("input", () => render(Number(weightInput.value) / 100));
+  document.querySelector("#reset").addEventListener("click", () => {
+    weightInput.value = 50;
+    render(0.5);
+  });
+  document.querySelector("#pooled").addEventListener("click", () => {
+    const weight = 1046 / 1277;
+    weightInput.value = Math.round(weight * 100);
+    render(weight, true);
+  });
+  render(0.5);
+</script>
+</html>
