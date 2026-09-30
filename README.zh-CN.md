@@ -173,9 +173,9 @@ Qwen3.8 27B 在两项评测中准确率最高，NLL 和 Brier 也最低。
 | <img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
 | <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
-</div>
-
 NLL、Brier 和 ECE 均在 Kev Transfer-v9 上计算。
+
+</div>
 
 [完整结果与评测协议](docs/EVALUATION.md#model-family-v2) ·
 [机器可读结果](results/model-family-v2.json) ·

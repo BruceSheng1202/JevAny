@@ -187,9 +187,9 @@ Among 4B releases, direct-token leads on JevBench; pointer leads on Kev Transfer
 | <img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
 | <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
-</div>
-
 NLL, Brier and ECE are measured on Kev Transfer-v9.
+
+</div>
 
 [Full results and protocols](docs/EVALUATION.md#model-family-v2) ·
 [Machine-readable results](results/model-family-v2.json) ·
