@@ -26,7 +26,7 @@ jevany = "jevany.cli:main"
 [project.urls]
 Repository = "https://github.com/SimpleJev/JevAny"
 Issues = "https://github.com/SimpleJev/JevAny/issues"
-Models = "https://huggingface.co/collections/tianxinwei/jevany-adaptive-decision-systems-6ab2c941bcecb4d2c61d1326"
+Models = "https://huggingface.co/collections/SimpleJev/jevany-adaptive-decision-systems-6abc8fd39266b1c17b11b4e6"
 
 [project.optional-dependencies]
 local = [
