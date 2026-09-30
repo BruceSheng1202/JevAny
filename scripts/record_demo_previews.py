@@ -2,7 +2,7 @@
 
 Start a JevAny server, then run with the demo extra installed:
     python scripts/record_demo_previews.py --base-url http://127.0.0.1:8008 \
-        --model tianxinwei/JevAny-Qwen3.8-27B-LoRA --media-root /tmp/jevany-media
+        --model SimpleJev/JevAny-Qwen3.8-27B-LoRA --media-root /tmp/jevany-media
 The robot replay is maintained separately.
 """
 import argparse

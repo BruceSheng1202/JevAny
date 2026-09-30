@@ -19,7 +19,7 @@
     "total_gpu_hours": 1422.5982218246077,
     "maximum_parallel_gpus_per_run": 40,
     "models": {
-      "tianxinwei/JevAny-Gemma-4B-LoRA": {
+      "SimpleJev/JevAny-Gemma-4B-LoRA": {
         "released_step": 2771,
         "parallel_gpus": 32,
         "wall_seconds": 11802.619868,
@@ -28,7 +28,7 @@
         "estimated": true,
         "estimate_basis": "run start and checkpoint timestamps"
       },
-      "tianxinwei/JevAny-Qwen3.5-4B-LoRA": {
+      "SimpleJev/JevAny-Qwen3.5-4B-LoRA": {
         "released_step": 13850,
         "parallel_gpus": 32,
         "wall_seconds": 37187.75734710693,
@@ -36,7 +36,7 @@
         "gpu_hours": 330.6,
         "estimated": false
       },
-      "tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA": {
+      "SimpleJev/JevAny-Qwen3.5-4B-Direct-Token-LoRA": {
         "released_step": 9695,
         "parallel_gpus": 32,
         "wall_seconds": 30270.641902685165,
@@ -44,7 +44,7 @@
         "gpu_hours": 269.1,
         "estimated": false
       },
-      "tianxinwei/JevAny-Qwen3.8-27B-LoRA": {
+      "SimpleJev/JevAny-Qwen3.8-27B-LoRA": {
         "released_step": 22160,
         "parallel_gpus": 32,
         "wall_seconds": 67800.68154883385,
@@ -52,7 +52,7 @@
         "gpu_hours": 602.7,
         "estimated": false
       },
-      "tianxinwei/JevAny-Muse-Glimmer-30B-LoRA": {
+      "SimpleJev/JevAny-Muse-Glimmer-30B-LoRA": {
         "released_step": 3324,
         "parallel_gpus": 40,
         "wall_seconds": 10384.479430913925,
@@ -78,7 +78,7 @@
   },
   "released_models": [
     {
-      "repository": "tianxinwei/JevAny-Gemma-4B-LoRA",
+      "repository": "SimpleJev/JevAny-Gemma-4B-LoRA",
       "readout": "pointer",
       "transfer_v9_accuracy": 0.7084130019120459,
       "transfer_v9_nll": 0.7064284258952175,
@@ -91,7 +91,7 @@
       "jevbench_tiers": {"easy": 1.0, "original": 0.9583333333333334, "hard": 0.5585585585585585}
     },
     {
-      "repository": "tianxinwei/JevAny-Qwen3.5-4B-LoRA",
+      "repository": "SimpleJev/JevAny-Qwen3.5-4B-LoRA",
       "readout": "pointer",
       "transfer_v9_accuracy": 0.7868068833652008,
       "transfer_v9_nll": 0.5868780845820413,
@@ -104,7 +104,7 @@
       "jevbench_tiers": {"easy": 1.0, "original": 0.9583333333333334, "hard": 0.6126126126126126}
     },
     {
-      "repository": "tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA",
+      "repository": "SimpleJev/JevAny-Qwen3.5-4B-Direct-Token-LoRA",
       "readout": "direct-token",
       "transfer_v9_accuracy": 0.7820267686424475,
       "transfer_v9_nll": 0.5641673018758349,
@@ -117,7 +117,7 @@
       "jevbench_tiers": {"easy": 1.0, "original": 0.9861111111111112, "hard": 0.6126126126126126}
     },
     {
-      "repository": "tianxinwei/JevAny-Qwen3.8-27B-LoRA",
+      "repository": "SimpleJev/JevAny-Qwen3.8-27B-LoRA",
       "readout": "pointer",
       "transfer_v9_accuracy": 0.8575525812619503,
       "transfer_v9_nll": 0.39249213352292833,
@@ -130,7 +130,7 @@
       "jevbench_tiers": {"easy": 1.0, "original": 0.9861111111111112, "hard": 0.8108108108108109}
     },
     {
-      "repository": "tianxinwei/JevAny-Muse-Glimmer-30B-LoRA",
+      "repository": "SimpleJev/JevAny-Muse-Glimmer-30B-LoRA",
       "readout": "pointer",
       "transfer_v9_accuracy": 0.8346080305927343,
       "transfer_v9_nll": 0.46413265214637384,

@@ -45,7 +45,7 @@ For multimodal decisions, start the model server with a shared image directory:
 ```bash
 mkdir -p /tmp/jevany-media
 JEVANY_MEDIA_ROOT=/tmp/jevany-media jevany serve \
-  --checkpoint tianxinwei/JevAny-Qwen3.8-27B-LoRA --device cuda --dtype bf16
+  --checkpoint SimpleJev/JevAny-Qwen3.8-27B-LoRA --device cuda --dtype bf16
 ```
 
 In a second terminal on the same host:
@@ -180,7 +180,7 @@ model server:
 
 ```bash
 python scripts/record_demo_previews.py \
-  --base-url http://127.0.0.1:8008 --model tianxinwei/JevAny-Qwen3.8-27B-LoRA \
+  --base-url http://127.0.0.1:8008 --model SimpleJev/JevAny-Qwen3.8-27B-LoRA \
   --media-root /tmp/jevany-media --out /tmp/jevany-replays
 ```
 
@@ -215,7 +215,7 @@ Use your own server or load a checkpoint directly, with the same application cod
 python -m examples.sql_repair --base-url http://127.0.0.1:8008
 python -m examples.sql_repair --checkpoint runs/my-jev --device cuda
 python -m examples.service_recovery \
-  --checkpoint tianxinwei/JevAny-Qwen3.8-27B-LoRA --device cuda --dtype bf16
+  --checkpoint SimpleJev/JevAny-Qwen3.8-27B-LoRA --device cuda --dtype bf16
 ```
 
 `--checkpoint` needs the `local` extra; the released vision-capable checkpoint
