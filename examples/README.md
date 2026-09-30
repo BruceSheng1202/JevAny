@@ -3,7 +3,7 @@
 ## Open the playground
 
 From the repository root, after creating the Python environment in the
-[installation guide](../README.md#try-the-playground):
+[installation guide](../README.md#quickstart):
 
 ```bash
 python -m pip install -e .
@@ -65,7 +65,7 @@ The demo writes each camera image under `--media-root` while inference runs,
 then removes the file. The model server must see that directory at the same
 path. A compatible server accepting inline images can omit `--media-root`.
 Use `--text-only` to send measurements without images; images remain visible
-in the browser. See the [server setup](../README.md#route-a-support-ticket) for prerequisites.
+in the browser. See the [server setup](../README.md#deployment) for prerequisites.
 Use `--model MODEL_ID` to set the request's model identity and `--timeout 300`
 if your server needs longer than the default 120 seconds per request.
 Hardware requirements belong to the model server; the playground itself runs

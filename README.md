@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <strong>English</strong> | <a href="README.zh-CN.md">简体中文</a><br>
+  <strong>🇺🇸 English</strong> | <a href="README.zh-CN.md">🇨🇳 简体中文</a><br>
   <a href="#quickstart">⚡ Quickstart</a> ·
   <a href="#demos">🎮 Demos</a> ·
   <a href="#pretrained-models">🤗 Models</a> ·
@@ -34,14 +34,24 @@ options, then returns a choice and its probabilities without generating answer t
 
 The following 30 examples show JevAny choosing actions across robotics,
 browser, software, laboratory and mobility tasks using `JevAny-27B-SFT`.
-[Explore the cases](docs/CASES.md), or open the playground below to inspect
+[Explore the cases](docs/CASES.md), or [try the playground](#try-the-playground) to inspect
 recorded actions and option probabilities.
 
 [![JevAny choosing actions across robotics, browser, software, laboratory and mobility tasks](docs/demos/jevany-cases.gif)](docs/CASES.md)
 
-## ⚡ Quickstart <a name="quickstart"></a>
+## 📑 Table of Contents
 
-### Try the playground
+- [🎮 Demos](#demos)
+- [⚡ 1. Quickstart](#quickstart)
+  - [🛠️ 1.1 JevAny Training](#training)
+  - [🚀 1.2 JevAny Deployment](#deployment)
+- [🤗 2. Pretrained Models](#pretrained-models)
+- [📊 3. Benchmark Results](#evaluation)
+- [🕹️ 4. Examples & Test Environments](#examples--test-environments)
+- [🧩 5. Supported Model Families](#supported-model-families)
+- [📚 6. Documentation and Contributing](#documentation-and-contributing)
+
+## ⚡ 1. Quickstart <a name="quickstart"></a>
 
 Use Python 3.12 or newer. Clone the repository and install the lightweight package:
 
@@ -51,14 +61,46 @@ cd JevAny
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-jevany demo
 ```
 
-Open `http://127.0.0.1:8090` and choose **Replay** to watch a recorded run.
-The bundled recordings play locally on CPU. Press Ctrl+C in the terminal to stop.
-For the remaining commands, keep this environment active and work from the repository root.
+Keep this environment active and work from the repository root. Choose
+[Training](#training) to build your own model or [Deployment](#deployment) to
+use a released checkpoint. For a preview on CPU, [try the playground](#try-the-playground).
 
-### Route a support ticket
+### 🛠️ 1.1 JevAny Training <a name="training"></a>
+
+Train on the same `state` and `questions` you send at inference, with a label
+for each question. Start with the bundled synthetic support tickets, then
+train on your own labelled data. The starter recipe uses Qwen3.5-0.8B on CUDA
+with BF16 and writes `runs/my-jev`:
+
+```bash
+python -m pip install -e '.[train]'
+jevany data init --out data/starter
+jevany data validate data/starter/train.jsonl
+jevany train --config recipes/sft.toml --dry-run
+jevany train --config recipes/sft.toml
+```
+
+After training, try the checkpoint on the included ticket request:
+
+```bash
+jevany decide examples/request.json --checkpoint runs/my-jev
+```
+
+Pass `--data` to train on your own [JSONL data](docs/DATA.md), or use
+[`recipes/finetune.toml`](recipes/finetune.toml) to adapt the released 27B model.
+See the [training guide](docs/TRAINING.md) for CPU settings, multimodal data and
+standard `torchrun` launches. For image/video training, install `.[train,multimodal]`.
+
+After SFT, you can continue with experimental [RLCR](docs/ALGORITHM.md#rlcr),
+which rewards correctness and probability calibration:
+
+```bash
+jevany train --config recipes/rlcr.toml
+```
+
+### 🚀 1.2 JevAny Deployment <a name="deployment"></a>
 
 Install the serving dependencies and start the released Qwen 4B model on a CUDA
 GPU. See the [hardware and loading guide](docs/DEPLOYMENT.md#checkpoints-and-hardware)
@@ -70,8 +112,9 @@ jevany serve --checkpoint tianxinwei/JevAny-Qwen3.5-4B-LoRA \
   --device cuda --dtype bf16 --port 8008
 ```
 
-Keep the server running. In a Python session using the same environment, send a
-ticket and the departments that can handle it:
+To serve your training output, replace the checkpoint ID with `runs/my-jev`.
+Keep the server running. In a Python session using the same environment, send
+a ticket and the departments that can handle it:
 
 ```python
 from jevany import Choice, JevClient
@@ -102,47 +145,7 @@ For in-process inference, [load a model in Python](docs/DEPLOYMENT.md#python)
 and use the same interface. For image and video inputs, follow the
 [media setup](docs/DEPLOYMENT.md#native-media-and-limits).
 
-## 🕹️ Examples & Test Environments <a name="examples--test-environments"></a>
-
-The playground includes the three environments below. These GIFs show accelerated
-`JevAny-27B-SFT` replays with recorded actions and option probabilities.
-
-### [Robot peg insertion](examples/README.md#robot-peg-insertion)
-
-Use a Franka gripper to grasp, align and insert a peg, checked by PyBullet contact physics.
-
-![Robot browser replay showing the Franka arm inserting a peg, recorded model probabilities and physical success checks](docs/demos/playground-arm.gif)
-
-### [Doom corridor · 3D](examples/README.md#doom-corridor-3d)
-
-Clear the final room by defeating the enemies on the left and right, then move
-forward. The environment uses ViZDoom and the included Freedoom assets.
-
-![Doom checkpoint replay: kill both enemies, then advance](docs/demos/playground-doom.gif)
-
-### [Crafter survival · 2D](examples/README.md#crafter-survival-2d)
-
-Gather wood, craft tools and mine stone while managing health and supplies.
-
-![Crafter browser replay showing resource gathering, crafting actions and progress through four goal milestones](docs/demos/playground-crafter.gif)
-
-### Run your model in the playground
-
-Stop the replay-only playground and keep your model server running. Install the
-optional game engines, then restart the playground with the server address:
-
-```bash
-python -m pip install -e '.[demo]'
-jevany demo --base-url http://127.0.0.1:8008 --text-only
-```
-
-Choose **Run model** in the browser, or **Play yourself** to control the game.
-Live control sends text state to the model. Robot control uses the
-`.[robotics]` extra. See the [playground guide](examples/README.md) for platform
-requirements and environment APIs, or [integrations](docs/INTEGRATIONS.md) to
-combine JevAny decisions with an LLM planner.
-
-## 🤗 Pretrained Models <a name="pretrained-models"></a>
+## 🤗 2. Pretrained Models <a name="pretrained-models"></a>
 
 | Model | Readout | Intended use |
 |---|---|---|
@@ -152,9 +155,13 @@ combine JevAny decisions with an LLM planner.
 | <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Qwen3.8-27B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | Default; highest released accuracy |
 | <img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Muse-Glimmer-30B-LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer alternative |
 
-These are LoRA adapters: the corresponding base model is loaded separately and
-its license and access terms apply. Allow roughly twice the base parameter count
-in bytes for BF16 weights, plus runtime memory. See the
+These LoRA adapters were trained with SFT on 1,772,725 text records containing
+2,180,242 labelled decisions; see [training compute and experiments](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
+for the setup. Full-parameter SFT and further post-training improvements are planned.
+
+The corresponding base model is loaded separately and its license and access
+terms apply. Allow roughly twice the base parameter count in bytes for BF16
+weights, plus runtime memory. See the
 [hardware and loading guide](docs/DEPLOYMENT.md#checkpoints-and-hardware).
 
 Pointer and direct-token models share the same API. Pointer supports up to
@@ -162,7 +169,7 @@ Pointer and direct-token models share the same API. Pointer supports up to
 See [readout choices](docs/TRAINING.md#pointer-and-direct-token-readouts) for
 training and accuracy tradeoffs.
 
-## 📊 Evaluation <a name="evaluation"></a>
+## 📊 3. Benchmark Results <a name="evaluation"></a>
 
 Qwen3.8 27B leads both benchmarks and has the lowest NLL and Brier.
 Among 4B releases, direct-token leads on JevBench; pointer leads on Kev Transfer-v9.
@@ -192,52 +199,63 @@ NLL, Brier and ECE are measured on Kev Transfer-v9.
 [Machine-readable results](results/model-family-v2.json) ·
 [Method and ablation report](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
 
-## 🛠️ Training <a name="training"></a>
+## 🕹️ 4. Examples & Test Environments <a name="examples--test-environments"></a>
 
-Train on the same `state` and `questions` you send at inference, with a label
-for each question. Start with the bundled synthetic support tickets, then
-train on your own labelled data. The starter recipe uses Qwen3.5-0.8B on CUDA
-with BF16 and writes `runs/my-jev`:
+The playground includes the three environments below. These GIFs show accelerated
+`JevAny-27B-SFT` replays with recorded actions and option probabilities.
 
-```bash
-python -m pip install -e '.[train]'
-jevany data init --out data/starter
-jevany data validate data/starter/train.jsonl
-jevany train --config recipes/sft.toml --dry-run
-jevany train --config recipes/sft.toml
-```
+### 🤖 4.1 [Robot peg insertion](examples/README.md#robot-peg-insertion) <a name="robot-peg-insertion"></a>
 
-After training, try the checkpoint on the included ticket request:
+Use a Franka gripper to grasp, align and insert a peg, checked by PyBullet contact physics.
 
-```bash
-jevany decide examples/request.json --checkpoint runs/my-jev
-```
+![Robot browser replay showing the Franka arm inserting a peg, recorded model probabilities and physical success checks](docs/demos/playground-arm.gif)
 
-Pass `--data` to train on your own [JSONL data](docs/DATA.md), or use
-[`recipes/finetune.toml`](recipes/finetune.toml) to adapt the released 27B model.
-See the [training guide](docs/TRAINING.md) for CPU settings, multimodal data and
-standard `torchrun` launches. For image/video training, install `.[train,multimodal]`.
+### 🔫 4.2 [Doom corridor · 3D](examples/README.md#doom-corridor-3d) <a name="doom-corridor-3d"></a>
 
-The released family uses LoRA SFT, trained on 1,772,725 text records containing
-2,180,242 labelled decisions; see [training compute and experiments](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
-for the setup. Full-parameter SFT and further post-training improvements are planned.
+Clear the final room by defeating the enemies on the left and right, then move
+forward. The environment uses ViZDoom and the included Freedoom assets.
 
-### RLCR (experimental)
+![Doom checkpoint replay: kill both enemies, then advance](docs/demos/playground-doom.gif)
 
-After SFT, continue training with the [RLCR objective](docs/ALGORITHM.md#rlcr),
-which rewards correctness and probability calibration:
+### ⛏️ 4.3 [Crafter survival · 2D](examples/README.md#crafter-survival-2d) <a name="crafter-survival-2d"></a>
+
+Gather wood, craft tools and mine stone while managing health and supplies.
+
+![Crafter browser replay showing resource gathering, crafting actions and progress through four goal milestones](docs/demos/playground-crafter.gif)
+
+### 🎮 4.4 Try the playground <a name="try-the-playground"></a>
+
+From the [Quickstart](#quickstart) environment, start the playground:
 
 ```bash
-jevany train --config recipes/rlcr.toml
+jevany demo
 ```
 
-## 🧩 Supported Model Families <a name="supported-model-families"></a>
+Open `http://127.0.0.1:8090` and choose **Replay** to watch a recorded run.
+The bundled recordings play locally on CPU.
+
+To run your model, keep the server from [Deployment](#deployment) running.
+Stop the replay viewer with Ctrl+C, install the optional game engines, then
+restart the playground with the server address:
+
+```bash
+python -m pip install -e '.[demo]'
+jevany demo --base-url http://127.0.0.1:8008 --text-only
+```
+
+Choose **Run model** in the browser, or **Play yourself** to control the game.
+Live control sends text state to the model. Robot control uses the
+`.[robotics]` extra. See the [playground guide](examples/README.md) for platform
+requirements and environment APIs, or [integrations](docs/INTEGRATIONS.md) to
+combine JevAny decisions with an LLM planner.
+
+## 🧩 5. Supported Model Families <a name="supported-model-families"></a>
 
 [Model IDs, supported inputs and setup requirements](docs/TRAINING.md#backbone-support).
 
 ![26 supported models across Qwen, Gemma, Muse, Mistral, GLM, Nemotron and Llama](docs/supported-model-families.svg)
 
-## 📚 Documentation and Contributing <a name="documentation-and-contributing"></a>
+## 📚 6. Documentation and Contributing <a name="documentation-and-contributing"></a>
 
 [Training](docs/TRAINING.md) · [Deployment](docs/DEPLOYMENT.md) · [API](docs/API.md) · [Data](docs/DATA.md) · [Evaluation](docs/EVALUATION.md) · [Contributing](CONTRIBUTING.md)
 

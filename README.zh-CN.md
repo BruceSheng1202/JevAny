@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | <strong>简体中文</strong><br>
+  <a href="README.md">🇺🇸 English</a> | <strong>🇨🇳 简体中文</strong><br>
   <a href="#快速上手">⚡ 快速上手</a> ·
   <a href="#演示">🎮 演示</a> ·
   <a href="#预训练模型">🤗 模型</a> ·
@@ -33,13 +33,23 @@
 
 以下 30 个案例展示了 JevAny 在机器人、浏览器、软件、实验室和出行任务中的动作选择。
 演示使用的模型是 `JevAny-27B-SFT`。[查看全部案例](docs/CASES.md)，
-或按下面的步骤打开演示，查看记录的动作和选项概率。
+或[打开交互演示](#打开交互演示)，查看记录的动作和选项概率。
 
 [![JevAny 在机器人、浏览器、软件、实验室和出行任务中选择动作](docs/demos/jevany-cases.gif)](docs/CASES.md)
 
-## ⚡ 快速上手 <a name="快速上手"></a>
+## 📑 目录
 
-### 打开交互演示
+- [🎮 演示](#演示)
+- [⚡ 1. 快速上手](#快速上手)
+  - [🛠️ 1.1 JevAny 训练](#训练)
+  - [🚀 1.2 JevAny 部署](#部署)
+- [🤗 2. 预训练模型](#预训练模型)
+- [📊 3. 基准测试结果](#评测)
+- [🕹️ 4. 示例与测试环境](#示例与测试环境)
+- [🧩 5. 支持的模型系列](#支持的模型系列)
+- [📚 6. 文档与贡献](#文档与贡献)
+
+## ⚡ 1. 快速上手 <a name="快速上手"></a>
 
 使用 Python 3.12 或更新版本，克隆仓库并安装轻量客户端：
 
@@ -49,14 +59,44 @@ cd JevAny
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-jevany demo
 ```
 
-打开 `http://127.0.0.1:8090`，点击 **Replay** 观看录制的运行过程。
-只需 CPU 即可播放内置录制内容。在终端按 Ctrl+C 停止演示。
 以下命令均在仓库根目录运行，并使用上述虚拟环境。
+你可以[训练自己的模型](#训练)，也可以[直接部署已发布模型](#部署)。
+只想先体验效果，可以在 CPU 上[打开交互演示](#打开交互演示)。
 
-### 给客服工单选择处理部门
+### 🛠️ 1.1 JevAny 训练 <a name="训练"></a>
+
+训练数据沿用推理时的 `state` 和 `questions`，为每个问题增加标签。
+先用随包提供的合成客服工单开始训练，再换成自己的标注数据。入门配置在 CUDA 上
+以 BF16 训练 Qwen3.5-0.8B，结果写入 `runs/my-jev`：
+
+```bash
+python -m pip install -e '.[train]'
+jevany data init --out data/starter
+jevany data validate data/starter/train.jsonl
+jevany train --config recipes/sft.toml --dry-run
+jevany train --config recipes/sft.toml
+```
+
+训练完成后，用随包提供的工单请求试用模型：
+
+```bash
+jevany decide examples/request.json --checkpoint runs/my-jev
+```
+
+通过 `--data` 指定自己的 [JSONL 数据](docs/DATA.md)，或用
+[`recipes/finetune.toml`](recipes/finetune.toml) 微调已发布的 27B 模型。
+CPU 配置、多模态数据和标准 `torchrun` 启动方式见[训练指南](docs/TRAINING.md)。
+训练图片或视频模型时，安装 `.[train,multimodal]`。
+
+完成 SFT 后，可用实验性的 [RLCR](docs/ALGORITHM.md#rlcr) 继续训练，其奖励兼顾正确率与概率校准：
+
+```bash
+jevany train --config recipes/rlcr.toml
+```
+
+### 🚀 1.2 JevAny 部署 <a name="部署"></a>
 
 安装推理依赖，在 CUDA GPU 上启动已发布的 Qwen 4B 模型。
 显存要求见[硬件与加载说明](docs/DEPLOYMENT.md#checkpoints-and-hardware)。
@@ -67,6 +107,7 @@ jevany serve --checkpoint tianxinwei/JevAny-Qwen3.5-4B-LoRA \
   --device cuda --dtype bf16 --port 8008
 ```
 
+部署自己的训练结果时，将 checkpoint ID 替换为 `runs/my-jev`。
 保持服务运行，在使用相同虚拟环境的 Python 会话中，发送工单和候选处理部门：
 
 ```python
@@ -95,43 +136,7 @@ print("Probabilities:", answer["probabilities"])
 进程内推理可以[在 Python 中加载模型](docs/DEPLOYMENT.md#python)，通过相同接口调用。
 图片和视频输入见[媒体配置](docs/DEPLOYMENT.md#native-media-and-limits)。
 
-## 🕹️ 示例与测试环境 <a name="示例与测试环境"></a>
-
-交互演示包含以下三个环境。动图展示 `JevAny-27B-SFT` 的加速回放，以及记录的动作和选项概率。
-
-### [机械臂插孔](examples/README.md#robot-peg-insertion)
-
-控制 Franka 夹爪抓取、对准并插入工件，由 PyBullet 接触物理验证结果。
-
-![机械臂浏览器回放：Franka 插孔动作、模型原始选项概率和物理成功检查](docs/demos/playground-arm.gif)
-
-### [Doom 走廊 · 3D](examples/README.md#doom-corridor-3d)
-
-击败最后一个房间中左右两侧的敌人，再向前移动。使用 ViZDoom 和随包提供的 Freedoom 资源。
-
-![Doom checkpoint 回放：击杀左右两名敌人后继续前进](docs/demos/playground-doom.gif)
-
-### [Crafter 生存建造 · 2D](examples/README.md#crafter-survival-2d)
-
-采集木材、制作工具、开采石头，同时管理生命值和物资。
-
-![Crafter 浏览器回放：资源采集、制作工具和四项目标的完成进度](docs/demos/playground-crafter.gif)
-
-### 让模型在环境中运行
-
-停止只播放回放的演示，保持模型服务运行。安装可选游戏引擎，再连接模型服务启动演示：
-
-```bash
-python -m pip install -e '.[demo]'
-jevany demo --base-url http://127.0.0.1:8008 --text-only
-```
-
-在浏览器中选择 **Run model** 让模型操作，或选择 **Play yourself** 自己操作。
-实时控制向模型发送文本状态；机械臂控制使用 `.[robotics]` 依赖。
-平台要求与环境接口见[演示指南](examples/README.md)，结合 LLM 规划器使用
-JevAny 决策可参考[集成文档](docs/INTEGRATIONS.md)。
-
-## 🤗 预训练模型 <a name="预训练模型"></a>
+## 🤗 2. 预训练模型 <a name="预训练模型"></a>
 
 | 模型 | Readout | 用途 |
 |---|---|---|
@@ -141,15 +146,18 @@ JevAny 决策可参考[集成文档](docs/INTEGRATIONS.md)。
 | <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Qwen3.8-27B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | 默认模型；当前发布准确率最高 |
 | <img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Muse-Glimmer-30B-LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer 版本 |
 
-这些仓库发布的是 LoRA adapter，加载时还需要对应基座，并适用基座模型的
-许可证和访问条款。BF16 基座权重大约需要参数量两倍的字节数，另需运行时
-显存。详见[硬件与加载说明](docs/DEPLOYMENT.md#checkpoints-and-hardware)。
+这些 LoRA adapter 采用 SFT 训练，训练数据包含 1,772,725 条文本记录和 2,180,242 个有标签决策，
+配置见[训练算力与实验说明](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)。
+全参数 SFT 与进一步的后训练改进仍在计划中。
+
+加载时还需要对应基座，并适用基座模型的许可证和访问条款。BF16 基座权重大约
+需要参数量两倍的字节数，另需运行时显存。详见[硬件与加载说明](docs/DEPLOYMENT.md#checkpoints-and-hardware)。
 
 Pointer 和 direct-token 模型使用相同 API。Pointer 在上下文允许的范围内支持最多
 4,096 个选项，direct-token 最多支持 255 个。
 训练与准确率的取舍见[输出方式说明](docs/TRAINING.md#pointer-and-direct-token-readouts)。
 
-## 📊 评测 <a name="评测"></a>
+## 📊 3. 基准测试结果 <a name="评测"></a>
 
 Qwen3.8 27B 在两项评测中准确率最高，NLL 和 Brier 也最低。
 4B 版本中，direct-token 的 JevBench 准确率最高，Pointer 的 Kev Transfer-v9 准确率最高。
@@ -179,50 +187,59 @@ NLL、Brier 和 ECE 均在 Kev Transfer-v9 上计算。
 [机器可读结果](results/model-family-v2.json) ·
 [方法与消融实验报告](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)
 
-## 🛠️ 训练 <a name="训练"></a>
+## 🕹️ 4. 示例与测试环境 <a name="示例与测试环境"></a>
 
-训练数据沿用推理时的 `state` 和 `questions`，为每个问题增加标签。
-先用随包提供的合成客服工单开始训练，再换成自己的标注数据。入门配置在 CUDA 上
-以 BF16 训练 Qwen3.5-0.8B，结果写入 `runs/my-jev`：
+交互演示包含以下三个环境。动图展示 `JevAny-27B-SFT` 的加速回放，以及记录的动作和选项概率。
 
-```bash
-python -m pip install -e '.[train]'
-jevany data init --out data/starter
-jevany data validate data/starter/train.jsonl
-jevany train --config recipes/sft.toml --dry-run
-jevany train --config recipes/sft.toml
-```
+### 🤖 4.1 [机械臂插孔](examples/README.md#robot-peg-insertion) <a name="机械臂插孔"></a>
 
-训练完成后，用随包提供的工单请求试用模型：
+控制 Franka 夹爪抓取、对准并插入工件，由 PyBullet 接触物理验证结果。
 
-```bash
-jevany decide examples/request.json --checkpoint runs/my-jev
-```
+![机械臂浏览器回放：Franka 插孔动作、模型原始选项概率和物理成功检查](docs/demos/playground-arm.gif)
 
-通过 `--data` 指定自己的 [JSONL 数据](docs/DATA.md)，或用
-[`recipes/finetune.toml`](recipes/finetune.toml) 微调已发布的 27B 模型。
-CPU 配置、多模态数据和标准 `torchrun` 启动方式见[训练指南](docs/TRAINING.md)。
-训练图片或视频模型时，安装 `.[train,multimodal]`。
+### 🔫 4.2 [Doom 走廊 · 3D](examples/README.md#doom-corridor-3d) <a name="doom-走廊-3d"></a>
 
-当前发布系列采用 LoRA SFT，训练数据包含 1,772,725 条文本记录和 2,180,242 个有标签决策，
-配置见[训练算力与实验说明](docs/JEVANY_METHOD_AND_ABLATIONS.pdf)。
-全参数 SFT 与进一步的后训练改进仍在计划中。
+击败最后一个房间中左右两侧的敌人，再向前移动。使用 ViZDoom 和随包提供的 Freedoom 资源。
 
-### RLCR（实验功能）
+![Doom checkpoint 回放：击杀左右两名敌人后继续前进](docs/demos/playground-doom.gif)
 
-完成 SFT 后，可用 [RLCR](docs/ALGORITHM.md#rlcr) 继续训练，其奖励兼顾正确率与概率校准：
+### ⛏️ 4.3 [Crafter 生存建造 · 2D](examples/README.md#crafter-survival-2d) <a name="crafter-生存建造-2d"></a>
+
+采集木材、制作工具、开采石头，同时管理生命值和物资。
+
+![Crafter 浏览器回放：资源采集、制作工具和四项目标的完成进度](docs/demos/playground-crafter.gif)
+
+### 🎮 4.4 打开交互演示 <a name="打开交互演示"></a>
+
+在[快速上手](#快速上手)配置的环境中启动交互演示：
 
 ```bash
-jevany train --config recipes/rlcr.toml
+jevany demo
 ```
 
-## 🧩 支持的模型系列 <a name="支持的模型系列"></a>
+打开 `http://127.0.0.1:8090`，点击 **Replay** 观看录制的运行过程。
+只需 CPU 即可播放内置录制内容。
+
+让模型在环境中运行时，保持[部署](#部署)中的模型服务运行。在终端按 Ctrl+C
+停止回放演示，安装可选游戏引擎，再连接模型服务启动演示：
+
+```bash
+python -m pip install -e '.[demo]'
+jevany demo --base-url http://127.0.0.1:8008 --text-only
+```
+
+在浏览器中选择 **Run model** 让模型操作，或选择 **Play yourself** 自己操作。
+实时控制向模型发送文本状态；机械臂控制使用 `.[robotics]` 依赖。
+平台要求与环境接口见[演示指南](examples/README.md)，结合 LLM 规划器使用
+JevAny 决策可参考[集成文档](docs/INTEGRATIONS.md)。
+
+## 🧩 5. 支持的模型系列 <a name="支持的模型系列"></a>
 
 [模型 ID、支持的输入与运行要求](docs/TRAINING.md#backbone-support)。
 
 ![支持的 26 个模型，涵盖 Qwen、Gemma、Muse、Mistral、GLM、Nemotron 和 Llama](docs/supported-model-families.svg)
 
-## 📚 文档与贡献 <a name="文档与贡献"></a>
+## 📚 6. 文档与贡献 <a name="文档与贡献"></a>
 
 [训练](docs/TRAINING.md) · [部署](docs/DEPLOYMENT.md) · [API](docs/API.md) · [数据](docs/DATA.md) · [评测](docs/EVALUATION.md) · [贡献指南](CONTRIBUTING.md)
 
