@@ -60,6 +60,36 @@ SOFTWARE.
       <stop stop-color="#eeecf6" />
       <stop offset="1" stop-color="#e5e3f0" />
     </linearGradient>
+    <linearGradient id="icon-slate" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#dfe5ee" />
+      <stop offset="1" stop-color="#eef2f8" />
+    </linearGradient>
+    <linearGradient id="icon-purple" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#e2dced" />
+      <stop offset="1" stop-color="#f0ebf7" />
+    </linearGradient>
+    <linearGradient id="icon-teal" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#dbe9e6" />
+      <stop offset="1" stop-color="#edf5f2" />
+    </linearGradient>
+    <filter id="icon-inset" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feOffset in="SourceAlpha" dx="2" dy="2" result="offset-shadow" />
+      <feComposite in="SourceAlpha" in2="offset-shadow" operator="out" result="inner-shadow" />
+      <feGaussianBlur in="inner-shadow" stdDeviation="1.5" result="soft-shadow" />
+      <feFlood flood-color="#7d8ba3" flood-opacity=".48" />
+      <feComposite in2="soft-shadow" operator="in" result="shade" />
+      <feOffset in="SourceAlpha" dx="-2" dy="-2" result="offset-light" />
+      <feComposite in="SourceAlpha" in2="offset-light" operator="out" result="inner-light" />
+      <feGaussianBlur in="inner-light" stdDeviation="1" result="soft-light" />
+      <feFlood flood-color="#ffffff" flood-opacity=".95" />
+      <feComposite in2="soft-light" operator="in" result="light" />
+      <feMerge result="inset">
+        <feMergeNode in="SourceGraphic" />
+        <feMergeNode in="shade" />
+        <feMergeNode in="light" />
+      </feMerge>
+      <feComposite in="inset" in2="SourceAlpha" operator="in" />
+    </filter>
     <filter id="raised" x="-30%" y="-50%" width="160%" height="200%" color-interpolation-filters="sRGB">
       <feGaussianBlur in="SourceAlpha" stdDeviation="9" result="blur" />
       <feOffset in="blur" dx="9" dy="9" result="lower" />
@@ -157,7 +187,7 @@ SOFTWARE.
   </defs>
 
   <rect width="1440" height="500" rx="32" fill="url(#surface)" />
-  <g id="diagram" font-family="Arial,Helvetica,sans-serif">
+  <g id="diagram" font-family="Arial,Helvetica,sans-serif" text-anchor="middle">
     <g fill="url(#card)" stroke="#f8faff" stroke-opacity=".5" filter="url(#raised)">
       <rect id="training-panel" x="226" y="40" width="566" height="420" rx="30" />
       <rect id="deployment-panel" x="858" y="40" width="540" height="420" rx="30" />
@@ -176,14 +206,15 @@ SOFTWARE.
         <path d="M128 320a64 64 0 0 0 128 0v-80l112-112" fill="none" stroke="#2dd4bf" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" />
         <circle cx="368" cy="128" r="36" fill="#2dd4bf" />
       </g>
-      <text x="114" y="132" text-anchor="middle" font-family="URW Gothic,Avenir Next,Century Gothic,sans-serif" font-size="29" font-weight="700"><tspan fill="#7c3aed">Jev</tspan><tspan fill="#0b8b80">Any</tspan></text>
-      <use href="#brain" transform="translate(95 199) scale(1.58333333)" color="#687a92" />
-      <g fill="#52617a" font-size="25" text-anchor="middle">
+      <text x="114" y="132" font-family="URW Gothic,Avenir Next,Century Gothic,sans-serif" font-size="29" font-weight="700"><tspan fill="#7c3aed">Jev</tspan><tspan fill="#0b8b80">Any</tspan></text>
+      <rect id="source-icon-well" x="84" y="190" width="60" height="60" rx="17" fill="url(#icon-slate)" filter="url(#icon-inset)" />
+      <use href="#brain" transform="translate(95 201) scale(1.58333333)" color="#687a92" />
+      <g fill="#52617a" font-size="25">
         <text x="114" y="293">Open<tspan x="114" dy="31">Source</tspan></text>
         <text x="114" y="369" font-size="22" font-weight="700">LLM / VLM</text>
       </g>
     </g>
-    <g font-size="31" font-weight="700" fill="#334157" text-anchor="middle">
+    <g font-size="31" font-weight="700" fill="#334157">
       <text x="509" y="92">Train your own Jev model</text>
       <text x="1128" y="92">Deploy your Jev model</text>
     </g>
@@ -213,23 +244,31 @@ SOFTWARE.
       </g>
     </g>
 
-    <use href="#images" transform="translate(288 158) scale(1.16666667)" color="#8470b1" />
-    <use href="#workflow" transform="translate(552 158) scale(1.16666667)" color="#8470b1" />
-    <use href="#cpu" transform="translate(288 362) scale(1.33333333)" color="#8064b3" />
-    <use href="#braces" transform="translate(932 183) scale(1.5)" color="#448a80" />
-    <use href="#flask" transform="translate(910 362) scale(1.33333333)" color="#518d85" />
-    <use href="#window" transform="translate(1162 362) scale(1.33333333)" color="#518d85" />
+    <g filter="url(#icon-inset)">
+      <rect id="data-icon-well" x="352" y="148" width="48" height="48" rx="14" fill="url(#icon-purple)" />
+      <rect id="training-icon-well" x="616" y="148" width="48" height="48" rx="14" fill="url(#icon-purple)" />
+      <rect id="model-icon-well" x="280" y="352" width="52" height="52" rx="15" fill="url(#icon-purple)" />
+      <rect id="api-icon-well" x="916" y="173" width="56" height="56" rx="16" fill="url(#icon-teal)" />
+      <rect id="test-icon-well" x="906" y="356" width="44" height="44" rx="13" fill="url(#icon-teal)" />
+      <rect id="example-icon-well" x="1158" y="356" width="44" height="44" rx="13" fill="url(#icon-teal)" />
+    </g>
+    <use href="#images" transform="translate(362 158) scale(1.16666667)" color="#8470b1" />
+    <use href="#workflow" transform="translate(626 158) scale(1.16666667)" color="#8470b1" />
+    <use href="#cpu" transform="translate(290 362) scale(1.33333333)" color="#8064b3" />
+    <use href="#braces" transform="translate(926 183) scale(1.5)" color="#448a80" />
+    <use href="#flask" transform="translate(914 364) scale(1.16666667)" color="#518d85" />
+    <use href="#window" transform="translate(1166 364) scale(1.16666667)" color="#518d85" />
 
     <g fill="#66518f" font-size="25">
-      <text x="280" y="225">Multi-modal<tspan x="280" dy="29">Training Data</tspan></text>
-      <text x="544" y="225"><tspan font-weight="700">RLCR</tspan> &amp; SFT<tspan x="544" dy="29">Training Infra</tspan></text>
+      <text x="376" y="222">Multi-modal<tspan x="376" dy="29">Training Data</tspan></text>
+      <text x="640" y="222"><tspan font-weight="700">RLCR</tspan> &amp; SFT<tspan x="640" dy="29">Training Infra</tspan></text>
     </g>
-    <text x="348" y="389" fill="#685090" font-size="30" font-weight="700">Your Jev Model</text>
-    <text x="1008" y="192" fill="#376c66" font-size="29" font-weight="700">Unified API</text>
-    <text x="1008" y="228" fill="#4a7873" font-size="26">&amp; call format</text>
+    <text x="542" y="389" fill="#685090" font-size="30" font-weight="700">Your Jev Model</text>
+    <text x="1166" y="192" fill="#376c66" font-size="29" font-weight="700">Unified API</text>
+    <text x="1166" y="228" fill="#4a7873" font-size="26">&amp; call format</text>
     <g fill="#486d69" font-size="22">
-      <text x="950" y="373">Test<tspan x="950" dy="28">environments</tspan></text>
-      <text x="1202" y="373">Practical<tspan x="1202" dy="28">examples</tspan></text>
+      <text x="1030" y="373">Test<tspan x="1030" dy="28">environments</tspan></text>
+      <text x="1282" y="373">Practical<tspan x="1282" dy="28">examples</tspan></text>
     </g>
   </g>
 </svg>
