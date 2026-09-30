@@ -21,10 +21,11 @@
   <a href="#documentation-and-contributing">📚 Docs</a></strong>
 </p>
 
-**JevAny is open infra for decision model training and deployment.** Use a
-released model or train on your own data to route support tickets, select tools,
-or choose a robot's next action. One API takes the state, question and candidate
-options, then returns a choice and its probabilities without generating answer text.
+**JevAny is open infra for System 1 decision model training and deployment**,
+covering data preparation, model adaptation and evaluation. Use a released
+model or train on your own data to route support tickets, select tools, or
+choose a robot's next action. One API takes the state, question and candidate
+options, then directly returns a choice and its probabilities.
 
 <p align="center">
   <img src="docs/hero.png" alt="JevAny infra for decision model training, deployment and application integration" width="100%">
