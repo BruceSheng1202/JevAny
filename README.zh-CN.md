@@ -139,11 +139,11 @@ JevAny 决策可参考[集成文档](docs/INTEGRATIONS.md)。
 
 | 模型 | Readout | 用途 |
 |---|---|---|
-| [JevAny-Gemma-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | Pointer | 轻量 Gemma 版本 |
-| [JevAny-Qwen3.5-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | Pointer | 轻量、支持灵活选项数 |
-| [JevAny-Qwen3.5-4B-Direct-Token-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | Direct-token | 当前 4B JevBench 最优版本 |
-| [JevAny-Qwen3.8-27B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | 默认模型；当前发布准确率最高 |
-| [JevAny-Muse-Glimmer-30B-LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer 版本 |
+| <img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Gemma-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Gemma-4B-LoRA) | Pointer | 轻量 Gemma 版本 |
+| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Qwen3.5-4B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-LoRA) | Pointer | 轻量、支持灵活选项数 |
+| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Qwen3.5-4B-Direct-Token-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.5-4B-Direct-Token-LoRA) | Direct-token | 当前 4B JevBench 最优版本 |
+| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Qwen3.8-27B-LoRA](https://huggingface.co/tianxinwei/JevAny-Qwen3.8-27B-LoRA) | Pointer | 默认模型；当前发布准确率最高 |
+| <img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;[JevAny-Muse-Glimmer-30B-LoRA](https://huggingface.co/tianxinwei/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer 版本 |
 
 这些仓库发布的是 LoRA adapter，加载时还需要对应基座，并适用基座模型的
 许可证和访问条款。BF16 基座权重大约需要参数量两倍的字节数，另需运行时
@@ -160,16 +160,16 @@ direct-token 的 JevBench 准确率更高，Pointer 的 Kev Transfer-v9 准确�
 
 | 模型 | Kev Transfer-v9 ↑ | JevBench ↑ | NLL ↓ | Brier ↓ | ECE ↓ |
 |---|---:|---:|---:|---:|---:|
-| Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
-| Kev-27B | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
-| Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
-| Laya | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
+| <img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-4B | 74.19% | 75.32% | 0.858 | 0.380 | 0.125 |
+| <img src="docs/model-logos/kev.svg" width="24" height="24" align="middle" alt="">&nbsp;Kev-27B | 82.31% | 85.28% | 0.533 | 0.265 | 0.050 |
+| <img src="docs/model-logos/typesafe.png" width="24" height="24" align="middle" alt="">&nbsp;Jev 1.13.0 | 85.37% | 86.58% | 0.644 | 0.212 | 0.033 |
+| <img src="docs/model-logos/laya.svg" width="24" height="24" align="middle" alt="">&nbsp;Laya | 52.29% | 58.01% | 1.264 | 0.615 | 0.127 |
 | **JevAny Releases** |  |  |  |  |  |
-| Gemma 4B LoRA | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
-| Qwen3.5 4B LoRA | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
-| Qwen3.5 4B Direct-Token LoRA | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
-| Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
-| **Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
+| <img src="docs/model-logos/jevany-gemma.svg" width="24" height="24" align="middle" alt="">&nbsp;Gemma 4B LoRA | 70.84% | 77.49% | 0.706 | 0.369 | 0.056 |
+| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;Qwen3.5 4B LoRA | 78.68% | 80.09% | 0.587 | 0.297 | 0.035 |
+| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;Qwen3.5 4B Direct-Token LoRA | 78.20% | 80.95% | 0.564 | 0.291 | **0.029** |
+| <img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;Muse Glimmer 30B LoRA | 83.46% | 87.45% | 0.464 | 0.229 | 0.032 |
+| <img src="docs/model-logos/jevany-qwen.svg" width="24" height="24" align="middle" alt="">&nbsp;**Qwen3.8 27B LoRA** | **85.76%** | **90.48%** | **0.392** | **0.200** | 0.030 |
 
 **Kev Transfer-v9** 包含 1,046 个计分决策，覆盖分类、问答和鲁棒性任务。
 **JevBench** 覆盖全部 231 个公开开发集样本，分数不代表封闭测试集榜单成绩。
