@@ -35,7 +35,8 @@
 [完整基准测试结果与评测说明](#评测)。
 
 以下 30 个案例展示了 JevAny 在机器人、浏览器、软件、实验室和出行任务中的动作选择。
-演示使用的模型是 `JevAny-27B-SFT`。[查看全部案例](docs/CASES.md)，
+以下 30 个案例是由早期兼容 checkpoint 录制的历史回放；当前默认发布模型为
+[JevAny-Qwen3.8-27B](https://huggingface.co/SimpleJev/JevAny-Qwen3.8-27B-LoRA)。[查看全部案例](docs/CASES.md)，
 或[打开交互演示](#打开交互演示)，查看记录的动作和选项概率。
 
 [![JevAny 在机器人、浏览器、软件、实验室和出行任务中选择动作](docs/demos/jevany-cases.gif)](docs/CASES.md)
@@ -151,7 +152,7 @@ print("Probabilities:", answer["probabilities"])
 | [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B](https://huggingface.co/SimpleJev/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer 版本 |
 
 这些 LoRA adapter 采用 SFT 训练，训练数据包含 1,772,725 条文本记录和 2,180,242 个有标签决策，
-配置见[训练算力与实验说明](reports/JEVANY_METHOD_AND_ABLATIONS.pdf)。
+配置见[训练算力与实验说明](reports/JevAny_Tech_Report.pdf)。
 全参数 SFT 与进一步的后训练改进仍在计划中。
 
 加载时还需要对应基座，并适用基座模型的许可证和访问条款。BF16 基座权重大约
@@ -189,11 +190,13 @@ NLL、Brier 和 ECE 均在 Kev Transfer-v9 上计算。
 
 [完整结果与评测协议](docs/EVALUATION.md#model-family-v2) ·
 [机器可读结果](results/model-family-v2.json) ·
-[方法与消融实验报告](reports/JEVANY_METHOD_AND_ABLATIONS.pdf)
+[方法与消融实验报告](reports/JevAny_Tech_Report.pdf)
 
 ## 🕹️ 4. 示例与测试环境 <a name="示例与测试环境"></a>
 
-交互演示包含以下三个环境。动图展示 `JevAny-27B-SFT` 的加速回放，以及记录的动作和选项概率。
+交互演示包含以下三个环境。动图保留历史模型的动作和选项概率；当前
+[JevAny-Qwen3.8-27B](https://huggingface.co/SimpleJev/JevAny-Qwen3.8-27B-LoRA)
+可按 playground 指南中的命令运行。
 
 ### 🤖 4.1 [机械臂插孔](examples/README.md#robot-peg-insertion) <a name="机械臂插孔"></a>
 
@@ -248,7 +251,7 @@ JevAny 决策可参考[集成文档](docs/INTEGRATIONS.md)。
 [训练](docs/TRAINING.md) · [部署](docs/DEPLOYMENT.md) · [API](docs/API.md) · [数据](docs/DATA.md) · [评测](docs/EVALUATION.md) · [贡献指南](CONTRIBUTING.md)
 
 欢迎贡献模型适配、评测或应用示例，开发步骤见[贡献指南](CONTRIBUTING.md)。
-[技术报告](reports/JEVANY_METHOD_AND_ABLATIONS.pdf)介绍了模型设计、多模态路径、实验与开放问题。
+[技术报告](reports/JevAny_Tech_Report.pdf)介绍了模型设计、多模态路径、实验与开放问题。
 
 代码和入门数据采用 Apache-2.0。部分组件改编自 [Kev](https://github.com/jaredpalmer/kev)，
 归属说明见 [NOTICE](NOTICE) 和 [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)。

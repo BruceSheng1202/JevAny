@@ -23,7 +23,7 @@ The playground has three modes:
 | **Play yourself** | Your button presses execute native environment actions on CPU | The environment's optional extra |
 | **Run model** | JevAny receives the camera image, measured state and recent actions, chooses an action, and displays its probabilities | Optional extra and a running JevAny server |
 
-All three replays show JevAny-27B-SFT runs with the recorded
+All three replays are archived runs from an earlier compatible checkpoint, with the recorded
 option probabilities. Crafter uses model-selected objectives before each native
 action; the robot uses primitive Cartesian controls and a measured subgoal
 harness. Fresh runs execute and record the model's choices and their outcomes.
@@ -147,7 +147,7 @@ An empty grasp or a peg left outside the socket fails these checks. Runs have
 a 120-decision limit. See [the harness and recorded results](../docs/ROBOTICS.md)
 for its stages, recovery behavior and evaluation conditions.
 
-![Accelerated local browser replay of the Franka peg-insertion task with recorded JevAny-27B-SFT probabilities](../docs/demos/playground-arm.gif)
+![Accelerated local browser replay of the Franka peg-insertion task with recorded model probabilities](../docs/demos/playground-arm.gif)
 
 ## Environment API
 

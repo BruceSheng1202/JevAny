@@ -104,45 +104,36 @@ When creating data:
 - preserve source, generator, prompt, verifier, and license metadata outside the model-facing fields;
 - audit generated labels and counterfactual pairs before training.
 
-## v0.2 Mixtures
+## Current Release Scale
 
-The SFT mixture contains 107,278 records and 127,012 questions:
+The current five-model LoRA family was trained with supervised fine-tuning on
+**1,772,725 text records** containing **2,180,242 labelled decisions**. At a
+high level, the corpus covers:
 
-| Group | Records |
-|---|---:|
-| HelpSteer3 preferences | 17,613 |
-| Agent and tool decisions | 16,734 |
-| A-OKVQA | 17,047 |
-| VideoFeedback | 19,570 |
-| QASC | 8,134 |
-| CommonsenseQA | 9,741 |
-| ScienceQA | 5,165 |
-| Classification, policy, compositional, and ARC | 13,274 |
+- preference and ranking decisions;
+- agent, tool-use, and action selection;
+- general and domain reasoning;
+- classification and policy decisions; and
+- safety-sensitive choices.
 
-The 1,000-record calibration partition and 1,002-record development partition are separate. AI2D and MMMU appear only in those held-out partitions. Multimodal rows carry image or video URIs that are resolved and passed through the backbone's native processor. The training split contains 22,212 image records and 19,570 video records; each evaluation partition contains 500 media records.
+These are the same aggregate counts and task families reported in the project
+README and the [technical report](../reports/JevAny_Tech_Report.pdf).
 
-The selected RLCR mixture contains exactly 40,000 records and 46,044 questions:
+JevAny also supports native image and video records through the same request
+schema. Media are resolved and passed to each compatible backbone's native
+processor; support is declared by the loaded checkpoint rather than inferred
+from a filename or prompt.
 
-| Group | Records |
-|---|---:|
-| Hard reasoning | 6,000 |
-| Many-choice reasoning | 6,000 |
-| Agent and tool decisions | 5,000 |
-| HelpSteer3 preferences | 5,000 |
-| Mathematical reasoning | 4,000 |
-| Medical reasoning | 4,000 |
-| Image-derived decisions | 4,000 |
-| Video-derived decisions | 2,000 |
-| Core replay | 4,000 |
+The bundled `build-sft` and `build-rlcr` commands remain reference builders for
+public experiments and custom training. They do not reconstruct the current
+release corpus. Review upstream licenses before downloading, training on, or
+redistributing any converted data.
 
-The mixture includes 5,000 HelpSteer3 rows, 6,000 eight-option QASC rows, 4,000 AQuA-RAT rows, 4,000 MedMCQA rows, and broad replay to limit drift. It has zero normalized-text-hash overlap with the `transfer-v9` evaluation panel.
+## Evaluation Separation
 
-The VideoFeedback `real` configuration maps all five score dimensions to level 3 in this conversion. We use these rows to exercise the native video path and exclude their 100 development questions from headline metrics. Video accuracy is evaluated on [MVBench with blank and shuffled-media controls](EVALUATION.md#native-image-and-video-decisions).
-
-The repository provides builders that download and convert upstream datasets. Review each upstream license before downloading, training, or redistributing converted records. Build SFT data with [`scripts/build_v2_data.py`](../scripts/build_v2_data.py) and RL data with [`scripts/build_v2_rlcr_mix.py`](../scripts/build_v2_rlcr_mix.py).
-
-## Test-Time Data
-
-Jev-Test removes every `label` and `target` before inference. It samples the parent decision 16 times at temperature 0.8, accepts only a strict majority, and rejects ties. Gold labels remain in the immutable source suite and are opened once after both SFT and RL adaptations finish.
-
-This protocol accepted 153 of 200 MMLU-Pro inputs and 732 of 756 MuSR inputs. The exact hashes and settings are recorded in [`results/ttt-protocol-v1.json`](../results/ttt-protocol-v1.json).
+Keep training, calibration, and evaluation records separate. Fit calibration
+parameters only on the calibration partition, preserve group identifiers for
+related questions, and check normalized text hashes before evaluation. Current
+release metrics and suite hashes are recorded in
+[`results/model-family-v2.json`](../results/model-family-v2.json); protocol notes
+are in [EVALUATION.md](EVALUATION.md).

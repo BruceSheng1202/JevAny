@@ -36,8 +36,9 @@ options, then directly returns a choice and its probabilities.
 
 [Full benchmark results and evaluation details](#evaluation).
 
-The following 30 examples show JevAny choosing actions across robotics,
-browser, software, laboratory and mobility tasks using `JevAny-27B-SFT`.
+The following 30 examples are archived replays from an earlier compatible
+JevAny checkpoint. The current default release is
+[JevAny-Qwen3.8-27B](https://huggingface.co/SimpleJev/JevAny-Qwen3.8-27B-LoRA).
 [Explore the cases](docs/CASES.md), or [try the playground](#try-the-playground) to inspect
 recorded actions and option probabilities.
 
@@ -160,7 +161,7 @@ and use the same interface. For image and video inputs, follow the
 | [<img src="docs/model-logos/jevany-muse.svg" width="24" height="24" align="middle" alt="">&nbsp;JevAny-Muse-Glimmer-30B](https://huggingface.co/SimpleJev/JevAny-Muse-Glimmer-30B-LoRA) | Pointer | Muse Glimmer alternative |
 
 These LoRA adapters were trained with SFT on 1,772,725 text records containing
-2,180,242 labelled decisions; see [training compute and experiments](reports/JEVANY_METHOD_AND_ABLATIONS.pdf)
+2,180,242 labelled decisions; see [training compute and experiments](reports/JevAny_Tech_Report.pdf)
 for the setup. Full-parameter SFT and further post-training improvements are planned.
 
 The corresponding base model is loaded separately and its license and access
@@ -201,12 +202,14 @@ NLL, Brier and ECE are measured on Kev Transfer-v9.
 
 [Full results and protocols](docs/EVALUATION.md#model-family-v2) ·
 [Machine-readable results](results/model-family-v2.json) ·
-[Method and ablation report](reports/JEVANY_METHOD_AND_ABLATIONS.pdf)
+[Method and ablation report](reports/JevAny_Tech_Report.pdf)
 
 ## 🕹️ 4. Examples & Test Environments <a name="examples--test-environments"></a>
 
-The playground includes the three environments below. These GIFs show accelerated
-`JevAny-27B-SFT` replays with recorded actions and option probabilities.
+The playground includes the three environments below. These GIFs preserve
+historical model actions and option probabilities; run the current
+[JevAny-Qwen3.8-27B](https://huggingface.co/SimpleJev/JevAny-Qwen3.8-27B-LoRA)
+checkpoint with the commands in the playground guide.
 
 ### 🤖 4.1 [Robot peg insertion](examples/README.md#robot-peg-insertion) <a name="robot-peg-insertion"></a>
 
@@ -264,7 +267,7 @@ combine JevAny decisions with an LLM planner.
 [Training](docs/TRAINING.md) · [Deployment](docs/DEPLOYMENT.md) · [API](docs/API.md) · [Data](docs/DATA.md) · [Evaluation](docs/EVALUATION.md) · [Contributing](CONTRIBUTING.md)
 
 To contribute a model adapter, evaluation or application example, start with the
-[contribution guide](CONTRIBUTING.md). The [technical report](reports/JEVANY_METHOD_AND_ABLATIONS.pdf)
+[contribution guide](CONTRIBUTING.md). The [technical report](reports/JevAny_Tech_Report.pdf)
 describes the model design, multimodal path, experiments and open questions.
 
 Code and starter data are Apache-2.0. Some components are adapted from

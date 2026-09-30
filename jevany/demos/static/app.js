@@ -74,7 +74,7 @@ function drawActions(decision) {
     mode === "model" ? "The model's probabilities appear after its first decision." :
     "This preview uses scripted controls. No model probabilities are shown.";
   if (mode === "replay" && replay.controller === "model" && !probabilities)
-    $("probability-note").textContent = "Recorded JevAny-27B-SFT probabilities appear at each step.";
+    $("probability-note").textContent = "Recorded checkpoint probabilities appear at each step.";
   $("actions").replaceChildren(...Object.entries(actions).map(([key, description]) => {
     const button = element("button", undefined, "action" + (decision?.action === key ? " selected" : ""));
     button.dataset.action = key; button.title = description;

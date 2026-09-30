@@ -1,6 +1,6 @@
 """Train and deploy your own Jev-style decision models."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from .api import Choice, Noul, Score, SystemOneRequest
 from .client import JevClient

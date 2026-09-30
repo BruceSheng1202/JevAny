@@ -1,6 +1,9 @@
 # Cases
 
-JevAny-27B-SFT chooses the actions in every case below. The overview shows each selected action with the probability it carried in the original run.
+These are archived replays from an earlier compatible JevAny checkpoint. The
+overview preserves each selected action and its probability from the original
+run. The current default release is
+[JevAny-Qwen3.8-27B](https://huggingface.co/SimpleJev/JevAny-Qwen3.8-27B-LoRA).
 
 [![JevAny tasks in one animated overview](demos/jevany-cases.gif)](demos/jevany-cases.gif)
 

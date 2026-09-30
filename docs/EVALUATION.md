@@ -104,7 +104,7 @@ python scripts/plot_evaluation_overview.py
 
 [Machine-readable release results](../results/model-family-v2.json) ·
 [Historical results](#earlier-releases-and-evaluations) ·
-[Technical report](../reports/JEVANY_METHOD_AND_ABLATIONS.pdf).
+[Technical report](../reports/JevAny_Tech_Report.pdf).
 
 ### Training compute
 

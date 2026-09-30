@@ -66,12 +66,16 @@ shared format manifest. A regression check rejects inconsistent formats or
 GIFs whose decision counts no longer match their recordings. Keep diagnostic
 visualizations separate from these three public assets.
 
-## Recorded evaluation
+## Historical recorded evaluation
 
-All runs used `tianxinwei/JevAny-27B-SFT` at revision
+The archived runs below used the predecessor `tianxinwei/JevAny-27B-SFT` at revision
 `ad7b48b7056a9742f54aacc9b98b6b46dc2ce167`, camera images, and argmax selection
 from the full action set. The environment executed the model-selected motor
 commands. Responses confirmed that nonempty image tensors reached the model.
+These results are retained with their original checkpoint identity and are not
+presented as runs of the current
+[JevAny-Qwen3.8-27B](https://huggingface.co/SimpleJev/JevAny-Qwen3.8-27B-LoRA)
+release.
 
 Four harness designs were first compared on seeds 17 and 29:
 
