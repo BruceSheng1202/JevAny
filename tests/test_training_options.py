@@ -8,6 +8,48 @@ from jevany.train import parse_args
 from jevany.training import TrainingArgumentParser
 
 
+@pytest.mark.parametrize("setting,value,message", [
+    ("head_dim", 0, "head dimension must be positive"),
+    ("head_dim", -1, "head dimension must be positive"),
+    ("replay", -1, "replay must be nonnegative"),
+    ("seed", -1, "seed must be in"),
+    ("seed", 2**32, "seed must be in"),
+])
+def test_invalid_training_limits_are_rejected_before_loading_inputs(tmp_path, monkeypatch, setting, value, message):
+    from jevany.train import main
+
+    def unexpected_preflight(*args):
+        pytest.fail("invalid options must be rejected before reading data or loading weights")
+
+    monkeypatch.setattr("jevany.train.preflight", unexpected_preflight)
+    output = tmp_path / "run"
+    with pytest.raises(ValueError, match=message):
+        main([
+            "--data", "records.jsonl", "--suite", "suite", "--out", str(output),
+            f"--{setting.replace('_', '-')}", str(value),
+        ], parser_class=TrainingArgumentParser)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("setting,value", [
+    ("head_dim", 1), ("replay", 0), ("replay", 1), ("seed", 0), ("seed", 2**32 - 1),
+])
+def test_valid_training_limit_boundaries(tmp_path, setting, value):
+    parsed = parse_args([
+        "--data", "records.jsonl", "--suite", "suite", "--out", str(tmp_path / "run"),
+        f"--{setting.replace('_', '-')}", str(value),
+    ])
+    assert getattr(parsed, setting) == value
+
+
+def test_lm_token_mode_does_not_require_a_pointer_head_dimension(tmp_path):
+    parsed = parse_args([
+        "--data", "records.jsonl", "--out", str(tmp_path / "run"),
+        "--decision-mode", "lm_token", "--head-dim", "0",
+    ])
+    assert parsed.head_dim == 0
+
+
 @pytest.mark.parametrize("setting", ["rlcr", "multimodal", "eval_before_start"])
 def test_boolean_recipe_settings_can_be_disabled_from_the_cli(tmp_path, setting):
     recipe = tmp_path / "recipe.toml"
