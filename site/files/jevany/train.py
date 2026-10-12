@@ -406,6 +406,10 @@ def parse_args(argv=None, *, parser_class=argparse.ArgumentParser):
         ap.error("numeric training settings must be finite")
     if min(a.epochs, a.accum, a.lora, a.batch) < 1:
         ap.error("epochs, accum, lora and batch must be positive")
+    if a.decision_mode == "pointer" and a.head_dim < 1:
+        ap.error("pointer head dimension must be positive")
+    if not 0 <= a.seed < 2**32:
+        ap.error("--seed must be in 0..4294967295")
     if a.head_residual_dim < 0 or not math.isfinite(a.lora_dropout) or not 0 <= a.lora_dropout < 1:
         ap.error("invalid residual-head dimension or LoRA dropout")
     if a.decision_mode == "lm_token" and (a.rlcr or a.head_lr or a.head_residual_dim):
@@ -414,6 +418,8 @@ def parse_args(argv=None, *, parser_class=argparse.ArgumentParser):
         ap.error("--dtype bf16 requires --device cuda")
     if any(not math.isfinite(value) for value in (a.lr, a.head_lr, a.weight_decay)) or a.lr <= 0 or a.head_lr < 0 or a.weight_decay < 0:
         ap.error("invalid learning rate or weight decay")
+    if a.replay < 0:
+        ap.error("--replay must be nonnegative")
     if a.replay and not (a.data and a.suite):
         ap.error("--replay needs both --data and --suite")
     if min(a.max_steps, a.eval_every_steps, a.eval_records, a.checkpoint_every_steps,

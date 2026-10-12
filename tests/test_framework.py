@@ -165,7 +165,7 @@ def test_training_and_local_http_parity(tiny_run, monkeypatch):
                             http_client=http) as official:
             result = official.system_one("state", {
                 "choice": OfficialChoice(criteria={"a": None, "b": None}),
-                "noul": OfficialNoul(),
+                "noul": OfficialNoul(instructions="Is the state valid?"),
                 "score": OfficialScore(criteria=[{"level": "low"}, {"level": "high"}]),
             })
             assert result.choices["choice"].choice in ("a", "b")

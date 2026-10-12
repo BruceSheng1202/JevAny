@@ -55,9 +55,10 @@ partitions listed together in one suite manifest; it does not compare separate
 conversion directories.</p>
 <p><code>options</code> can be a list or its Python-literal string representation.
 For named keys, use <code>choices: {"text": [...], "label": [...]}</code>.
-<code>answer</code> or <code>answerKey</code> resolves in this order: an exact option key, exact
+<code>answer</code> or <code>answerKey</code> resolves in this order: an exact option key, unambiguous
 option text, a letter (<code>A</code>, <code>B</code>, …), or a zero-based index. Missing answers,
-negative indices, duplicate keys and mismatched text/label arrays are rejected.
+negative indices, duplicate keys, ambiguous text answers and mismatched
+text/label arrays are rejected. For repeated option text, supply an explicit key.
 Omit <code>label</code> to generate index keys; an explicitly empty label array is invalid.
 <code>question</code> may also be an object with a <code>stem</code> string.</p>
 <p>Optional <code>hint</code>, <code>fact1</code>, <code>fact2</code> and <code>combinedfact</code> fields become evidence.
