@@ -3,271 +3,262 @@ window.FILM_DATA = {
  "provenance": {
   "cases": {
    "path": "docs/demos/case-showcase.json",
-   "sha256": "5f13a8615c62f515f1950d1373973c7715644f193ab79fbb62f2eb6ea775138b",
-   "checkpoint": "tianxinwei/JevAny-27B-SFT",
-   "scope": "Decision records for the 30-case overview. All current trial outcomes, supplied text states, candidate definitions, original probabilities and resulting states are included. Original observation images, full physics trajectories and historical task-version trials remain in the local recording library and are not bundled here. The 21 illustrative 3D replays are not the model input images; added display geometry was not used for collision checks. Nine cases use original interface recordings. These controlled examples are separate from the benchmark evaluations."
+   "sha256": "5f13a8615c62f515f1950d1373973c7715644f193ab79fbb62f2eb6ea775138b"
+  },
+  "playground": {
+   "path": "docs/demos/playground-format.json",
+   "sha256": "4035c48e142bf0f7cb69eebae6eb2e44f654029c0a89bada339c96387ebf26c1"
   },
   "traces": {
    "path": "docs/demos/jev-agent-harness-traces.json",
-   "sha256": "a3b37ce261a1741896caa9e7ba7513016c2bcf6b06c0adf340a653cd3f7c77d0",
-   "webshop_source": "runs/agent-harness/webshop-llm-candidates-supplement-v2.json",
-   "webshop_selection": "positive pair from the LLM-authored candidate supplement"
+   "sha256": "a3b37ce261a1741896caa9e7ba7513016c2bcf6b06c0adf340a653cd3f7c77d0"
+  },
+  "family": {
+   "path": "results/model-family-v2.json",
+   "sha256": "a49f03bd9371f1846d78a09682f000cba9f64004d8d5a222b3868f11ccb48d8c"
+  },
+  "latency": {
+   "path": "results/efficiency-h200-best-v1.json",
+   "sha256": "cce998b5c8998ea5e5041592c7ce998a1d6cf7cc9c98a82a7e2fe875c827422f"
+  },
+  "models": {
+   "path": "docs/supported-models.json",
+   "sha256": "f9f163d04cba2396f5d68601aa14280e6e7cdc0e3e75534ef2184cc718c81502"
+  },
+  "recipe": {
+   "path": "recipes/sft.toml",
+   "sha256": "a3d94b39ee90b939363d73ef8e9e06d7823706cd5d06463146d633e2e99fa7fc"
+  },
+  "rlcr": {
+   "path": "recipes/rlcr.toml",
+   "sha256": "399c8111c3ca8b9517c12a7d090a2188289094e6b5d6664bb17a9389c2bac447"
+  },
+  "train": {
+   "path": "examples/train.jsonl",
+   "sha256": "d9ea908fe14346bcc7e1150697b3fc188e99e6013a36f4dc003e95e9fbe6cf77"
   }
  },
- "crosswalk": {
-  "trial": "crosswalk/task-challenge-v6/seed-17",
-  "title": "Yield while the pedestrian moves",
-  "success": true,
-  "steps": [
-   {
-    "step": 1,
-    "action": "wait_long",
-    "label": "Hold for 5 seconds",
-    "probability": 0.300534,
-    "option_count": 7,
-    "feedback": "Pedestrian y=1.60 m; roadway clear=False.",
-    "shown": [
-     {
-      "action": "proceed",
-      "label": "Drive through",
-      "probability": 0.124167
-     },
-     {
-      "action": "approach",
-      "label": "Approach stop line",
-      "probability": 0.292144
-     },
-     {
-      "action": "yield",
-      "label": "Hold 1 s",
-      "probability": 0.217455
-     },
-     {
-      "action": "wait_long",
-      "label": "Hold 5 s",
-      "probability": 0.300534
-     }
-    ]
-   },
-   {
-    "step": 2,
-    "action": "wait_long",
-    "label": "Hold for 5 seconds",
-    "probability": 0.432541,
-    "option_count": 7,
-    "feedback": "Pedestrian y=2.25 m; roadway clear=True.",
-    "shown": [
-     {
-      "action": "proceed",
-      "label": "Drive through",
-      "probability": 0.033076
-     },
-     {
-      "action": "approach",
-      "label": "Approach stop line",
-      "probability": 0.053586
-     },
-     {
-      "action": "yield",
-      "label": "Hold 1 s",
-      "probability": 0.424983
-     },
-     {
-      "action": "wait_long",
-      "label": "Hold 5 s",
-      "probability": 0.432541
-     }
-    ]
-   },
-   {
-    "step": 3,
-    "action": "proceed",
-    "label": "Drive through crossing",
-    "probability": 0.753933,
-    "option_count": 7,
-    "feedback": "Action executed.",
-    "shown": [
-     {
-      "action": "proceed",
-      "label": "Drive through",
-      "probability": 0.753933
-     },
-     {
-      "action": "approach",
-      "label": "Approach stop line",
-      "probability": 0.135159
-     },
-     {
-      "action": "yield",
-      "label": "Hold 1 s",
-      "probability": 0.02519
-     },
-     {
-      "action": "wait_long",
-      "label": "Hold 5 s",
-      "probability": 0.009317
-     }
-    ]
-   }
-  ]
- },
- "montage": [
+ "wall": [
   {
-   "case": "peg_insertion",
-   "title": "Insert the peg",
-   "visual": "3D replay",
-   "success": true,
-   "first": {
-    "step": 1,
-    "action": "approach",
-    "label": "Approach peg",
-    "probability": 0.98684,
-    "option_count": 9,
-    "feedback": "Action executed."
-   }
+   "clip": "pg-arm",
+   "kind": "playground replay",
+   "title": "Robot peg insertion"
   },
   {
-   "case": "drone",
-   "title": "Deliver with an energy reserve",
-   "visual": "3D replay",
-   "success": true,
-   "first": {
-    "step": 1,
-    "action": "weather",
-    "label": "Read wind forecast",
-    "probability": 0.794091,
-    "option_count": 11,
-    "feedback": "Headwind-adjusted route energy and the pad service interval received."
-   }
+   "clip": "block_stacking",
+   "kind": "3D replay",
+   "title": "Stack the blocks"
   },
   {
-   "case": "lab",
-   "title": "Prepare a calibrated mixture",
-   "visual": "3D replay",
-   "success": true,
-   "first": {
-    "step": 1,
-    "action": "calibrate",
-    "label": "Calibrate dispenser",
-    "probability": 0.863946,
-    "option_count": 11,
-    "feedback": "Gravimetric check removed the initial +10% volumetric bias."
-   }
+   "clip": "frontend",
+   "kind": "Original interface recording",
+   "title": "Repair the checkout at three widths"
   },
   {
-   "case": "inbox",
-   "title": "Triage the complete threads",
-   "visual": "Original interface recording",
-   "success": true,
-   "first": {
-    "step": 1,
-    "action": "read_thread",
-    "label": "Read full thread",
-    "probability": 0.960393,
-    "option_count": 9,
-    "feedback": "Approved at 11:20; launch unblocked. No action remains."
-   }
+   "clip": "drawer_opening",
+   "kind": "3D replay",
+   "title": "Open the drawer"
   },
   {
-   "case": "sql",
-   "title": "Repair the revenue dashboard",
-   "visual": "Original interface recording",
-   "success": true,
-   "first": {
-    "step": 1,
-    "action": "exists",
-    "label": "Correlated EXISTS",
-    "probability": 0.731466,
-    "option_count": 11,
-    "feedback": "Candidate SQL executed; totals are [[\"North\", 80], [\"South\", 70], [\"West\", 90]]"
-   }
+   "clip": "research",
+   "kind": "Original interface recording",
+   "title": "Resolve conflicting documentation"
   },
   {
-   "case": "driving",
-   "title": "Yield, merge and stop safely",
-   "visual": "3D replay",
-   "success": true,
-   "first": {
-    "step": 1,
-    "action": "yield",
-    "label": "Wait at crossing",
-    "probability": 0.716077,
-    "option_count": 9,
-    "feedback": "Crosswalk is clear and signal is green; rear-lane traffic is independent."
-   }
+   "clip": "conveyor_sorting",
+   "kind": "3D replay",
+   "title": "Sort the parcel"
+  },
+  {
+   "clip": "sql",
+   "kind": "Original interface recording",
+   "title": "Repair the revenue dashboard"
+  },
+  {
+   "clip": "assembly",
+   "kind": "3D replay",
+   "title": "Commission the inspection rover"
+  },
+  {
+   "clip": "pg-doom",
+   "kind": "playground replay",
+   "title": "Doom corridor"
+  },
+  {
+   "clip": "inbox",
+   "kind": "Original interface recording",
+   "title": "Triage the complete threads"
+  },
+  {
+   "clip": "peg_insertion",
+   "kind": "3D replay",
+   "title": "Insert the peg"
+  },
+  {
+   "clip": "ci",
+   "kind": "Original interface recording",
+   "title": "Repair and execute the release bundle"
+  },
+  {
+   "clip": "control_panel",
+   "kind": "3D replay",
+   "title": "Commission the interlocked fixture"
+  },
+  {
+   "clip": "drone",
+   "kind": "3D replay",
+   "title": "Deliver with an energy reserve"
+  },
+  {
+   "clip": "calendar",
+   "kind": "Original interface recording",
+   "title": "Coordinate a conflict-free meeting"
+  },
+  {
+   "clip": "obstacle_push",
+   "kind": "3D replay",
+   "title": "Push a part around the fixture"
+  },
+  {
+   "clip": "pg-crafter",
+   "kind": "playground replay",
+   "title": "Crafter survival"
+  },
+  {
+   "clip": "lab",
+   "kind": "3D replay",
+   "title": "Prepare a calibrated mixture"
+  },
+  {
+   "clip": "spreadsheet",
+   "kind": "Original interface recording",
+   "title": "Reconcile the order revisions"
+  },
+  {
+   "clip": "driving",
+   "kind": "3D replay",
+   "title": "Yield, merge and stop safely"
+  },
+  {
+   "clip": "warehouse_rover",
+   "kind": "3D replay",
+   "title": "Navigate through the shelf aisles"
   }
  ],
- "webshop": {
-  "seed": 3107,
-  "goal": "Women's long-sleeve blazer, z-dark green, small, under $80",
-  "baseline": {
-   "reward": 1,
-   "steps": 9,
-   "llm_calls": 9,
-   "tokens": 38852,
-   "wall_time_seconds": 18.54,
-   "path": [
-    "search",
-    "open product",
-    "select color",
-    "select size",
-    "inspect features",
-    "repeat color and size",
-    "buy now"
-   ]
+ "checkpoints": [
+  {
+   "repository": "SimpleJev/JevAny-Qwen3.8-27B-LoRA",
+   "name": "Qwen3.8-27B",
+   "readout": "pointer",
+   "transfer": 0.860421,
+   "jevbench": 0.900433,
+   "nll": 0.3878,
+   "brier": 0.1952,
+   "ece": 0.0263
   },
-  "jev": {
-   "reward": 1,
-   "steps": 5,
-   "llm_calls": 4,
-   "tokens": 14256,
-   "wall_time_seconds": 7.83,
-   "path": [
-    {
-     "controller": "llm",
-     "action": "search"
-    },
-    {
-     "controller": "llm",
-     "action": "open matching product"
-    },
-    {
-     "controller": "jev",
-     "action": "click[z-dark green]",
-     "confidence": 1.0,
-     "action_is_valid": true
-    },
-    {
-     "controller": "jev",
-     "action": "click[small]",
-     "confidence": 1.0,
-     "action_is_valid": true
-    },
-    {
-     "controller": "llm",
-     "action": "click[buy now]"
-    }
-   ]
+  {
+   "repository": "SimpleJev/JevAny-Muse-Glimmer-30B-LoRA",
+   "name": "Muse-Glimmer-30B",
+   "readout": "pointer",
+   "transfer": 0.834608,
+   "jevbench": 0.874459,
+   "nll": 0.4641,
+   "brier": 0.2285,
+   "ece": 0.0318
   },
-  "groups": [
-   {
-    "subgoal": "Select z-dark green color",
-    "actions": [
-     "click[z-dark green]",
-     "click[z-army green]",
-     "click[z-khaki]"
-    ],
-    "selected": "click[z-dark green]"
-   },
-   {
-    "subgoal": "Select small size",
-    "actions": [
-     "click[x-small]",
-     "click[small]",
-     "click[medium]"
-    ],
-    "selected": "click[small]"
-   }
+  {
+   "repository": "SimpleJev/JevAny-Qwen3.5-4B-LoRA",
+   "name": "Qwen3.5-4B",
+   "readout": "pointer",
+   "transfer": 0.786807,
+   "jevbench": 0.800866,
+   "nll": 0.5869,
+   "brier": 0.2965,
+   "ece": 0.0348
+  },
+  {
+   "repository": "SimpleJev/JevAny-Qwen3.5-4B-Direct-Token-LoRA",
+   "name": "Qwen3.5-4B Direct-Token",
+   "readout": "direct-token",
+   "transfer": 0.782027,
+   "jevbench": 0.809524,
+   "nll": 0.5642,
+   "brier": 0.2908,
+   "ece": 0.0292
+  },
+  {
+   "repository": "SimpleJev/JevAny-Gemma-4B-LoRA",
+   "name": "Gemma-4B",
+   "readout": "pointer",
+   "transfer": 0.708413,
+   "jevbench": 0.774892,
+   "nll": 0.7064,
+   "brier": 0.3685,
+   "ece": 0.0564
+  }
+ ],
+ "training": {
+  "records": 1772725,
+  "decisions": 2180242,
+  "gpu_hours": 2082,
+  "max_gpus": 40,
+  "hardware": "NVIDIA H200"
+ },
+ "protocols": {
+  "transfer": 1046,
+  "jevbench": 231
+ },
+ "supported": {
+  "count": 26,
+  "families": [
+   "GLM",
+   "Gemma",
+   "Llama",
+   "Mistral",
+   "Muse",
+   "Nemotron",
+   "Qwen"
   ]
+ },
+ "recipe": {
+  "base": "Qwen/Qwen3.5-0.8B",
+  "data": "data/starter/train.jsonl",
+  "out": "runs/my-jev",
+  "device": "cuda",
+  "dtype": "bf16",
+  "lora": 16,
+  "epochs": 3,
+  "lr": 0.0002
+ },
+ "rlcr": {
+  "init_from": "runs/my-jev",
+  "rlcr": true,
+  "rlcr_group_size": 32,
+  "epochs": 1
+ },
+ "record": "{\"state\":{\"ticket\":\"The parcel is ten days late and the card was charged twice.\",\"customer_tier\":\"premium\"},\"questions\":{\"department\":{\"type\":\"choice\",\"instructions\":\"Which team should handle this first?\",\"criteria\":{\"billing\":\"Charges and payment problems\",\"shipping\":\"Delivery delays and lost parcels\",\"returns\":\"Returns and exchanges\"},\"label\":\"billing\"},\"urgent\":{\"type\":\"noul\",\"instructions\":\"Does this require human review within one hour?\",\"label\":true}}}",
+ "latency": {
+  "model": "JevAny-Qwen3.8-27B",
+  "hardware": "1 x NVIDIA H200",
+  "suite": "JevBench public",
+  "records": 231,
+  "before_ms": 113.54,
+  "after_ms": 30.53,
+  "speedup": 3.72,
+  "correct_before": 207,
+  "correct_after": 207,
+  "before_config": "BF16 merged LoRA + FLA + fused SDPA; CUDA graphs disabled",
+  "after_config": "same matched path; CUDA graphs enabled"
+ },
+ "webshop": {
+  "llm_calls": [
+   9,
+   4
+  ],
+  "reward": [
+   1,
+   1
+  ],
+  "selection": "positive pair from the LLM-authored candidate supplement"
  }
 };

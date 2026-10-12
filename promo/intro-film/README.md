@@ -1,8 +1,11 @@
 # JevAny intro film
 
-Source for the 90-second JevAny introduction video: a 1920x1080 master and a
+Source for the 90-second JevAny overview video: a 1920x1080 master and a
 1080x1350 (4:5) feed version, both at 30 fps with English narration, an
-original synthesized score and English captions.
+original synthesized score and English captions. A moving wall of the
+project's demo recordings opens the film under "Build your own decision
+models". Chapters follow for checkpoints, data, training, evaluation and
+deployment. The first cut (crosswalk opening) is in Git history at 817d2b5.
 
 Every frame is a pure function of its frame number. `film.html` loads
 `src/film.js`, which rebuilds the stage on `FILM.seek(frame)`. Headless
@@ -13,13 +16,15 @@ generous safe areas), but the film does not depend on the Remotion package.
 | Path | Contents |
 |---|---|
 | `film.html`, `src/film.css`, `src/film.js` | Scenes, layout for both aspect ratios, motion |
-| `src/data.js` | Decision records and run statistics shown on screen, generated from `docs/demos/` |
+| `src/data.js` | Facts, records and demo provenance shown on screen, generated from `docs/demos/`, `results/`, `recipes/` and `examples/` |
 | `audio/narration.json` | Narration lines, start times, voice and caption overrides |
 | `scripts/` | Data and clip extraction, TTS, score, mix, captions, render and finishing |
 
 Fonts come from `site/assets/fonts` (DM Sans and IBM Plex Sans Condensed, OFL)
-and the system URW Gothic used by the README title. Case footage comes from
-`site/assets/media`.
+and the system URW Gothic used by the README title. Demo footage comes from
+`site/assets/media` (case library) and `site/assets/media/docs` (playground
+replays); on-screen labels state that these are archived replays or interface
+recordings.
 
 ## Render
 
@@ -34,7 +39,7 @@ python3.12 -m venv "$WORK/venv"
 "$WORK/venv/bin/python" -m playwright install chromium
 PY="$WORK/venv/bin/python"; F=promo/intro-film/scripts
 
-$PY $F/extract_data.py                                   # refresh src/data.js from docs/demos
+$PY $F/extract_data.py                                   # refresh src/data.js from repository evidence
 $PY $F/extract_clips.py "$FFMPEG" "$WORK/clips"         # cropped JPEG frames from site/assets/media
 HF_HOME="$WORK/hf" $PY $F/tts.py "$WORK/vo"            # Kokoro-82M narration + timing.json
 $PY $F/score.py "$WORK/music.wav"

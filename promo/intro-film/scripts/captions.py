@@ -16,36 +16,40 @@ MAX_LINE = 42
 
 
 def wrapped(text: str) -> list[str]:
-    lines = textwrap.wrap(text, MAX_LINE)
-    if len(lines) > 2 and ", " in text:
-        # Prefer one clause per line when both clauses fit a slightly longer line.
-        head, tail = text.split(", ", 1)
-        if len(head) + 1 <= MAX_LINE + 4 and len(tail) <= MAX_LINE + 4:
-            return [head + ",", tail]
-    return lines
+    """Wrap to one line, or two balanced lines when that fits; else greedy lines."""
+    if len(text) <= MAX_LINE:
+        return [text]
+    words = text.split()
+    options = []
+    for i in range(1, len(words)):
+        a, b = " ".join(words[:i]), " ".join(words[i:])
+        if len(a) <= MAX_LINE and len(b) <= MAX_LINE:
+            options.append((abs(len(a) - len(b)) - (8 if a[-1] in ",:;" else 0), [a, b]))
+    return min(options)[1] if options else textwrap.wrap(text, MAX_LINE)
+
+
+def split_balanced(text: str) -> list[str]:
+    """Split text into the fewest cues of at most two lines, preferring clause breaks."""
+    if len(wrapped(text)) <= 2:
+        return [text]
+    words = text.split()
+    best = None
+    for i in range(1, len(words)):
+        head, tail = " ".join(words[:i]), " ".join(words[i:])
+        # Prefer breaks after punctuation, then before conjunctions; penalise imbalance.
+        bonus = 0 if head[-1] in ",:;" else 12 if words[i] in ("and", "or", "so", "with", "through", "for") else 30
+        cost = abs(len(head) - len(tail)) + bonus
+        if best is None or cost < best[0]:
+            best = (cost, head, tail)
+    return split_balanced(best[1]) + split_balanced(best[2])
 
 
 def chunks(text: str) -> list[str]:
     """Split narration into cues that wrap to at most two lines."""
     out = []
     for sentence in re.split(r"(?<=[.?!])\s+", text):
-        if len(wrapped(sentence)) <= 2:
-            out.append(sentence)
-            continue
-        cur = ""
-        for clause in re.split(r"(?<=,)\s+", sentence):
-            trial = f"{cur} {clause}".strip()
-            if cur and len(wrapped(trial)) > 2:
-                out.append(cur)
-                cur = clause
-            else:
-                cur = trial
-        out.append(cur)
-    final = []
-    for cue in out:
-        lines = wrapped(cue)
-        final.extend(" ".join(lines[i:i + 2]) for i in range(0, len(lines), 2))
-    return final
+        out.extend(split_balanced(sentence))
+    return out
 
 
 def stamp(t: float, sep: str) -> str:

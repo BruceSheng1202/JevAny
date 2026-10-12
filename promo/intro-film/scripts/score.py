@@ -2,7 +2,7 @@
 
 Usage: python scripts/score.py OUT.wav
 Deterministic (fixed seeds); no samples or third-party recordings. 120 BPM in
-A minor. Cue times match the scene boundaries in src/film.js.
+A minor. Cue times match the chapter boundaries in src/film.js.
 """
 
 import sys
@@ -106,36 +106,27 @@ def main() -> None:
     out = sys.argv[1]
     pads, plucks, drums, bass, fx = (np.zeros(N) for _ in range(5))
 
-    # Hook: drone, clock ticks, choice pings, state-change whoosh, riser into the title.
-    drone_t = np.arange(int(10.4 * SR)) / SR
-    drone = (np.sin(2 * np.pi * 55 * drone_t) + 0.4 * np.sin(2 * np.pi * 110.3 * drone_t)) * np.minimum(1, drone_t / 1.2) * np.minimum(1, (10.4 - drone_t) / 0.4)
-    place(pads, lp(drone, 500) * 0.55, 0)
-    for i in range(20):
-        place(drums, hat(0.03), i * BEAT, 0.35 + 0.25 * (i % 2 == 0))
-    place(fx, riser(4.3), 1.2, 0.5)
-    place(plucks, pluck(hz(76), 1.2, 3.5) + pluck(hz(81), 1.2, 3.5), 4.35, 0.45)
-    place(fx, riser(0.55)[::-1].copy(), 5.05, 0.6)
-    place(drums, kick(), 5.6, 0.7)
-    place(plucks, pluck(hz(83), 1.4, 3.0) + pluck(hz(88), 1.4, 3.0), 6.7, 0.5)
-    for i in range(4):
-        place(drums, kick(), 8.0 + i * BEAT, 0.35 + 0.1 * i)
+    # Hook: the wall reveal lands on an impact; the groove starts at once.
+    place(fx, impact(), 0.0, 0.7)
     place(fx, riser(2.0), 8.0, 0.8)
-    place(fx, impact(), 10.0, 1.0)
+    place(fx, impact(), 10.0, 0.85)
 
-    # Body: chord progression, one chord per bar of 2 s.
+    # Chord progression, one chord per 2 s bar from 0 s. Section starts match the
+    # chapter boundaries in src/film.js.
     sections = [  # (start, end, kick pattern, hats, arp, bass, brightness)
-        (10.0, 24.5, "half", False, True, False, 0.35),
-        (24.5, 39.0, "half", True, True, True, 0.4),
-        (39.0, 47.0, "four", True, True, True, 0.55),
-        (47.0, 56.0, "four", True, True, True, 0.45),
-        (56.0, 64.5, "none", False, True, True, 0.4),
-        (64.5, 72.0, "four", True, True, True, 0.6),
-        (72.0, 76.5, "none", False, False, False, 0.3),
+        (0.0, 10.0, "four", True, True, True, 0.5),
+        (10.0, 17.0, "half", False, True, False, 0.35),
+        (17.0, 27.0, "half", True, True, True, 0.4),
+        (27.0, 36.0, "four", True, True, True, 0.45),
+        (36.0, 49.0, "four", True, True, True, 0.55),
+        (49.0, 63.0, "four", True, True, True, 0.5),
+        (63.0, 75.0, "four", True, True, True, 0.6),
+        (75.0, 80.5, "none", False, True, False, 0.35),
     ]
     for start, end, kicks, hats, arp, has_bass, bright in sections:
         t = start
         while t < end - 1e-6:
-            bar = int(round((t - 10.0) / 2.0))
+            bar = int(round(t / 2.0))
             name = PROG[bar % 4]
             length = min(2.0, end - t)
             chord = sum(pad_voice(hz(m), length + 0.6, bright) for m in CHORDS[name]) * env_ar(int((length + 0.6) * SR), 0.25, 0.6)
@@ -155,19 +146,18 @@ def main() -> None:
                 for s in range(int(round(length / (BEAT / 2)))):
                     place(plucks, pluck(hz(notes[(s * 3 + bar) % len(notes)] + 12), 0.5, 7.5), t + s * BEAT / 2, 0.11)
             t += 2.0
-    place(fx, riser(2.0), 62.5, 0.55)
-    place(fx, riser(1.5), 75.0, 0.6)
+    place(fx, riser(1.8), 78.7, 0.6)
 
     # Finale: impact, wide chords, long resolve to A minor.
-    place(fx, impact(), 76.5, 0.9)
-    for i, (name, at, length) in enumerate((("Am9", 76.5, 4.0), ("F", 80.5, 4.0), ("C", 84.5, 2.0), ("Am", 86.5, 3.4))):
+    place(fx, impact(), 80.5, 0.9)
+    for i, (name, at, length) in enumerate((("Am9", 80.5, 2.0), ("F", 82.5, 2.0), ("C", 84.5, 2.0), ("Am", 86.5, 3.4))):
         chord = sum(pad_voice(hz(m), length + 0.4, 0.45) for m in CHORDS[name]) * env_ar(int((length + 0.4) * SR), 0.3, 0.8 if i < 3 else 3.0)
         place(pads, chord, at, 0.36)
         for s in range(int(length / (BEAT / 2))):
             notes = CHORDS[name] + [CHORDS[name][2] + 12]
             place(plucks, pluck(hz(notes[(s * 2 + i) % len(notes)] + 12), 0.5, 7.0), at + s * BEAT / 2, 0.09 * (1 - s / (length / (BEAT / 2))) if i == 3 else 0.09)
     for i in range(16):
-        place(drums, kick(), 76.5 + i * BEAT, 0.42 if i % 2 == 0 else 0.0)
+        place(drums, kick(), 80.5 + i * BEAT, 0.42 if i % 2 == 0 and i < 14 else 0.0)
 
     ir_l, ir_r = reverb_ir()
     wet_src = pads * 0.6 + plucks + fx * 0.5

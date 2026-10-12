@@ -1,7 +1,7 @@
 """Extract cropped JPEG frames from the repository's case recordings.
 
 Usage: python scripts/extract_clips.py FFMPEG OUT_DIR
-The recordings place the replay or interface viewport at x=360..1260,
+Case recordings place the replay or interface viewport at x=360..1260,
 y=128..574 of a 1280x720 frame. Frames stay at the source 20 fps; the film
 blends neighbouring frames when it plays them slower.
 """
@@ -14,15 +14,15 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]
 MEDIA = REPO / "site/assets/media"
 VIEWPORT = "crop=900:446:360:128"
-CLIPS = {
-    "crosswalk": ("crosswalk.mp4", f"{VIEWPORT},scale=1800:892:flags=lanczos,unsharp=5:5:0.6"),
-    "peg_insertion": ("peg_insertion.mp4", VIEWPORT),
-    "drone": ("drone.mp4", VIEWPORT),
-    "lab": ("lab.mp4", VIEWPORT),
-    "inbox": ("inbox.mp4", VIEWPORT),
-    "sql": ("sql.mp4", VIEWPORT),
-    "driving": ("driving.mp4", VIEWPORT),
-}
+# Playground recordings (1120x900) place the scene at x=16..816, y=76..616.
+PLAYGROUND = "crop=800:540:16:76"
+WALL = ",scale=450:-2:flags=lanczos"
+CASES = ["peg_insertion", "block_stacking", "drawer_opening", "conveyor_sorting", "assembly", "control_panel", "obstacle_push",
+         "frontend", "research", "sql", "ci", "inbox", "calendar", "spreadsheet", "drone", "lab", "driving", "warehouse_rover"]
+# Wall tiles are half-size crops; "arm-hd" is the full-size playground replay for the agent-loop scene.
+CLIPS = {name: (f"{name}.mp4", VIEWPORT + WALL) for name in CASES}
+CLIPS.update({f"pg-{name}": (f"docs/playground-{name}.mp4", PLAYGROUND + WALL) for name in ("arm", "doom", "crafter")})
+CLIPS["arm-hd"] = ("docs/playground-arm.mp4", PLAYGROUND)
 
 
 def main() -> None:

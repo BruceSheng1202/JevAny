@@ -5,81 +5,57 @@
   "lines": [
     {
       "id": "hook-1",
-      "start": 0.45,
-      "text": "A pedestrian is still in the road."
+      "start": 0.4,
+      "text": "Build your own decision models with JevAny."
     },
     {
       "id": "hook-2",
-      "start": 2.35,
-      "text": "What should the car do?"
+      "start": 3.3,
+      "text": "We provide open checkpoints and the infrastructure for research, training, and deployment."
     },
     {
-      "id": "hook-3",
-      "start": 4.15,
-      "text": "The model holds."
+      "id": "map",
+      "start": 10.4,
+      "text": "Start from a released checkpoint or one of 26 supported open models, and keep every step in one repository."
     },
     {
-      "id": "hook-4",
-      "start": 6.05,
-      "text": "The road clears, and now it drives."
+      "id": "checkpoints",
+      "start": 17.6,
+      "text": "Five checkpoints, from 4 B to 30 B, come with benchmark results. Serve one, or fine-tune from it."
     },
     {
-      "id": "title",
-      "start": 10.5,
-      "text": "That's a System 1 decision model. JevAny is open infrastructure to train and deploy them."
-    },
-    {
-      "id": "why",
-      "start": 16.4,
-      "text": "Agents often write paragraphs of reasoning to choose from a short list. A decision model reads the state and picks, with probabilities you can check."
-    },
-    {
-      "id": "api-1",
-      "start": 25.0,
-      "text": "Send one request with a state, a question and the candidate options."
-    },
-    {
-      "id": "api-2",
-      "start": 29.6,
-      "text": "You get back a choice and its probabilities, ready for your application to use."
-    },
-    {
-      "id": "api-3",
-      "start": 35.3,
-      "text": "Depending on the backbone, the state can include images or video."
-    },
-    {
-      "id": "range",
-      "start": 39.4,
-      "text": "The same call can route a ticket, pick a tool, or choose a robot's next move."
+      "id": "data",
+      "start": 27.4,
+      "text": "Write your own decisions as JSON lines: a state, the questions and their labels, with text, images or video."
     },
     {
       "id": "train",
-      "start": 47.6,
-      "text": "Start from a released checkpoint, or fine-tune a supported open model on your own decisions. Then evaluate it and serve it."
+      "start": 36.4,
+      "text": "Train from a recipe file, on one GPU or many with the same recipe. Choose a pointer or direct-token head, or continue with experimental RLCR for calibrated probabilities."
+    },
+    {
+      "id": "evaluate",
+      "start": 49.4,
+      "text": "Evaluate on held-out data, with accuracy and calibration side by side. Runs save their recipe, optimizer and data order, so you can resume and compare training paradigms."
+    },
+    {
+      "id": "deploy",
+      "start": 63.4,
+      "text": "Serve the checkpoint you trained behind one API. Your applications get choices and probabilities through HTTP or the Python client."
     },
     {
       "id": "loop",
-      "start": 56.6,
-      "text": "Inside an agent loop, the LLM still plans and recovers. It hands Jev the repeated choices between a few valid options."
-    },
-    {
-      "id": "webshop",
-      "start": 64.7,
-      "text": "In one paired WebShop run, Jev picked the color and the size. Same purchase, with four LLM calls instead of nine."
-    },
-    {
-      "id": "vary",
-      "start": 72.4,
-      "text": "Results vary by task, so measure before you delegate."
+      "start": 76.0,
+      "text": "In agent loops, the LLM plans and Jev takes the repeated choices."
     },
     {
       "id": "cta",
-      "start": 77.4,
+      "start": 81.4,
       "text": "JevAny is open source under Apache 2.0. Find it on GitHub, at SimpleJev slash JevAny."
     }
   ],
   "captions": {
+    "checkpoints": "Five checkpoints, from 4B to 30B, come with benchmark results. Serve one, or fine-tune from it.",
     "cta": "JevAny is open source under Apache 2.0. Find it on GitHub: SimpleJev/JevAny."
   }
 }
