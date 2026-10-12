@@ -53,6 +53,8 @@ def answer_key(answer, keys: list[str], choices: list[str]) -> str:
     if answer in keys:
         return answer
     if answer in choices:
+        if choices.count(answer) > 1:
+            raise ValueError(f"answer text {answer!r} matches multiple options; use an explicit option key")
         return keys[choices.index(answer)]
     if len(answer) == 1 and answer.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
         index = ord(answer.upper()) - ord("A")
