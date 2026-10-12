@@ -1,0 +1,85 @@
+{
+  "voice": "af_heart",
+  "speed": 1.04,
+  "sample_rate": 24000,
+  "lines": [
+    {
+      "id": "hook-1",
+      "start": 0.45,
+      "text": "A pedestrian is still in the road."
+    },
+    {
+      "id": "hook-2",
+      "start": 2.35,
+      "text": "What should the car do?"
+    },
+    {
+      "id": "hook-3",
+      "start": 4.15,
+      "text": "The model holds."
+    },
+    {
+      "id": "hook-4",
+      "start": 6.05,
+      "text": "The road clears, and now it drives."
+    },
+    {
+      "id": "title",
+      "start": 10.5,
+      "text": "That's a System 1 decision model. JevAny is open infrastructure to train and deploy them."
+    },
+    {
+      "id": "why",
+      "start": 16.4,
+      "text": "Agents often write paragraphs of reasoning to choose from a short list. A decision model reads the state and picks, with probabilities you can check."
+    },
+    {
+      "id": "api-1",
+      "start": 25.0,
+      "text": "Send one request with a state, a question and the candidate options."
+    },
+    {
+      "id": "api-2",
+      "start": 29.6,
+      "text": "You get back a choice and its probabilities, ready for your application to use."
+    },
+    {
+      "id": "api-3",
+      "start": 35.3,
+      "text": "Depending on the backbone, the state can include images or video."
+    },
+    {
+      "id": "range",
+      "start": 39.4,
+      "text": "The same call can route a ticket, pick a tool, or choose a robot's next move."
+    },
+    {
+      "id": "train",
+      "start": 47.6,
+      "text": "Start from a released checkpoint, or fine-tune a supported open model on your own decisions. Then evaluate it and serve it."
+    },
+    {
+      "id": "loop",
+      "start": 56.6,
+      "text": "Inside an agent loop, the LLM still plans and recovers. It hands Jev the repeated choices between a few valid options."
+    },
+    {
+      "id": "webshop",
+      "start": 64.7,
+      "text": "In one paired WebShop run, Jev picked the color and the size. Same purchase, with four LLM calls instead of nine."
+    },
+    {
+      "id": "vary",
+      "start": 72.4,
+      "text": "Results vary by task, so measure before you delegate."
+    },
+    {
+      "id": "cta",
+      "start": 77.4,
+      "text": "JevAny is open source under Apache 2.0. Find it on GitHub, at SimpleJev slash JevAny."
+    }
+  ],
+  "captions": {
+    "cta": "JevAny is open source under Apache 2.0. Find it on GitHub: SimpleJev/JevAny."
+  }
+}
