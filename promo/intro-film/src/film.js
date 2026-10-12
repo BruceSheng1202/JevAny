@@ -198,10 +198,19 @@
       <div class="layer" style="background:radial-gradient(ellipse ${FEED ? "85% 55%" : "62% 58%"} at 50% 48%, rgba(6,10,12,${(0.55 + 0.3 * (1 - level)).toFixed(3)}), rgba(6,10,12,${(0.25 + 0.55 * (1 - level)).toFixed(3)}))"></div>`;
   }
 
+  // Extra dimming under the hook copy; it fades as the chapters' own dimming takes over.
+  function hookDim(t) {
+    if (t >= 10.2) return "";
+    const a = (0.4 * k(t, 0.25, 1.3, INOUT) + 0.22 * k(t, 3.3, 4.4, INOUT)) * (1 - k(t, 9.6, 10.2, INOUT));
+    return `<div class="layer" style="background:radial-gradient(ellipse ${FEED ? "90% 60%" : "70% 62%"} at 50% 50%, rgba(4,7,9,${Math.min(0.92, a * 1.25).toFixed(3)}), rgba(4,7,9,${(a * 0.75).toFixed(3)}))"></div>`;
+  }
+
   // Wall strength over the film: bright under the hook and close, dim behind chapters.
   function wallLevel(t) {
-    if (t < 9.6) return 1;
-    if (t < 17) return lerp(1, 0.42, k(t, 9.6, 10.6, INOUT));
+    // Under the hook: dim with the headline (0.25-1.3 s), then with the chips (3.3-4.4 s).
+    const hook = 1 - 0.38 * k(t, 0.25, 1.3, INOUT) - 0.2 * k(t, 3.3, 4.4, INOUT);
+    if (t < 9.6) return hook;
+    if (t < 17) return lerp(hook, 0.42, k(t, 9.6, 10.6, INOUT));
     if (t < 80.2) return lerp(0.42, 0.14, k(t, 16.6, 17.6, INOUT));
     return lerp(0.14, 0.75, k(t, 80.2, 81.6, INOUT));
   }
@@ -277,7 +286,8 @@
 
   // ---------- 0-10 s: hook ----------
   function hook(t) {
-    let html = `<div class="abs" style="left:${HX}px;top:${FEED ? 70 : 56}px;display:flex;align-items:center;gap:18px;${rv(t, -0.2, 0.6, 10, 4)}">
+    let html = `<div class="abs" style="left:${HX - 14}px;top:${FEED ? 58 : 44}px;display:flex;align-items:center;gap:18px;padding:12px 26px 12px 12px;
+      border-radius:22px;border:1.5px solid rgba(168,240,200,.42);background:rgba(6,10,12,.82);box-shadow:0 10px 40px rgba(0,0,0,.55);${rv(t, -0.2, 0.6, 10, 4)}">
       ${logo(FEED ? 60 : 56, -0.6, t, 0.6)}${wordmark(FEED ? 50 : 46)}</div>`;
     const y1 = FEED ? 380 : 300;
     const size = FEED ? 124 : 150;
@@ -594,7 +604,7 @@
     }
     // Hook: start tight on the first wall tile, then pull back to reveal the wall.
     const zoom = lerp(2.7, FEED ? 1.08 : 1.0, k(t, 0, 2.0, bezier(0.7, 0, 0.2, 1))) * (1 + 0.04 * clamp((t - 2) / 88));
-    return background(t, 0.12) + wall(t, wallLevel(t), zoom) + html + stationRail(t) + SWEEPS.map((s) => sweep(t, s)).join("") + grain(frame);
+    return background(t, 0.12) + wall(t, wallLevel(t), zoom) + hookDim(t) + html + stationRail(t) + SWEEPS.map((s) => sweep(t, s)).join("") + grain(frame);
   }
   // ---------- clip frame cache ----------
   const cache = new Map();
