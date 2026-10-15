@@ -15,7 +15,8 @@ Capture makes the attention-mask decisions of eager inference (``_eager_mask_dec
 ``is_causal`` path (FlashAttention) inside the graphs instead of reading a materialised causal mask.
 
 Results are not bit-identical to the eager path: padded shapes select different kernels. Replays reuse static
-buffers, so calls must not overlap; ``DecisionRuntime`` already serializes inference under its lock.
+buffers, so calls must not overlap; ``DecisionRuntime`` serializes inference under its lock (``model_lock`` when
+request batching is enabled). Batched requests always run the eager path.
 """
 import contextlib
 import threading
