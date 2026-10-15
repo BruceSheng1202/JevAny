@@ -1,0 +1,61 @@
+{
+  "voice": "af_heart",
+  "speed": 1.04,
+  "sample_rate": 24000,
+  "lines": [
+    {
+      "id": "hook-1",
+      "start": 0.4,
+      "text": "Build your own decision models with JevAny."
+    },
+    {
+      "id": "hook-2",
+      "start": 3.3,
+      "text": "We provide open checkpoints and the infrastructure for research, training, and deployment."
+    },
+    {
+      "id": "map",
+      "start": 10.4,
+      "text": "Start from a released checkpoint or one of 26 supported open models, and keep every step in one repository."
+    },
+    {
+      "id": "checkpoints",
+      "start": 17.6,
+      "text": "Five checkpoints, from 4 B to 30 B, come with benchmark results. Serve one, or fine-tune from it."
+    },
+    {
+      "id": "data",
+      "start": 27.4,
+      "text": "Write your own decisions as JSON lines: a state, the questions and their labels, with text, images or video."
+    },
+    {
+      "id": "train",
+      "start": 36.4,
+      "text": "Train from a recipe file, on one GPU or many with the same recipe. Choose a pointer or direct-token head, or continue with experimental RLCR for calibrated probabilities."
+    },
+    {
+      "id": "evaluate",
+      "start": 49.4,
+      "text": "Evaluate on held-out data, with accuracy and calibration side by side. Runs save their recipe, optimizer and data order, so you can resume and compare training paradigms."
+    },
+    {
+      "id": "deploy",
+      "start": 63.4,
+      "text": "Serve the checkpoint you trained behind one API. Your applications get choices and probabilities through HTTP or the Python client."
+    },
+    {
+      "id": "loop",
+      "start": 76.0,
+      "text": "In agent loops, the LLM plans and Jev takes the repeated choices."
+    },
+    {
+      "id": "cta",
+      "start": 81.4,
+      "text": "JevAny is open source under Apache 2.0. Find it on GitHub, at SimpleJev slash JevAny."
+    }
+  ],
+  "captions": {
+    "checkpoints": "Five checkpoints, from 4B to 30B, come with benchmark results. Serve one, or fine-tune from it.",
+    "cta": "JevAny is open source under Apache 2.0. Find it on GitHub: SimpleJev/JevAny."
+  }
+}

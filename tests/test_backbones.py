@@ -7,9 +7,9 @@ from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
 from transformers import (
-    AutoModelForCausalLM, Gemma4TextConfig, Glm4MoeLiteConfig, GPT2Config,
-    LlamaConfig, MistralConfig, NemotronHConfig, Qwen3_5MoeTextConfig,
-    PreTrainedTokenizerFast, Qwen3_5TextConfig,
+    AutoModelForCausalLM, Gemma4TextConfig, Glm4MoeConfig, Glm4MoeLiteConfig, GPT2Config,
+    LlamaConfig, Llama4TextConfig, MistralConfig, NemotronHConfig, Qwen3_5MoeTextConfig,
+    PreTrainedTokenizerFast, Qwen3_5TextConfig, Qwen3NextConfig,
 )
 
 from jevany.backbones import DECISION_TOKENS, LEGACY_TOKENS, decision_tokens, prepare_tokenizer
@@ -77,6 +77,20 @@ def make_base(path, family, *, legacy=False):
         ),
         "gpt2": lambda: GPT2Config(vocab_size=len(tokenizer), n_embd=32, n_layer=2, n_head=4,
                                    n_positions=512, pad_token_id=1, eos_token_id=2, bos_token_id=2),
+        # MoE layers with dense or shared-expert nn.Linear MLPs that PEFT would remap.
+        "qwen3_next": lambda: Qwen3NextConfig(
+            **common, head_dim=8, layer_types=["linear_attention", "full_attention"],
+            linear_num_key_heads=2, linear_num_value_heads=2, linear_key_head_dim=8, linear_value_head_dim=8,
+            num_experts=4, num_experts_per_tok=2, moe_intermediate_size=16, shared_expert_intermediate_size=32,
+        ),
+        "glm4_moe": lambda: Glm4MoeConfig(
+            **{**common, "num_key_value_heads": 4}, head_dim=8, moe_intermediate_size=16,
+            n_routed_experts=4, num_experts_per_tok=2, n_shared_experts=1, first_k_dense_replace=1,
+            n_group=1, topk_group=1,
+        ),
+        "llama4": lambda: Llama4TextConfig(
+            **common, head_dim=8, intermediate_size_mlp=64, num_local_experts=4, num_experts_per_tok=1,
+        ),
     }
     model = AutoModelForCausalLM.from_config(configurations[family]())
     model.save_pretrained(path)
@@ -95,6 +109,9 @@ def test_text_causal_lm_direct_token_preserves_vocabulary_head(tmp_path):
     tokenizer = load_tokenizer(base)
     model = DecisionModel(base, tokenizer, "cpu", lora=2, decision_mode="lm_token",
                           verbalizers=["yes", "no"])
+    assert model._verbalizer_index.device == model.lm_head.weight.device
+    assert model._verbalizer_index.tolist() == model.verbalizer_ids
+    assert "_verbalizer_index" not in model.state_dict()
     encoded = model.encode(tokenizer, RECORD)
     model.train()
     logits = model(encoded)
@@ -171,6 +188,80 @@ def test_train_tokens_lora_isolation_cache_and_reload(tmp_path, family):
         torch.testing.assert_close(left, right, atol=2e-6, rtol=1e-5)
 
 
+@pytest.mark.parametrize("saved_dtype", ["fp32", "bf16"])
+@pytest.mark.parametrize("requested_dtype", [None, "fp32", "fp16", "bf16"])
+@pytest.mark.parametrize("merge_bf16", [False, True])
+def test_checkpoint_explicit_dtype_preserves_merge_policy(tmp_path, saved_dtype, requested_dtype, merge_bf16):
+    from jevany import JevModel
+    from jevany.checkpoint import LoadOptions
+
+    dtypes = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
+    base = tmp_path / "base"
+    make_base(base, "llama", legacy=True)
+    tokenizer = load_tokenizer(base)
+    model = DecisionModel(base, tokenizer, "cpu", lora=2, head_dim=8, dtype=dtypes[saved_dtype])
+    checkpoint = tmp_path / "checkpoint"
+    model.lm.save_pretrained(checkpoint, save_embedding_layers=False)
+    tokenizer.save_pretrained(checkpoint)
+    write_meta(checkpoint, Meta(base=str(base), head=model.head.state_dict(), lora=2, head_dim=8,
+                               weights_dtype=saved_dtype, tokenizer_saved=True))
+
+    local = JevModel.from_pretrained(checkpoint, device="cpu", dtype=requested_dtype,
+                                    options=LoadOptions(merge_bf16=merge_bf16))
+    restored = local.runtime.model
+    assert restored.lm.get_input_embeddings().weight.dtype == dtypes[requested_dtype or saved_dtype]
+    assert restored.inference_acceleration["lora_merged"] == (saved_dtype == "fp32" or merge_bf16)
+    probabilities = restored.probs(restored.encode(local.runtime.tok, RECORD))
+    assert all(torch.isfinite(p).all() for p in probabilities)
+    if requested_dtype is None:
+        explicit = JevModel.from_pretrained(checkpoint, device="cpu", dtype=saved_dtype,
+                                           options=LoadOptions(merge_bf16=merge_bf16))
+        expected = explicit.runtime.model.probs(explicit.runtime.model.encode(explicit.runtime.tok, RECORD))
+        for left, right in zip(probabilities, expected):
+            torch.testing.assert_close(left, right, atol=0, rtol=0)
+
+
+@pytest.mark.parametrize("family,branch_mode", [
+    ("llama", "packed"), ("llama", "rows"), ("mistral", "rows"),
+    ("qwen35", "rows"), ("gemma", "rows"), ("qwen35_moe", "rows"),
+    ("gpt2", "rows"), ("glm", "rows"), ("nemotron", "rows"),
+])
+def test_ordinary_scoring_disables_cache_without_changing_logits(tmp_path, family, branch_mode):
+    base = tmp_path / "base"
+    make_base(base, family)
+    tokenizer = load_tokenizer(base)
+    model = DecisionModel(base, tokenizer, "cpu", lora=2, head_dim=8, branch_mode=branch_mode).eval()
+    model.lm.config.use_cache = True
+    encoded = model.encode(tokenizer, RECORD)
+
+    # Reproduce the old forward call, which inherited the backbone's cache default.
+    def inherited_cache(module, args, kwargs):
+        kwargs.pop("use_cache", None)
+        return args, kwargs
+
+    handle = model.lm.register_forward_pre_hook(inherited_cache, with_kwargs=True)
+    try:
+        with torch.no_grad():
+            expected = model(encoded)
+    finally:
+        handle.remove()
+
+    calls = []
+    def inspect_cache(module, args, kwargs, output):
+        calls.append(kwargs.get("use_cache"))
+        assert getattr(output, "past_key_values", None) is None
+
+    handle = model.lm.register_forward_hook(inspect_cache, with_kwargs=True)
+    try:
+        with torch.no_grad():
+            actual = model(encoded)
+    finally:
+        handle.remove()
+    assert calls == [False]
+    for left, right in zip(actual, expected):
+        torch.testing.assert_close(left, right, atol=2e-6, rtol=1e-5)
+
+
 @pytest.mark.parametrize("family,preset", [
     ("glm", "all"), ("glm", "dense"), ("glm", "attn"),
     ("nemotron", "all"), ("nemotron", "dense"), ("nemotron", "attn"),
@@ -206,6 +297,38 @@ def test_moe_lora_projection_coverage(tmp_path, family, preset, attn):
             DecisionModel(base, tokenizer, "cpu", lora=2, lora_targets="qv")
     with pytest.raises(ValueError, match="does not support packed"):
         DecisionModel(base, tokenizer, "cpu", lora=2, branch_mode="packed")
+
+
+@pytest.mark.parametrize("family", ["qwen3_next", "glm4_moe", "llama4"])
+def test_moe_linear_layers_peft_would_remap_stay_frozen(tmp_path, family):
+    torch.manual_seed(17)
+    base = tmp_path / "base"
+    make_base(base, family)
+    tokenizer = load_tokenizer(base)
+    model = DecisionModel(base, tokenizer, "cpu", lora=2, head_dim=8)
+    model.lm.config.use_cache = False
+    config = model.lm.peft_config["default"]
+    assert not config.target_parameters
+    leaves = {name.rsplit(".", 1)[-1] for name in config.target_modules}
+    assert {"q_proj", "o_proj"} <= leaves
+    assert "router" not in leaves
+    remapped = {"gate_proj", "up_proj", "down_proj"}
+    if family == "llama4":
+        assert remapped <= leaves
+    else:
+        assert not leaves & remapped
+    encoded = model.encode(tokenizer, RECORD)
+    loss = sum(value.sum() for value in model(encoded))
+    loss.backward()
+    for name, parameter in model.named_parameters():
+        if "lora_B" in name:
+            assert parameter.grad is not None and parameter.grad.abs().sum() > 0, name
+    model.eval()
+    changed = {**RECORD, "questions": [RECORD["questions"][0], {"instr": "choose", "options": ["b", "a"], "label": 0}]}
+    torch.testing.assert_close(model.probs(encoded)[0], model.probs(model.encode(tokenizer, changed))[0])
+    with pytest.raises(ValueError, match="incompatible.*LoRA"):
+        DecisionModel(base, tokenizer, "cpu", lora=2,
+                      lora_target_modules="q_proj,router" if family == "llama4" else "q_proj,down_proj")
 
 
 def test_legacy_tokens_and_checkpoint_stay_compatible(tmp_path):

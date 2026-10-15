@@ -27,17 +27,17 @@ def single_thread():
     torch.set_num_threads(previous)
 
 
-def make_checkpoint(root, family="llama", adapter="auto"):
+def make_checkpoint(root, family="llama", adapter="auto", legacy=False):
     torch.manual_seed(43)
     base, checkpoint = root / "base", root / "checkpoint"
-    make_base(base, family)
+    make_base(base, family, legacy=legacy)
     tokenizer = load_tokenizer(base)
     model = DecisionModel(base, tokenizer, "cpu", lora=2, head_dim=8, backbone_adapter=adapter)
     model.lm.save_pretrained(checkpoint, save_embedding_layers=False)
     tokenizer.save_pretrained(checkpoint)
     write_meta(checkpoint, Meta(
         base=str(base), head=model.head.state_dict(), lora=2, head_dim=8,
-        special_embeddings=True, tokenizer_saved=True,
+        special_embeddings=model.special_embeddings, tokenizer_saved=True,
         backbone_adapter=adapter, branch_mode=model.branch_mode,
     ))
     return checkpoint
@@ -110,6 +110,10 @@ def test_checkpoint_python_http_and_prefix_parity(tmp_path, family, request_body
         assert description["limits"]["branch_tokens"] == 512
         assert description["prefix_cache"]["hits"] == 2 * cache_enabled
         assert description["branch_mode"] == local.runtime.model.branch_mode
+        local_models = local.models()
+        assert len(local_models) == 1
+        for field in ("id", "aliases", "capabilities", "branch_mode", "prefix_cache"):
+            assert local_models[0][field] == description[field]
         kernels = description["acceleration"]["linear_attention_kernels"]
         assert (kernels is None) == (not local.runtime.model.hybrid)
         assert kernels is None or set(kernels) == {"flash_linear_attention", "causal_conv1d"}
@@ -248,6 +252,35 @@ def test_state_branch_and_packed_limits(checkpoint, request_body):
         baseline.runtime.inference_options = replace(exact, **{name: limit - 1})
         with pytest.raises(ValueError, match=error):
             baseline(request_body)
+
+
+def test_media_directory_permission_error_explains_how_to_retry(tmp_path, monkeypatch):
+    from pathlib import Path
+    from fastapi import HTTPException
+    from PIL import Image
+    from jevany import serve
+
+    image = tmp_path / "image.png"
+    Image.new("RGB", (16, 16), "red").save(image)
+    monkeypatch.setattr(serve, "MEDIA_ROOT", str(tmp_path))
+    request = SystemOneRequest(
+        state="state", media=[{"type": "image", "uri": str(image)}],
+        questions={"color": Choice(criteria={"red": None, "blue": None})},
+    )
+    resolve = Path.resolve
+
+    def inaccessible(path, *args, **kwargs):
+        if path == image:
+            raise PermissionError("the server user cannot traverse the frame directory")
+        return resolve(path, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "resolve", inaccessible)
+        with pytest.raises(HTTPException) as caught:
+            serve.prepare(request)
+        assert caught.value.status_code == 422
+        assert "shared directory and file permissions" in caught.value.detail
+    assert serve.prepare(request).media[0].uri == str(image)
 
 
 def test_cache_eviction_failure_recovery_and_concurrent_requests(checkpoint, request_body, monkeypatch):
