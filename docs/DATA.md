@@ -44,9 +44,10 @@ conversion directories.
 
 `options` can be a list or its Python-literal string representation.
 For named keys, use `choices: {"text": [...], "label": [...]}`.
-`answer` or `answerKey` resolves in this order: an exact option key, exact
+`answer` or `answerKey` resolves in this order: an exact option key, unambiguous
 option text, a letter (`A`, `B`, …), or a zero-based index. Missing answers,
-negative indices, duplicate keys and mismatched text/label arrays are rejected.
+negative indices, duplicate keys, ambiguous text answers and mismatched
+text/label arrays are rejected. For repeated option text, supply an explicit key.
 Omit `label` to generate index keys; an explicitly empty label array is invalid.
 `question` may also be an object with a `stem` string.
 

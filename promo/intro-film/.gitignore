@@ -1,0 +1,10 @@
+# Generated during rendering; keep outside Git.
+clips/
+build/
+*.mp4
+*.m4a
+*.wav
+*.png
+*.jpg
+node_modules/
+__pycache__/

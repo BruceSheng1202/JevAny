@@ -1,8 +1,11 @@
 """Native precision, gradient parity and the adapter's forward/cache contract."""
+from types import SimpleNamespace
+
 import pytest
 import torch
 
 from jevany.backbones import BackboneAdapter
+from jevany.cudagraphs import RowGraphs
 from jevany.model import DecisionModel, load_tokenizer
 from test_backbones import RECORD, make_base
 
@@ -67,7 +70,9 @@ def test_bf16_readout_and_gradients_match_full_hidden_upcast(tmp_path, branch_mo
     assert model.adapter.calls == [(False, False, torch.bfloat16)]
     if branch_mode == "packed":
         with torch.no_grad():
-            assert model.hidden_batch([encoded]).dtype == torch.bfloat16
+            assert model._hidden_batch([encoded]).dtype == torch.bfloat16
+            assert model.hidden_batch([encoded]).dtype == torch.float32
+            assert model.hidden(encoded).dtype == torch.float32
     model.zero_grad(set_to_none=True)
 
     # Emulate the old full-sequence FP32 conversion using the same frozen base,
@@ -84,3 +89,17 @@ def test_bf16_readout_and_gradients_match_full_hidden_upcast(tmp_path, branch_mo
     for name, parameter in model.named_parameters():
         if name in gradients:
             torch.testing.assert_close(parameter.grad, gradients[name], rtol=0, atol=0)
+
+
+def test_graph_capture_forward_uses_adapter(tmp_path):
+    base = tmp_path / "base"
+    make_base(base, "llama")
+    tokenizer = load_tokenizer(base)
+    model = DecisionModel(base, tokenizer, "cpu", lora=2, head_dim=8, branch_mode="rows").eval()
+    model.adapter = RecordingAdapter()
+    ids = torch.full((1, 3), model.pad_id, dtype=torch.long)
+    positions = torch.arange(3)[None]
+    with torch.no_grad():
+        hidden = RowGraphs._forward(SimpleNamespace(model=model), ids, positions)
+    assert hidden.shape == (1, 3, model.lm.config.hidden_size)
+    assert model.adapter.calls == [(False, False, torch.float32)]

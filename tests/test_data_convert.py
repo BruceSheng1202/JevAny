@@ -61,6 +61,47 @@ def test_invalid_rows_report_physical_line_without_creating_output(tmp_path, row
     assert not output.exists()
 
 
+def test_duplicate_answer_text_is_rejected_before_creating_output(tmp_path):
+    row = {
+        "question": "Pick one",
+        "choices": {"text": ["same", "same"], "label": ["left", "right"]},
+        "answer": "same",
+    }
+    export = tmp_path / "export.jsonl"
+    export.write_text("\n" + json.dumps(row) + "\n")
+    output = tmp_path / "suite"
+
+    with pytest.raises(ValueError, match=r"export.jsonl:2:.*matches multiple options"):
+        convert_jsonl(export, output, source="custom", revision="r1", split="train")
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("answer,expected", [
+    ("left", "left"), ("right", "right"), ("A", "left"), ("B", "right"),
+    (0, "left"), (1, "right"),
+])
+def test_duplicate_option_text_can_be_disambiguated(tmp_path, answer, expected):
+    export = write_export(tmp_path / "export.jsonl", [{
+        "question": "Pick one",
+        "choices": {"text": ["same", "same"], "label": ["left", "right"]},
+        "answer": answer,
+    }])
+    output = convert_jsonl(export, tmp_path / "suite", source="custom", revision="r1", split="train")
+    question = load_split(output, "train")[0]["questions"]["answer"]
+    assert question["criteria"] == {"left": "same", "right": "same"}
+    assert question["label"] == expected
+
+
+def test_explicit_option_key_still_takes_precedence_over_duplicate_text(tmp_path):
+    export = write_export(tmp_path / "export.jsonl", [{
+        "question": "Pick one",
+        "choices": {"text": ["same", "same"], "label": ["same", "other"]},
+        "answer": "same",
+    }])
+    output = convert_jsonl(export, tmp_path / "suite", source="custom", revision="r1", split="train")
+    assert load_split(output, "train")[0]["questions"]["answer"]["label"] == "same"
+
+
 @pytest.mark.parametrize("content", ["", "\n\n", '{"question":'])
 def test_empty_or_invalid_json_does_not_create_a_suite(tmp_path, content):
     export = tmp_path / "export.jsonl"
