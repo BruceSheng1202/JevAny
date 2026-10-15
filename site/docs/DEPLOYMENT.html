@@ -271,8 +271,26 @@ device. Downloading 4B needs roughly 8 GB of cache and 27B roughly 54 GB; set
 <td><code>JEVANY_PREFIX_MIN_TOKENS</code></td>
 <td>384</td>
 </tr>
+<tr>
+<td><code>max_batch_size</code></td>
+<td><code>--max-batch-size</code></td>
+<td><code>JEVANY_MAX_BATCH_SIZE</code></td>
+<td>1</td>
+</tr>
 </tbody>
 </table></div>
+<p>With <code>max_batch_size</code> above 1, concurrent text requests that arrive while a
+forward pass is running share the next one. An idle server still scores each
+request alone, with no delay to collect a batch. Combining requests is limited
+to <code>max_packed_tokens</code> padded token slots; a single request keeps the existing
+context limits, including repeated state tokens in row mode. Multimodal
+checkpoints and requests served from the prefix cache run alone. FP32
+batches match unbatched scores within floating-point tolerance; BF16/FP16 GPU
+kernels round differently by batch shape, so keep the default of 1 when
+reproducing published metrics. On one H200 with 32 concurrent requests to a
+Qwen3.5-0.8B checkpoint, batching raised throughput 2.3x in FP32 (largest
+probability change 1.5e-5, no decision changed) and 4.6x in BF16, where 2 of 32
+requests changed at least one decision. <code>GET /v1/models</code> reports batch counts.</p>
 <p>A branch includes its shared state. State and branch limits are capped at the
 backbone's context window; the packed limit covers the complete request, including
 all branches. Oversized inputs are rejected without truncation. Set the cache size
@@ -340,6 +358,13 @@ exact checkpoint path unless their report says otherwise.</p>
 <td><code>2048</code></td>
 <td><code>2048</code></td>
 <td>Longer rows stay on eager inference instead of being padded into a slower graph</td>
+</tr>
+<tr>
+<td><code>JEVANY_FUSED_KERNELS</code> / <code>--fused-kernels</code></td>
+<td><code>0</code>, <code>1</code></td>
+<td><code>1</code> with merged BF16 LoRA and direct graphs</td>
+<td><code>0</code> until measured</td>
+<td>Fused Qwen3.5 kernels: one-kernel norms, merged projections and transposed weights</td>
 </tr>
 </tbody>
 </table></div>
@@ -415,6 +440,16 @@ because their PEFT embedding adapter allocates tensors during each forward.
 <code>describe()</code> reports the lengths, capture time and how many calls replayed or ran
 eagerly under <code>acceleration.cuda_graphs</code>. Direct graphs cannot be combined with
 <code>JEVANY_COMPILE</code>.</p>
+<p>Transformers counts CUDA stream capture as tracing. Left alone, it materialises
+the causal mask inside every captured graph, so SDPA runs its memory-efficient
+kernel there instead of the FlashAttention kernel that eager inference uses.
+During capture JevAny therefore makes the eager mask decisions for an unpadded
+single row; rows whose positions do not rise by one run eagerly. On an
+A100-40GB with BF16 merged JevAny-Qwen3.5-4B, this made captured public-JevBench
+requests of 513 to 2,048 tokens 3–5% faster and left shorter ones unchanged.
+With a 4,096-token limit, requests of 2,049 to 4,096 tokens became 6–10% faster
+in graphs, but they were still no faster than eager inference, so the default
+limit stays at 2,048 tokens.</p>
 <p>Padded shapes select different kernels, so probabilities are close to, not
 identical with, the eager path. On an A100-40GB with FLA and causal-conv1d
 installed and SDPA, over every request of the development suites, median
@@ -432,10 +467,33 @@ BF16-merged paths, 4B changed from 187 to 185 correct answers with three argmax
 changes, while 27B stayed at 207 with no argmax changes. Maximum probability
 changes were 0.0160 and 0.0146 respectively. These serving measurements do not
 replace the exact benchmark scores reported by the model cards.</p>
+<p><code>--fused-kernels</code> (<code>JEVANY_FUSED_KERNELS=1</code>, <code>LoadOptions(fused_kernels=True)</code>)
+rewrites a merged Qwen3.5-architecture backbone (the Qwen3.5 and Qwen3.8 bases)
+for batch-1 inference; see <code>jevany/fused_kernels.py</code>. Each RMSNorm runs as one
+FLA kernel; the MLP gate and up projections, the four Gated DeltaNet input
+projections and the attention query, key and value projections each run as one
+GEMM; FLA's chunked kernel applies the DeltaNet gate and beta sigmoid itself;
+and decoder weights are stored transposed so that cuBLAS reads both GEMM
+operands in their natural layout. The original modules keep views of the fused
+weights, so memory does not grow. The option needs the LoRA merged into the
+backbone (<code>JEVANY_MERGE_BF16=1</code> for BF16 checkpoints; direct-token checkpoints
+stay unmerged), one CUDA device and <code>flash-linear-attention</code>. It cannot be
+combined with <code>JEVANY_COMPILE</code>, a device map or choice readout, and
+<code>describe()</code> reports what was fused under <code>acceleration.fused_kernels</code>.</p>
+<p>On an A100-40GB with BF16 merged JevAny-Qwen3.5-4B, SDPA, FLA, causal-conv1d
+and direct graphs, fused kernels changed public-JevBench forward latency (231
+requests × 3, <code>scripts/benchmark_latency.py --serving-kernels</code>) from 16.43 to
+11.25 ms at the median, from 41.79 to 34.10 ms on average and from 130.14 to
+112.30 ms at p90. Requests above the graph limit run eagerly and became 12%
+faster as well. On the Transfer-v9 development suite with the same serving
+settings, clean accuracy moved from 78.68% to 78.78% and NLL from 0.587 to
+0.588; 5 of 1,264 argmax decisions changed and the largest probability change
+was 0.044. The option has not been measured on 27B.</p>
 <p><code>scripts/benchmark_latency.py</code> accepts <code>--cuda-graphs</code>,
-<code>--cuda-graph-max-tokens</code>, <code>--max-packed</code> and <code>--serving-kernels</code>. The last
-option keeps the fused SDPA kernels used by <code>jevany serve</code> instead of selecting
-the math kernel used for fp32-exact evaluation.</p>
+<code>--cuda-graph-max-tokens</code>, <code>--fused-kernels</code>, <code>--max-packed</code> and
+<code>--serving-kernels</code>. The last option keeps the fused SDPA kernels used by
+<code>jevany serve</code> instead of selecting the math kernel used for fp32-exact
+evaluation.</p>
 <p>For a latency-oriented 27B deployment, keep compilation off and cap direct
 graphs at 2,048 tokens:</p>
 <pre tabindex="0" role="region" aria-label="Code example"><code class="language-bash">JEVANY_MERGE_BF16=1 JEVANY_ATTN=sdpa JEVANY_COMPILE=0 \
@@ -591,6 +649,11 @@ adapter; setting a media root does not enable vision in a text checkpoint.</p>
 <code>GET /v1/models</code> for the active limits and capabilities. The default packed limit is 8,192 tokens;
 evaluation covers the 2,048-token training window.
 Confidence thresholds may need recalibration on your domain.</p>
+<p>Video decoding goes through the Transformers video processor. torchvision 0.26 and
+later no longer ship <code>read_video</code>, so with those releases install <code>torchcodec</code>
+and a system FFmpeg that it supports. Image requests do not need either.</p>
+<pre tabindex="0" role="region" aria-label="Code example"><code class="language-bash">python -m pip install torchcodec   # also requires FFmpeg libraries on the host
+</code></pre>
 <h2 id="extend-backbone-support">Extend backbone support</h2>
 <p>Serving uses the same <code>backbone_adapter = "my_package.adapters:MyAdapter"</code> saved
 by training. Install that trusted package in the serving environment; no HTTP
