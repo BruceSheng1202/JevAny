@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0a1114">
+<title>VSR License-Filtered Evaluation — JevAny</title><link rel="stylesheet" href="../styles.css"><link rel="icon" href="../assets/favicon.svg" type="image/svg+xml"></head>
+<body class="docs-page"><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header wrap"><a class="brand" href="../index.html"><img src="../assets/favicon.svg" width="30" height="30" alt=""><span>JevAny<span class="brand-period">.</span></span></a>
+<nav aria-label="Main navigation"><a href="../index.html#benchmarks">Benchmarks</a><a href="../index.html#models">Models</a><a href="../index.html#get-started">Get started</a></nav></header>
+<div class="docs-layout wrap"><aside class="docs-sidebar"><a class="text-link" href="../index.html">← Project homepage</a><nav aria-label="Documentation"><a href="quickstart.html">Quickstart</a><a href="TRAINING.html">Training</a><a href="DATA.html">Data</a><a href="DEPLOYMENT.html">Deployment</a><a href="API.html">API reference</a><a href="examples.html">Examples</a><a href="CASES.html">Cases</a><a href="EVALUATION.html">Evaluation</a><a href="ALGORITHM.html">Method</a><a href="INTEGRATIONS.html">Integrations</a><a href="zh.html">中文文档</a></nav>
+<details class="doc-toc"><summary>On this page</summary><div class="toc">
+<ul>
+<li><a href="#task-and-source">Task and Source</a></li>
+<li><a href="#licensing-and-attribution">Licensing and Attribution</a></li>
+<li><a href="#prepare-local-inputs">Prepare Local Inputs</a></li>
+<li><a href="#optional-evaluation">Optional Evaluation</a></li>
+<li><a href="#interpretation-limits">Interpretation Limits</a></li>
+</ul>
+</div>
+</details></aside>
+<main id="content" class="doc-content"><p class="eyebrow">JEVANY / DOCUMENTATION</p><h1>VSR License-Filtered Evaluation</h1><p>This standalone offline converter prepares a Visual Spatial Reasoning (VSR)
+subset using images whose COCO metadata identifies <strong>CC BY 2.0</strong>. It does not
+train a model, change default benchmarks, download images, or run inference.</p>
+<p>Call the output a <strong>COCO-metadata CC BY 2.0-filtered VSR subset</strong>, not the full
+VSR benchmark or a legally cleared image collection.</p>
+<h2 id="task-and-source">Task and Source</h2>
+<p>An original VSR caption becomes one <code>noul</code> question about the supplied image.
+The converter preserves the caption exactly and maps integer <code>0</code> to <code>false</code>,
+integer <code>1</code> to <code>true</code>. Labels, relation categories, votes, object metadata,
+source identifiers and licenses do not enter model evidence. It does not
+rewrite captions, generate negative examples, or repair annotations.</p>
+<p>Use the <a href="https://github.com/cambridgeltl/visual-spatial-reasoning">author repository</a>,
+starting with revision <code>b27a0af0ee1462d2b6b92c8c83e869d9254a241a</code>.
+Its original configurations are <code>random</code> and <code>zeroshot</code>, with <code>train</code>, <code>dev</code>
+and <code>test</code> partitions. This converter accepts only <code>dev</code> and <code>test</code> and keeps
+those partitions separate. The author provides public test labels.</p>
+<p>The Hugging Face loading script and older dataset-card statistics need not
+match this author revision. Pin the original export rather than mixing
+versions. Record the revision actually used; declaring it is not proof that
+a local file was obtained from that revision.</p>
+<h2 id="licensing-and-attribution">Licensing and Attribution</h2>
+<p>These are three different licensing layers:</p>
+<ul>
+<li>The VSR project and dataset card declare Apache-2.0. Retain applicable
+  upstream notices, cite the source, and describe the conversion when
+  distributing VSR annotations or derived records.</li>
+<li>The <a href="https://cocodataset.org/#termsofuse">COCO Consortium's annotations and website</a>
+  are licensed under CC BY 4.0; retain the appropriate COCO attribution.</li>
+<li>Individual photographs retain their authors' rights and conditions.
+  The filter accepts only COCO image records whose resolved license URL is
+  <code>http://creativecommons.org/licenses/by/2.0/</code> or its HTTPS equivalent.
+  It does not infer permission from a license ID or display name. Other
+  licenses are excluded from this particular policy, not declared invalid.</li>
+</ul>
+<p>CC BY 2.0 has attribution and other conditions. Review the original source
+and retain required author, source and license information for the intended
+use. The converter preserves available Flickr URLs and COCO license records,
+but it does not retrieve photographer names, verify a license grant, check
+current Flickr pages, or grant rights. Follow your organization's data-use
+requirements where applicable. Private evaluation is not automatically exempt
+from image terms.</p>
+<p>Do not commit real photographs, downloaded annotations or generated suites.
+Committed tests use original synthetic images and annotation fixtures. If
+sharing a generated suite or results containing photographs, separately
+satisfy the applicable attribution and redistribution conditions. Do not
+relabel all source material as Apache-2.0.</p>
+<h2 id="prepare-local-inputs">Prepare Local Inputs</h2>
+<p>Obtain a fixed author JSONL export and COCO image/license tables separately.
+The official <a href="https://cocodataset.org/#download">COCO download page</a> links the
+2017 train/validation annotation archive. Caption or instance annotation JSON
+contains <code>images</code> and <code>licenses</code> tables. Supply both train and validation
+metadata when the VSR export references both COCO partitions; consistent
+repeated tables across files are supported.</p>
+<p>For example, prepare these absolute local paths outside the checkout:</p>
+<ul>
+<li><code>/tmp/vsr-input/random-dev.jsonl</code></li>
+<li><code>/tmp/vsr-input/captions_train2017.json</code></li>
+<li><code>/tmp/vsr-input/captions_val2017.json</code></li>
+<li><code>/tmp/vsr-input/images/train2017/</code> and <code>/tmp/vsr-input/images/val2017/</code></li>
+</ul>
+<p>Place only needed, appropriately usable images under their original twelve-digit
+COCO filenames. Excluded images need not be present. Missing selected images,
+unknown license mappings and contradictory metadata are errors, not silent
+exclusions. <code>image_link</code>, COCO filename, image ID and original COCO partition
+must agree. Symlinks resolving outside the image root are rejected.</p>
+<p>Conversion needs Pillow, already included in JevAny's <code>dev</code> and <code>multimodal</code>
+extras. Run commands from the repository checkout with JevAny installed:</p>
+<pre tabindex="0" role="region" aria-label="Code example"><code class="language-bash">python -m scripts.convert_vsr /tmp/vsr-input/random-dev.jsonl \
+  --coco-annotations /tmp/vsr-input/captions_train2017.json /tmp/vsr-input/captions_val2017.json \
+  --image-root /tmp/vsr-input/images \
+  --revision b27a0af0ee1462d2b6b92c8c83e869d9254a241a \
+  --config random --split dev --out /tmp/vsr-random-dev-cc-by
+
+python -m jevany data check-suite /tmp/vsr-random-dev-cc-by
+</code></pre>
+<p>The output must not already exist. All annotations, associations and selected
+images are validated before output creation. Images are copied byte-for-byte
+into content-addressed media paths, without resizing or re-encoding. An I/O
+failure during writing may leave an incomplete output; inspect it and use a
+new output path rather than overwriting it.</p>
+<p>The manifest records input SHA-256 values, the exact license selection rule,
+retained/excluded counts and reasons, and before/after label and relation
+counts. Record metadata retains source configuration, original partition and
+line number, COCO ID, Flickr/COCO URLs, image license and media hash. Relative
+media references make the suite portable. Hashes identify supplied bytes;
+they do not establish the authenticity or legal status of the input metadata.</p>
+<h2 id="optional-evaluation">Optional Evaluation</h2>
+<p>Conversion and synthetic tests require no model. Scoring requires a checkpoint
+or endpoint that supports image inputs and Noul decisions; a text-only model
+is not sufficient.</p>
+<p>For a development suite, the existing evaluator can be used:</p>
+<pre tabindex="0" role="region" aria-label="Code example"><code class="language-bash">python -m jevany eval --run /path/to/compatible-image-checkpoint \
+  --suite /tmp/vsr-random-dev-cc-by --out /tmp/vsr-dev-scores
+</code></pre>
+<p>The existing multimodal evaluation script also supports development media
+controls (full, blank and shuffled). Its CLI loads <code>development</code> only. These
+controls diagnose image sensitivity; replacing the image does not create
+new ground-truth annotations.</p>
+<p>For an original test export, convert with <code>--split test</code> into another fresh
+directory, then explicitly validate the locked partition:</p>
+<pre tabindex="0" role="region" aria-label="Code example"><code class="language-bash">python -m jevany data check-suite /tmp/vsr-random-test-cc-by --allow-test
+</code></pre>
+<p>For test scoring, the generic evaluator selects the locked test partition when
+<code>--allow-test</code> is supplied with <code>--suite</code>:</p>
+<pre tabindex="0" role="region" aria-label="Code example"><code class="language-bash">python -m jevany eval --run /path/to/compatible-image-checkpoint \
+  --suite /tmp/vsr-random-test-cc-by --allow-test --out /tmp/vsr-test-scores
+</code></pre>
+<p>Without that flag, <code>--suite</code> selects development. Do not rename test to
+development or treat raw JSONL loading as a suite lock.</p>
+<h2 id="interpretation-limits">Interpretation Limits</h2>
+<p>Freeze the data revision, configuration, partition, filtering policy, prompt,
+checkpoint and readout before scoring. Report the retained size, exclusions,
+label/relation counts, rejected predictions and coverage. Do not select records
+according to model performance or compare a filtered result as if it were the
+full benchmark.</p>
+<p>Multiple captions for one image remain distinct records but share a media-hash
+group. Original random splits were not designed to guarantee image-disjoint
+partitions. Zeroshot describes VSR's object-concept split, not proof that a
+modern model has never seen those concepts or COCO pictures. The configurations
+are not necessarily independent evaluation sets.</p>
+<p>Each output contains one original partition. Suite validation does not compare
+separate directories or audit undisclosed pretraining corpora. Compare media
+hashes/groups across available prior data when making exposure claims; no such
+claim follows from license filtering. This contribution supplies evaluation
+infrastructure, not model scores or evidence of capability improvement.</p></main></div>
+<footer class="site-footer wrap"><a href="../index.html">← Back to JevAny</a><a href="license.html">Apache-2.0 code</a></footer></body></html>
