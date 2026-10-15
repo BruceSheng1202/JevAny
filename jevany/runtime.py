@@ -3,9 +3,13 @@
 """One inference runtime shared by Python applications and the HTTP server."""
 import threading
 import time
+from collections import deque
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
+
+import torch
+import torch.nn.functional as F
 
 from .api import SystemOneRequest, output_tokens, to_answers, to_record, validate_response
 from .backbones import linear_attention_kernels
@@ -13,9 +17,31 @@ from .checkpoint import Checkpoint, LoadOptions
 from .client import DecisionClient
 from .device import default_device, sync
 from .inference import InferenceOptions
-from .model import DecisionModel
+from .model import ContextLengthError, DecisionModel
+from .readout import resolve_readout_options
 
 DEFAULT_CHECKPOINT = "SimpleJev/JevAny-Qwen3.8-27B-LoRA"
+
+
+@dataclass(eq=False)
+class _Pending:
+    admitted: tuple
+    result: tuple | None = None
+    error: BaseException | None = None
+    done: bool = False
+
+
+def _padded_tokens(encodings: list[dict], branch_mode: str) -> int:
+    """Token slots one forward_batch call allocates for these encodings after right-padding."""
+    if branch_mode != "rows":
+        return len(encodings) * max(len(e["ids"]) for e in encodings)
+    rows = longest = 0
+    for e in encodings:
+        state = e["seg"].count(0)
+        branches = [e["seg"].count(k) for k in range(1, len(e["decide_idx"]) + 1)]
+        rows += len(branches)
+        longest = max(longest, state + max(branches))
+    return rows * longest
 
 
 @dataclass
@@ -30,6 +56,12 @@ class DecisionRuntime:
     prefix_cache: dict = field(default_factory=dict)
     prefix_hits: int = 0
     prefix_misses: int = 0
+    # Request batching (max_batch_size > 1): `lock` guards the tokenizer, cache and queue;
+    # `model_lock` serializes forward passes. Take model_lock before lock, never the reverse.
+    model_lock: Any = field(default_factory=threading.Lock, repr=False)
+    pending: deque = field(default_factory=deque, repr=False)
+    batches: int = 0
+    batched_requests: int = 0
 
     def __post_init__(self) -> None:
         if not isinstance(self.model_id, str) or not self.model_id.strip():
@@ -47,6 +79,11 @@ class DecisionRuntime:
         }
 
     @property
+    def batching(self) -> bool:
+        """Batch text requests. Multimodal checkpoints share a mutable media processor, so they never batch."""
+        return self.inference_options.max_batch_size > 1 and not self.model.multimodal
+
+    @property
     def aliases(self) -> list[str]:
         return [] if self.model_id == "jevany-latest" else ["jevany-latest"]
 
@@ -62,6 +99,7 @@ class DecisionRuntime:
                 "devices": getattr(self.model, "devices", [self.device]),
                 "temperature": self.model.temperature,
                 "decision_mode": self.checkpoint.meta.decision_mode,
+                "readout": "native",
                 "backbone_adapter": self.model.backbone_adapter,
                 "branch_mode": self.model.branch_mode,
                 "acceleration": {
@@ -72,13 +110,19 @@ class DecisionRuntime:
                     "linear_attention_kernels": (linear_attention_kernels()
                                                  if getattr(self.model, "hybrid", False) else None),
                 },
-                "capabilities": asdict(capabilities), "limits": self.limits,
+                "capabilities": {**asdict(capabilities), "media_types": list(capabilities.media_types)},
+                "limits": self.limits,
                 "prefix_cache": {
                     "enabled": self.inference_options.prefix_cache_size > 0 and capabilities.prefix_cache,
                     "size": self.inference_options.prefix_cache_size,
                     "min_state_tokens": self.inference_options.prefix_min_tokens,
                     "hits": self.prefix_hits, "misses": self.prefix_misses,
                     "cached_states": len(self.prefix_cache),
+                },
+                "batching": {
+                    "enabled": self.batching,
+                    "max_batch_size": self.inference_options.max_batch_size,
+                    "batches": self.batches, "batched_requests": self.batched_requests,
                 },
             }
 
@@ -89,56 +133,149 @@ class DecisionRuntime:
             self.prefix_hits = self.prefix_misses = 0
 
     def probs(self, record: dict) -> tuple[list[list[float]], dict]:
-        """Encode and score under one lock, including the shared media processor."""
+        """Admit and score a request, batching text when explicitly enabled."""
+        if self.batching:
+            return self._batched_probs(record)
         with self.lock:
-            limits, options = self.limits, self.inference_options
-            capabilities = self.model.inference_capabilities
-            if record.get("media"):
-                if any(item["type"] not in capabilities.media_types for item in record["media"]):
-                    raise ValueError("checkpoint does not support the requested media type")
-                maximum = capabilities.max_media_questions
-                if maximum is not None and len(record["questions"]) > maximum:
-                    raise ValueError(f"media requests support at most {maximum} question(s)")
-            encoding = self.model.encode(
-                self.tok, record, max_state=limits["state_tokens"], max_branch=limits["branch_tokens"], strict=True,
-            )
-            if len(encoding["ids"]) > limits["packed_tokens"]:
-                raise ValueError(f"request exceeds {limits['packed_tokens']} packed tokens: {len(encoding['ids'])}")
-            if capabilities.context_window is not None and max(encoding["pos"]) >= capabilities.context_window:
-                raise ValueError(f"request exceeds backbone context window of {capabilities.context_window} tokens")
-            state_tokens = encoding["seg"].count(0)
-            key = (tuple(encoding["ids"][:state_tokens]), bool(encoding.get("option_isolation")))
-            cache, hit = self.prefix_cache, False
-            sync(self.device)
-            start = time.perf_counter()
-            eligible = (options.prefix_cache_size > 0 and capabilities.prefix_cache
-                        and state_tokens >= options.prefix_min_tokens
-                        and not record.get("media") and not encoding.get("multimodal"))
-            if eligible and key in cache:
-                prefix = cache.pop(key)
-                probabilities = self.model.probs_with_prefix(encoding, prefix)
-                cache[key] = prefix
-                self.prefix_hits += 1
-                hit = True
-            elif eligible:
-                probabilities, prefix = self.model.probs_and_prefix(encoding)
-                cache[key] = prefix
-                while len(cache) > options.prefix_cache_size:
-                    cache.pop(next(iter(cache)))
-                self.prefix_misses += 1
-            else:
-                probabilities = self.model.probs(encoding)
-            sync(self.device)
-            elapsed = time.perf_counter() - start
+            return self._score(*self._admit(record))
+
+    def _admit(self, record: dict) -> tuple[dict, dict, int, tuple, bool]:
+        """Validate and encode one record; the caller holds `lock`."""
+        limits, options = self.limits, self.inference_options
+        capabilities = self.model.inference_capabilities
+        if record.get("media"):
+            if any(item["type"] not in capabilities.media_types for item in record["media"]):
+                raise ValueError("checkpoint does not support the requested media type")
+            maximum = capabilities.max_media_questions
+            if maximum is not None and len(record["questions"]) > maximum:
+                raise ValueError(f"media requests support at most {maximum} question(s)")
+        encoding = self.model.encode(
+            self.tok, record, max_state=limits["state_tokens"], max_branch=limits["branch_tokens"], strict=True,
+        )
+        if len(encoding["ids"]) > limits["packed_tokens"]:
+            raise ContextLengthError(
+                f"request exceeds {limits['packed_tokens']} packed tokens: {len(encoding['ids'])}")
+        if capabilities.context_window is not None and max(encoding["pos"]) >= capabilities.context_window:
+            raise ContextLengthError(
+                f"request exceeds backbone context window of {capabilities.context_window} tokens")
+        state_tokens = encoding["seg"].count(0)
+        key = (tuple(encoding["ids"][:state_tokens]), bool(encoding.get("option_isolation")))
+        eligible = (options.prefix_cache_size > 0 and capabilities.prefix_cache
+                    and state_tokens >= options.prefix_min_tokens
+                    and not record.get("media") and not encoding.get("multimodal"))
+        return record, encoding, state_tokens, key, eligible
+
+    def _score(self, record: dict, encoding: dict, state_tokens: int, key: tuple,
+               eligible: bool) -> tuple[list[list[float]], dict]:
+        """Score one admitted record, reusing the prefix cache when eligible; the caller holds `lock`."""
+        options = self.inference_options
+        cache, hit = self.prefix_cache, False
+        sync(self.device)
+        start = time.perf_counter()
+        if eligible and key in cache:
+            prefix = cache.pop(key)
+            probabilities = self.model.probs_with_prefix(encoding, prefix)
+            cache[key] = prefix
+            self.prefix_hits += 1
+            hit = True
+        elif eligible:
+            probabilities, prefix = self.model.probs_and_prefix(encoding)
+            cache[key] = prefix
+            while len(cache) > options.prefix_cache_size:
+                cache.pop(next(iter(cache)))
+            self.prefix_misses += 1
+        else:
+            probabilities = self.model.probs(encoding)
+        sync(self.device)
+        elapsed = time.perf_counter() - start
         return [p.tolist() for p in probabilities], {
             "tokens": len(encoding["ids"]), "state_tokens": state_tokens,
             "latency_ms": round(elapsed * 1000, 1), "prefix_cache_hit": hit,
         }
 
+    def _batched_probs(self, record: dict) -> tuple[list[list[float]], dict]:
+        """Group commit: whichever caller holds model_lock scores the queued text requests together.
+
+        An idle runtime scores each request alone. Requests that arrive during a forward pass
+        share the next one. Prefix-cache requests are scored alone.
+        """
+        with self.lock:
+            admitted = self._admit(record)
+            alone = admitted[4]
+            if not alone:
+                slot = _Pending(admitted)
+                self.pending.append(slot)
+        if alone:
+            with self.model_lock, self.lock:
+                return self._score(*admitted)
+        while True:
+            with self.model_lock:
+                if slot.done:
+                    break
+                with self.lock:
+                    batch = self._take_batch()
+                self._run_batch(batch)
+        if slot.error is not None:
+            raise slot.error
+        return slot.result
+
+    def _take_batch(self) -> list[_Pending]:
+        """Dequeue in arrival order within max_batch_size and a max_packed_tokens padded-token budget."""
+        options = self.inference_options
+        batch = [self.pending.popleft()]
+        while self.pending and len(batch) < options.max_batch_size:
+            encodings = [item.admitted[1] for item in (*batch, self.pending[0])]
+            if _padded_tokens(encodings, self.model.branch_mode) > options.max_packed_tokens:
+                break
+            batch.append(self.pending.popleft())
+        return batch
+
+    def _run_batch(self, batch: list[_Pending]) -> None:
+        """Score a batch in one forward pass; on failure, score each request alone. Caller holds model_lock."""
+        try:
+            sync(self.device)
+            start = time.perf_counter()
+            with torch.no_grad():
+                logits = self.model.forward_batch([item.admitted[1] for item in batch])
+                probabilities = [[F.softmax(z, -1).cpu() for z in record] for record in logits]
+            sync(self.device)
+            elapsed = round((time.perf_counter() - start) * 1000, 1)
+            for item, values in zip(batch, probabilities):
+                _, encoding, state_tokens, _, _ = item.admitted
+                item.result = ([p.tolist() for p in values], {
+                    "tokens": len(encoding["ids"]), "state_tokens": state_tokens,
+                    "latency_ms": elapsed, "prefix_cache_hit": False, "batch_size": len(batch),
+                })
+            with self.lock:
+                self.batches += 1
+                self.batched_requests += len(batch)
+        except Exception as error:
+            if len(batch) == 1:
+                batch[0].error = error
+            else:
+                for item in batch:
+                    try:
+                        with self.lock:
+                            item.result = self._score(*item.admitted)
+                    except Exception as single_error:
+                        item.error = single_error
+        finally:
+            for item in batch:
+                item.done = True
+
     def answer(self, request: SystemOneRequest) -> dict[str, Any]:
         if request.model not in (self.model_id, *self.aliases):
             raise ValueError(f"unknown model {request.model!r}; this deployment serves {self.model_id!r}")
         record, metadata = to_record(request)
+        if self.batching:
+            probabilities, measurements = self.probs(record)
+            with self.lock:
+                answers = to_answers(probabilities, metadata)
+                return validate_response(request, {
+                    "model": self.model_id, "answers": answers,
+                    "usage": {"input_tokens": measurements["tokens"], "output_tokens": output_tokens(self.tok, answers)},
+                    "latency_ms": measurements["latency_ms"],
+                })
         # Output accounting uses the same tokenizer as encoding; media processors
         # can mutate its settings, so serialize both operations together.
         with self.lock:
@@ -164,21 +301,42 @@ class JevModel(DecisionClient):
         device: str | None = None, dtype: str | None = None,
         model_name: str | None = None, options: LoadOptions | None = None,
         inference_options: InferenceOptions | None = None,
+        readout: str = "native", choice_temperature: float | None = None,
+        choice_native_weight: float | None = None, choice_max_tokens: int | None = None,
+        letter_temperature: float | None = None,
+        letter_pointer_weight: float | None = None, letter_max_tokens: int | None = None,
     ) -> "JevModel":
         """Load a local run or Hugging Face adapter ID (optionally ``owner/repo@revision``).
 
         The full backbone must fit on the selected device unless ``options.device_map``
         (or JEVANY_DEVICE_MAP) splits it over the visible GPUs. ``dtype`` accepts
         fp32, fp16 or bf16; omission uses the checkpoint/environment settings.
-        Files used by native media requests are trusted local paths.
+        ``readout='choice'`` replaces the checkpoint head with a training-free
+        choice-token projection; its temperature, native blend, and prompt
+        limit are deployment settings, not checkpoint metadata. ``letter`` and
+        ``letter_*`` remain accepted legacy aliases. Files used by native media
+        requests are trusted local paths.
         """
         import torch
+
+        readout, choice_options = resolve_readout_options(
+            readout,
+            choice_temperature=choice_temperature,
+            choice_native_weight=choice_native_weight,
+            choice_max_tokens=choice_max_tokens,
+            letter_temperature=letter_temperature,
+            letter_pointer_weight=letter_pointer_weight,
+            letter_max_tokens=letter_max_tokens,
+        )
+        if readout == "choice" and inference_options is not None:
+            raise ValueError("inference_options apply only to native readout; use choice_max_tokens")
 
         device = default_device() if device is None else device
         if device not in ("cpu", "mps", "cuda"):
             raise ValueError("device must be cpu, mps or cuda")
         options = options or LoadOptions.from_env()
-        inference_options = inference_options or InferenceOptions.from_env()
+        if readout == "native":
+            inference_options = inference_options or InferenceOptions.from_env()
         if model_name is not None and (not isinstance(model_name, str) or not model_name.strip()):
             raise ValueError("model_name must be a nonempty string")
         if dtype is not None:
@@ -188,7 +346,27 @@ class JevModel(DecisionClient):
             options = replace(options, dtype=dtypes[dtype])
         if device == "mps" and options.attn is None:
             options = replace(options, attn="sdpa")
-        loaded = Checkpoint(checkpoint)
+        if readout == "choice" and options.cuda_graphs:
+            raise ValueError("CUDA graph capture is available only for native readout")
+        if readout == "choice" and options.fused_kernels:
+            raise ValueError("fused kernels are available only for native readout")
+        if readout == "choice" and options.temperature is not None:
+            raise ValueError("JEVANY_TEMPERATURE applies to the native head; use choice_temperature")
+        predictor = None
+        if readout == "choice":
+            from .letter_predictor import LetterReadoutPredictor
+
+            predictor = LetterReadoutPredictor(
+                checkpoint=checkpoint,
+                device=device,
+                options=options,
+                temperature=choice_options.temperature,
+                native_weight=choice_options.native_weight,
+                max_tokens=choice_options.max_tokens,
+            )
+            loaded = predictor.checkpoint
+        else:
+            loaded = Checkpoint(checkpoint)
         if model_name is None:
             source = loaded.requested.partition("@")[0]
             if source == DEFAULT_CHECKPOINT:
@@ -197,12 +375,19 @@ class JevModel(DecisionClient):
                 model_name = "jevany-27b"
             else:
                 model_name = Path(source).name or Path(loaded.path).resolve().name
+        if predictor is not None:
+            from .letter_runtime import LetterDecisionRuntime
+            return cls(LetterDecisionRuntime(predictor, model_name))
         tokenizer, model = loaded.load(device, options)
         return cls(DecisionRuntime(loaded, tokenizer, model, device, model_name, inference_options))
 
     def describe(self) -> dict[str, Any]:
         """Return identity, backbone capabilities, effective limits and cache statistics."""
         return self.runtime.describe()
+
+    def models(self) -> list[dict[str, Any]]:
+        """List this local model using the same discovery method as JevClient."""
+        return [self.describe()]
 
     def clear_cache(self) -> None:
         """Release this model's cached state prefixes."""

@@ -1,0 +1,64 @@
+@font-face {
+  font-family: "DM Sans";
+  src: url("../../../site/assets/fonts/dm-sans-latin.woff2") format("woff2");
+  font-weight: 100 1000;
+}
+@font-face {
+  font-family: "Plex Condensed";
+  src: url("../../../site/assets/fonts/ibm-plex-sans-condensed-medium.woff2") format("woff2");
+  font-weight: 500;
+}
+
+:root {
+  --bg: #060a0c;
+  --ink: #f1f3ed;
+  --muted: #a9b4b6;
+  --subtle: #7d8f92;
+  --mint: #a8f0c8;
+  --teal: #2dd4bf;
+  --violet: #a78bfa;
+  --llm: #8fa3c4;
+  --amber: #f5b971;
+  --line: rgba(210, 239, 229, .14);
+  --card: rgba(14, 24, 28, .78);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); overflow: hidden; }
+#stage {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "DM Sans", sans-serif;
+  font-synthesis: none;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+.abs { position: absolute; }
+.layer { position: absolute; inset: 0; }
+.head { font-family: "Plex Condensed", sans-serif; font-weight: 500; letter-spacing: -.02em; line-height: 1.04; }
+.kicker { font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--mint); }
+.mono { font-family: "DejaVu Sans Mono", monospace; letter-spacing: -.01em; }
+.foot { color: var(--subtle); font-size: 22px; line-height: 1.35; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(8, 14, 16, .72);
+}
+.dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+.track { position: absolute; height: 10px; border-radius: 5px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; }
+.mint { color: var(--mint); }
+.teal { color: var(--teal); }
+.violet { color: var(--violet); }
+.muted { color: var(--muted); }
+canvas { display: block; }
