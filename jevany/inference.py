@@ -32,7 +32,7 @@ class InferenceOptions:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "InferenceOptions":
-        """Read JEVANY_MAX_*_TOKENS and the existing JEVANY_PREFIX_* settings."""
+        """Read JEVANY_MAX_* and the existing JEVANY_PREFIX_* settings."""
         env = os.environ if env is None else env
         names = {item.name: "JEVANY_" + item.name.upper() for item in fields(cls)}
         names["prefix_cache_size"] = "JEVANY_PREFIX_CACHE"

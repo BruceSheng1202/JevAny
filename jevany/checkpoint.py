@@ -21,6 +21,8 @@ import torch
 
 from .model import DecisionModel, load_preprocessor
 from .backbones import get_backbone_adapter
+# Re-exported: the lightweight tools import these without the modelling stack.
+from .placement import DEVICE_MAPS, add_placement_arguments
 
 HUB_ID = re.compile(r"[\w.-]+/[\w.-]+(@[\w.-]+)?")
 COMPILE_MODES = frozenset({"default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs"})
@@ -56,10 +58,6 @@ def _check_compile_runtime():
                 f"torch.compile is disabled: torch requires {requirement}, but Triton {installed} is installed"
             )
         return
-
-
-# Accelerate placement strategies accepted for LoadOptions.device_map.
-DEVICE_MAPS = ("auto", "balanced", "balanced_low_0", "sequential")
 
 
 def is_hub_id(run):
@@ -132,6 +130,7 @@ class LoadOptions:
 
     dtype        None = fp32 (bf16 when the checkpoint was trained with a bf16 backbone). bf16 halves memory for
                  serving large backbones; probabilities then differ from fp32 in the third decimal.
+                 An explicit dtype overrides the checkpoint default without changing its merge policy.
     merge        fold the LoRA into the base weights in fp32 before any cast. Exact in fp32; in bf16 it is faster (~15%)
                  and closer to fp32 than merging directly into bf16. Ignored for adapters that carry trained token embeddings.
     attn         attention backend; None = the model default (SDPA on CUDA, eager elsewhere). "sdpa" on MPS measured
@@ -153,6 +152,11 @@ class LoadOptions:
     cuda_graph_max_tokens
                  largest captured row. Longer rows use eager inference. The conservative default avoids padding
                  regressions on long requests; raise it only after measuring the target model and workload.
+    fused_kernels
+                 fused Qwen3.5 inference kernels (jevany.fused_kernels): one-kernel RMSNorms, merged projections, the
+                 Gated DeltaNet gate inside FLA's kernel and transposed weight storage. Needs the LoRA merged, one
+                 CUDA device and flash-linear-attention; the gain comes inside CUDA graphs. Probabilities are close
+                 to, not identical with, the unfused path.
     """
     dtype: torch.dtype | None = None
     merge: bool = True
@@ -166,6 +170,7 @@ class LoadOptions:
     max_memory_gib: float | None = None
     cuda_graphs: bool = False
     cuda_graph_max_tokens: int = 2048
+    fused_kernels: bool = False
 
     def __post_init__(self):
         if self.compile_mode not in (None, *COMPILE_MODES):
@@ -183,11 +188,15 @@ class LoadOptions:
             raise ValueError("cuda_graphs require the whole model on one GPU; disable device_map")
         if type(self.cuda_graph_max_tokens) is not int or self.cuda_graph_max_tokens < 1:
             raise ValueError("cuda_graph_max_tokens must be a positive integer")
+        if self.fused_kernels and self.compile_mode:
+            raise ValueError("fused_kernels and compile_mode cannot be combined")
+        if self.fused_kernels and self.device_map is not None:
+            raise ValueError("fused_kernels require the whole model on one GPU; disable device_map")
 
     @classmethod
     def from_env(cls, env=os.environ):
         """Read checkpoint loading, placement and optional inference acceleration settings."""
-        return cls(dtype={"bf16": torch.bfloat16, "fp16": torch.float16}.get(env.get("JEVANY_DTYPE", "")),
+        return cls(dtype={"fp32": torch.float32, "bf16": torch.bfloat16, "fp16": torch.float16}.get(env.get("JEVANY_DTYPE", "")),
                    merge=env.get("JEVANY_MERGE", "1") != "0", attn=env.get("JEVANY_ATTN") or None,
                    lora_scale=float(env.get("JEVANY_LORA_SCALE", "1")),
                    temperature=float(env["JEVANY_TEMPERATURE"]) if env.get("JEVANY_TEMPERATURE") else None,
@@ -197,15 +206,8 @@ class LoadOptions:
                    device_map=env.get("JEVANY_DEVICE_MAP") or None,
                    max_memory_gib=float(env["JEVANY_MAX_MEMORY_GIB"]) if env.get("JEVANY_MAX_MEMORY_GIB") else None,
                    cuda_graphs=env.get("JEVANY_CUDA_GRAPHS", "0") == "1",
-                   cuda_graph_max_tokens=int(env.get("JEVANY_CUDA_GRAPH_MAX_TOKENS", "2048")))
-
-
-def add_placement_arguments(parser):
-    """--device-map / --max-memory-gib for the command-line tools; explicit flags override the environment."""
-    parser.add_argument("--device-map", choices=DEVICE_MAPS, default=None,
-                        help="split the backbone over all visible GPUs (Accelerate); overrides JEVANY_DEVICE_MAP")
-    parser.add_argument("--max-memory-gib", type=float, default=None,
-                        help="per-GPU weight budget with --device-map; overrides JEVANY_MAX_MEMORY_GIB")
+                   cuda_graph_max_tokens=int(env.get("JEVANY_CUDA_GRAPH_MAX_TOKENS", "2048")),
+                   fused_kernels=env.get("JEVANY_FUSED_KERNELS", "0") == "1")
 
 
 def load_options_from_args(args, env=os.environ):
@@ -234,11 +236,13 @@ class Checkpoint:
                 raise ValueError("torch.compile acceleration is supported only on CUDA")
             _check_compile_runtime()
         meta = self.meta
-        dtype, merge = opts.dtype or torch.float32, opts.merge
+        default_dtype = torch.bfloat16 if meta.weights_dtype == "bf16" else torch.float32
+        dtype = opts.dtype if opts.dtype is not None else default_dtype
+        merge = opts.merge
         if meta.weights_dtype == "bf16":
-            # The exact path keeps the FP32 adapter separate from BF16 base weights.
-            # An explicit fast-mode opt-in permits the lossy BF16 merge.
-            dtype, merge = torch.bfloat16, merge and opts.merge_bf16
+            # Preserve the checkpoint's separate-adapter default even when dtype is overridden.
+            # Merging still requires the explicit fast-mode opt-in.
+            merge = merge and opts.merge_bf16
         source, revision = meta.base, meta.base_revision
         if opts.base_load_path:
             if not Path(opts.base_load_path).is_dir():
@@ -258,6 +262,14 @@ class Checkpoint:
         # Keep that association intact instead of merging the wrapper away.
         merge = (merge and meta.decision_mode != "lm_token"
                  and not adapter_config.get("trainable_token_indices"))
+        if opts.fused_kernels:
+            if not str(device).startswith("cuda"):
+                raise ValueError("fused_kernels run on CUDA only")
+            if not merge:
+                raise ValueError("fused_kernels need the LoRA merged into the backbone (JEVANY_MERGE_BF16=1 for BF16 "
+                                 "checkpoints); direct-token checkpoints and trainable token embeddings stay unmerged")
+            from .fused_kernels import load_kernels
+            load_kernels()   # fail before loading weights when flash-linear-attention is missing
         saved_args = meta.extra.get("args", {})
         lora_targets = saved_args.get("lora_targets", "all")
         explicit_targets = saved_args.get("lora_target_modules", "")
@@ -295,7 +307,11 @@ class Checkpoint:
             "compile_mode": opts.compile_mode,
             "lora_merged": bool(merge),
             "approximate_bf16_merge": bool(merge and meta.weights_dtype == "bf16"),
+            "fused_kernels": None,
         }
+        if opts.fused_kernels:
+            from .fused_kernels import fuse_qwen3_5
+            m.inference_acceleration["fused_kernels"] = fuse_qwen3_5(m.lm)
         if opts.compile_mode:
             m.lm.compile(mode=opts.compile_mode, fullgraph=False, dynamic=True)
         graphs = None

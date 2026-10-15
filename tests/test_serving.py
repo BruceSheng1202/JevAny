@@ -14,7 +14,7 @@ from jevany.api import to_record
 from jevany.backbones import BackboneAdapter, InferenceCapabilities
 from jevany.checkpoint import Meta, write_meta
 from jevany.inference import add_inference_arguments, inference_options_from_args
-from jevany.model import DecisionModel, load_tokenizer
+from jevany.model import ContextLengthError, DecisionModel, load_tokenizer
 from jevany.serve import create_app
 from test_backbones import make_base
 
@@ -110,6 +110,10 @@ def test_checkpoint_python_http_and_prefix_parity(tmp_path, family, request_body
         assert description["limits"]["branch_tokens"] == 512
         assert description["prefix_cache"]["hits"] == 2 * cache_enabled
         assert description["branch_mode"] == local.runtime.model.branch_mode
+        local_models = local.models()
+        assert len(local_models) == 1
+        for field in ("id", "aliases", "capabilities", "branch_mode", "prefix_cache"):
+            assert local_models[0][field] == description[field]
         kernels = description["acceleration"]["linear_attention_kernels"]
         assert (kernels is None) == (not local.runtime.model.hybrid)
         assert kernels is None or set(kernels) == {"flash_linear_attention", "causal_conv1d"}
@@ -123,6 +127,7 @@ def test_checkpoint_python_http_and_prefix_parity(tmp_path, family, request_body
 @pytest.mark.parametrize("options", [
     {"max_state_tokens": 0}, {"max_branch_tokens": -1}, {"max_packed_tokens": 2.5},
     {"prefix_cache_size": -1}, {"prefix_min_tokens": True},
+    {"max_batch_size": 0}, {"max_batch_size": -1}, {"max_batch_size": True}, {"max_batch_size": 1.5},
 ])
 def test_invalid_inference_options(options):
     with pytest.raises(ValueError, match="must be an integer"):
@@ -134,10 +139,13 @@ def test_environment_settings_and_cli_overrides(monkeypatch):
     monkeypatch.setenv("JEVANY_MAX_STATE_TOKENS", "128")
     monkeypatch.setenv("JEVANY_PREFIX_CACHE", "2")
     monkeypatch.setenv("JEVANY_PREFIX_MIN_TOKENS", "32")
+    monkeypatch.setenv("JEVANY_MAX_BATCH_SIZE", "8")
     parser = argparse.ArgumentParser()
     add_inference_arguments(parser)
     actual = inference_options_from_args(parser.parse_args(["--prefix-cache-size", "0"]))
-    assert actual == InferenceOptions(max_state_tokens=128, prefix_cache_size=0, prefix_min_tokens=32)
+    assert actual == InferenceOptions(max_state_tokens=128, prefix_cache_size=0, prefix_min_tokens=32,
+                                      max_batch_size=8)
+    assert inference_options_from_args(parser.parse_args(["--max-batch-size", "3"])).max_batch_size == 3
     with pytest.raises(ValueError, match="JEVANY_PREFIX_CACHE must be an integer"):
         InferenceOptions.from_env({"JEVANY_PREFIX_CACHE": "bad"})
     with pytest.raises(ValueError, match="prefix_cache_size"):
@@ -229,7 +237,8 @@ def test_model_context_and_invalid_requests_fail_before_forward(checkpoint, requ
         local(request_body.model_dump() | {"media": [{"type": "image", "uri": "unused.png"}]})
 
 
-def test_state_branch_and_packed_limits(checkpoint, request_body):
+@pytest.mark.parametrize("max_batch_size", [1, 8])
+def test_state_branch_and_packed_limits(checkpoint, request_body, max_batch_size):
     baseline = JevModel.from_pretrained(checkpoint, device="cpu")
     record, _ = to_record(request_body)
     encoded = baseline.runtime.model.encode(baseline.runtime.tok, record)
@@ -237,7 +246,8 @@ def test_state_branch_and_packed_limits(checkpoint, request_body):
     branch_tokens = state_tokens + max(encoded["seg"].count(i) for i in (1, 2, 3))
     packed_tokens = len(encoded["ids"])
     exact = InferenceOptions(max_state_tokens=state_tokens, max_branch_tokens=branch_tokens,
-                             max_packed_tokens=packed_tokens, prefix_cache_size=0)
+                             max_packed_tokens=packed_tokens, prefix_cache_size=0,
+                             max_batch_size=max_batch_size)
     baseline.runtime.inference_options = exact
     assert baseline(request_body)["answers"]
     for name, limit, error in [
@@ -246,14 +256,50 @@ def test_state_branch_and_packed_limits(checkpoint, request_body):
         ("max_packed_tokens", packed_tokens, "packed tokens"),
     ]:
         baseline.runtime.inference_options = replace(exact, **{name: limit - 1})
-        with pytest.raises(ValueError, match=error):
+        with pytest.raises(ContextLengthError, match=error):
             baseline(request_body)
+        with TestClient(create_app(model=baseline)) as http:
+            response = http.post("/v1/systemone", json=request_body.model_dump())
+            assert response.status_code == 422
+            assert response.headers["X-JevAny-Error-Code"] == "context_length_exceeded"
 
 
-def test_cache_eviction_failure_recovery_and_concurrent_requests(checkpoint, request_body, monkeypatch):
+def test_media_directory_permission_error_explains_how_to_retry(tmp_path, monkeypatch):
+    from pathlib import Path
+    from fastapi import HTTPException
+    from PIL import Image
+    from jevany import serve
+
+    image = tmp_path / "image.png"
+    Image.new("RGB", (16, 16), "red").save(image)
+    monkeypatch.setattr(serve, "MEDIA_ROOT", str(tmp_path))
+    request = SystemOneRequest(
+        state="state", media=[{"type": "image", "uri": str(image)}],
+        questions={"color": Choice(criteria={"red": None, "blue": None})},
+    )
+    resolve = Path.resolve
+
+    def inaccessible(path, *args, **kwargs):
+        if path == image:
+            raise PermissionError("the server user cannot traverse the frame directory")
+        return resolve(path, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "resolve", inaccessible)
+        with pytest.raises(HTTPException) as caught:
+            serve.prepare(request)
+        assert caught.value.status_code == 422
+        assert "shared directory and file permissions" in caught.value.detail
+    assert serve.prepare(request).media[0].uri == str(image)
+
+
+@pytest.mark.parametrize("max_batch_size", [1, 8])
+def test_cache_eviction_failure_recovery_and_concurrent_requests(checkpoint, request_body, monkeypatch,
+                                                                max_batch_size):
     local = JevModel.from_pretrained(
         checkpoint, device="cpu",
-        inference_options=InferenceOptions(prefix_cache_size=1, prefix_min_tokens=0))
+        inference_options=InferenceOptions(prefix_cache_size=1, prefix_min_tokens=0,
+                                            max_batch_size=max_batch_size))
     first = local(request_body)
     local(request_body.model_copy(update={"state": "other"}))
     assert len(local.runtime.prefix_cache) == 1
@@ -369,7 +415,7 @@ def test_native_media_checkpoint_python_http_parity(tmp_path, family, monkeypatc
         backbone_adapter=model.backbone_adapter, branch_mode=model.branch_mode,
     ))
     local = JevModel.from_pretrained(
-        checkpoint, device="cpu", inference_options=InferenceOptions(prefix_min_tokens=0))
+        checkpoint, device="cpu", inference_options=InferenceOptions(prefix_min_tokens=0, max_batch_size=8))
     image = tmp_path / "image.png"
     Image.new("RGB", (28, 28), "red").save(image)
     request = SystemOneRequest(
@@ -378,6 +424,7 @@ def test_native_media_checkpoint_python_http_parity(tmp_path, family, monkeypatc
     )
     expected = local(request)
     assert local.describe()["prefix_cache"]["cached_states"] == 0
+    assert not local.describe()["batching"]["enabled"]
     monkeypatch.setattr(serve, "MEDIA_ROOT", str(tmp_path))
     with TestClient(create_app(model=local)) as http:
         body = request.model_dump()
@@ -408,7 +455,8 @@ def _varied_requests(request_body):
 
 
 @pytest.mark.parametrize("family", ["llama", "qwen35"])
-def test_request_batching_matches_serial_scoring(tmp_path, request_body, family):
+@pytest.mark.parametrize("max_batch_size", [3, 8])
+def test_request_batching_matches_serial_scoring(tmp_path, request_body, family, max_batch_size):
     import time
     checkpoint = make_checkpoint(tmp_path, family)
     serial = JevModel.from_pretrained(checkpoint, device="cpu", inference_options=InferenceOptions())
@@ -417,25 +465,35 @@ def test_request_batching_matches_serial_scoring(tmp_path, request_body, family)
     assert serial.describe()["batching"] == {"enabled": False, "max_batch_size": 1, "batches": 0, "batched_requests": 0}
 
     batched = JevModel.from_pretrained(checkpoint, device="cpu",
-                                       inference_options=InferenceOptions(max_batch_size=8, prefix_cache_size=0))
+                                       inference_options=InferenceOptions(max_batch_size=max_batch_size,
+                                                                          prefix_cache_size=0))
     runtime = batched.runtime
-    runtime.model_lock.acquire()   # hold the model so every request queues before the first forward
-    with ThreadPoolExecutor(len(requests)) as pool:
-        try:
-            futures = [pool.submit(batched, request) for request in requests]
-            deadline = time.monotonic() + 30
-            while len(runtime.pending) < len(requests) and time.monotonic() < deadline:
-                time.sleep(0.01)
-            queued = len(runtime.pending)
-        finally:
-            runtime.model_lock.release()
-        actual = [future.result(timeout=60) for future in futures]
+    with TestClient(create_app(model=batched)) as http:
+        def call(index, request):
+            if index % 2:
+                return batched(request)
+            response = http.post("/v1/systemone", json=request.model_dump())
+            assert response.status_code == 200
+            return response.json()
+
+        runtime.model_lock.acquire()   # hold the model so every request queues before the first forward
+        with ThreadPoolExecutor(len(requests)) as pool:
+            try:
+                futures = [pool.submit(call, index, request) for index, request in enumerate(requests)]
+                deadline = time.monotonic() + 30
+                while len(runtime.pending) < len(requests) and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                queued = len(runtime.pending)
+            finally:
+                runtime.model_lock.release()
+            actual = [future.result(timeout=60) for future in futures]
     assert queued == len(requests)
     for left, right in zip(actual, expected):
         assert_answers_close(left["answers"], right["answers"])
         assert left["usage"] == right["usage"]
     stats = batched.describe()["batching"]
-    assert stats["batched_requests"] == len(requests) and stats["batches"] < len(requests)
+    assert stats["batched_requests"] == len(requests)
+    assert stats["batches"] == (len(requests) + max_batch_size - 1) // max_batch_size
     alone = batched(requests[0])   # an idle runtime scores one request alone
     assert_answers_close(alone["answers"], expected[0]["answers"])
     with TestClient(create_app(model=batched)) as http:
@@ -445,7 +503,9 @@ def test_request_batching_matches_serial_scoring(tmp_path, request_body, family)
         assert http.post("/v1/systemone", json=requests[1].model_dump() | {"questions": {}}).status_code == 422
 
 
-def test_request_batching_isolates_failures_and_respects_token_budget(checkpoint, request_body, monkeypatch):
+@pytest.mark.parametrize("family", ["llama", "qwen35"])
+def test_request_batching_isolates_failures_and_respects_token_budget(tmp_path, request_body, monkeypatch, family):
+    checkpoint = make_checkpoint(tmp_path, family)
     local = JevModel.from_pretrained(checkpoint, device="cpu",
                                      inference_options=InferenceOptions(max_batch_size=8, prefix_cache_size=0))
     runtime = local.runtime

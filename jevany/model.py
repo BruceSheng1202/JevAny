@@ -19,6 +19,10 @@ BASE_VERBALIZERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567
 MAX_DECISION_OPTIONS = 255
 
 
+class ContextLengthError(ValueError):
+    """A valid request cannot fit the configured token limits."""
+
+
 def load_tokenizer(name, revision=None):
     return get_backbone_adapter("text").load_preprocessor(name, revision)
 
@@ -103,7 +107,7 @@ def encode(tok, rec, max_state=MAX_STATE, max_branch=MAX_BRANCH, strict=False, o
     """
     state_tokens = user_tokens(tok, rec["state"])
     if strict and len(state_tokens) + 1 > max_state:
-        raise ValueError(f"state exceeds {max_state} tokens: {len(state_tokens) + 1}")
+        raise ContextLengthError(f"state exceeds {max_state} tokens: {len(state_tokens) + 1}")
     special = decision_tokens(tok)
     S = [tok.convert_tokens_to_ids(special[0])] + state_tokens[: max_state - 1]
     ids, seg, pos, opt = list(S), [0] * len(S), list(range(len(S))), [OPT_NONE] * len(S)
@@ -114,7 +118,7 @@ def encode(tok, rec, max_state=MAX_STATE, max_branch=MAX_BRANCH, strict=False, o
         spans = [[o_id] + user_tokens(tok, o) + [c_id] for o in q["options"]]
         br = instr + [t for sp in spans for t in sp] + [d_id]
         if len(br) > max_branch - len(S):
-            raise ValueError(f"branch too long: {len(br)}")
+            raise ContextLengthError(f"branch too long: {len(S) + len(br)} tokens (limit: {max_branch})")
         base = len(ids); p0 = len(S)
         br_opt = [OPT_NONE] * len(instr) + [j for j, sp in enumerate(spans) for _ in sp] + [OPT_DECIDE]
         if option_isolation:
@@ -177,14 +181,14 @@ def encode_multimodal(processor, rec, max_state=MAX_STATE, max_branch=MAX_BRANCH
     state_len = question_starts[0]
     text_state_len = len(user_tokens(tok, rec["state"])) + 1
     if strict and text_state_len > max_state:
-        raise ValueError(f"multimodal text state exceeds {max_state} tokens: {text_state_len}")
+        raise ContextLengthError(f"multimodal text state exceeds {max_state} tokens: {text_state_len}")
     opt_idx, seg = [], [0] * state_len
     for index, (start, end, question) in enumerate(zip(question_starts, decide_idx, rec["questions"]), start=1):
         ends = [position for position in range(start, end) if ids[position] == close_id]
         if len(ends) != len(question["options"]):
             raise ValueError("multimodal option delimiter layout mismatch")
         if end - start + 1 + state_len > max_branch:
-            raise ValueError(f"multimodal branch exceeds {max_branch} tokens")
+            raise ContextLengthError(f"multimodal branch exceeds {max_branch} tokens")
         opt_idx.append(ends)
         seg.extend([index] * (end - start + 1))
     if len(seg) != len(ids):
@@ -201,7 +205,7 @@ def fits(rec, *tokenizers, max_state=MAX_STATE, max_branch=MAX_BRANCH, max_packe
     given (frozen suites are admitted against the tokenizers of all their pinned bases)."""
     try:
         return all(len(encode(tok, rec, max_state=max_state, max_branch=max_branch, strict=True)["ids"]) <= max_packed for tok in tokenizers)
-    except ValueError:
+    except ContextLengthError:
         return False
 
 
@@ -306,17 +310,8 @@ class DecisionModel(nn.Module):
             raise ValueError(f"backbone adapter {self.backbone_adapter!r} does not support device_map")
         self.lm, self.mm = self.adapter.load_model(name, revision=revision, dtype=dtype, attn=attn,
                                                    **({"placement": placement} if placement else {}))
-        if placement:
-            # Accelerate returns the top-level model's output on the input device, but the backbone is a submodule
-            # (and PEFT wraps it later), so bring its hidden states back to `device` for the readout. Registered on
-            # the raw backbone, the hook survives PEFT wrapping and merge_and_unload().
-            home = torch.device(device)
-            def hidden_to_device(module, args, output):
-                hidden = getattr(output, "last_hidden_state", None)
-                if hidden is not None and hidden.device != home:
-                    output.last_hidden_state = hidden.to(home)
-                return output
-            self.lm.register_forward_hook(hidden_to_device)
+        # Keep backbone outputs on their producing device. Readout selects the
+        # needed token vectors there before transferring them to the head.
         added_token_ids = prepare_embeddings(self.lm, tokenizer)
         for module in self.adapter.frozen_modules(self.mm):
             module.requires_grad_(False)
@@ -342,7 +337,10 @@ class DecisionModel(nn.Module):
             extra = {"trainable_token_indices": {embedding_name: [
                 tokenizer.convert_tokens_to_ids(t) for t in decision_tokens(tokenizer)
             ]}} if self.special_embeddings else {}
-            targets = self.adapter.lora_modules(self.lm, lora_targets, lora_target_modules)
+            targets = self.adapter.lora_modules(
+                self.lm, lora_targets, lora_target_modules,
+                **({"lora_dropout": lora_dropout}
+                   if "lora_dropout" in inspect.signature(self.adapter.lora_modules).parameters else {}))
             cfg = LoraConfig(task_type="FEATURE_EXTRACTION", r=lora, lora_alpha=2 * lora,
                              lora_dropout=lora_dropout, target_modules=targets, **extra)
             self.set_language_model(get_peft_model(self.lm, cfg))
@@ -369,6 +367,10 @@ class DecisionModel(nn.Module):
         self.verbalizers = (list(verbalizers) if verbalizers is not None
                             else decision_verbalizers(tokenizer)) if decision_mode == "lm_token" else []
         self.verbalizer_ids = verbalizer_token_ids(tokenizer, self.verbalizers) if self.verbalizers else []
+        index_device = self.lm_head.weight.device if self.lm_head is not None else device
+        self.register_buffer("_verbalizer_index",
+                             torch.tensor(self.verbalizer_ids, dtype=torch.long, device=index_device),
+                             persistent=False)
         self.temperature = 1.0
         self.device = device
         self.device_map = device_map
@@ -463,25 +465,32 @@ class DecisionModel(nn.Module):
         return ids, pos, att
 
     def hidden_batch(self, encs):
-        """[B, L_max, d] hidden states for a right-padded batch of encoded records under the packed block-causal mask."""
+        """Full [B, L_max, d] packed hidden states in FP32 on the requested device."""
+        return self._hidden_batch(encs).to(device=self.device, dtype=torch.float32)
+
+    def _hidden_batch(self, encs):
+        """Packed backbone output in its native dtype and device, before readout selection."""
         ids, pos, _ = self._pad_rows([(e["ids"], e["pos"]) for e in encs])
         isolate = any(e.get("option_isolation") for e in encs)
         if isolate and not all(e.get("option_isolation") for e in encs):
             raise ValueError("cannot mix option-isolated and plain encodings in one batch")
         lm_dtype = next(self.lm.parameters()).dtype
         mask = branch_mask_batch([e["seg"] for e in encs], self.device, dtype=lm_dtype, opts=[e["opt"] for e in encs] if isolate else None, length=ids.shape[1])
-        return self.lm(input_ids=ids, position_ids=pos, attention_mask=mask).last_hidden_state.float()   # head stays fp32
+        return self.adapter.forward(self.lm, input_ids=ids, position_ids=pos, attention_mask=mask, use_cache=False).last_hidden_state
 
     def _question_readout(self, h, decide, options):
-        query = h[decide]
         if self.decision_mode == "lm_token":
-            logits = F.linear(query.to(self.lm_head.weight.device, self.lm_head.weight.dtype), self.lm_head.weight).float()
-            if self.training:
-                return logits
-            candidates = torch.tensor(self.verbalizer_ids[:len(options)], device=logits.device)
-            logits = logits.index_select(0, candidates)
-            return logits if self.temperature == 1.0 else logits / self.temperature
-        return self.head(query, h[torch.tensor(options, device=self.device)])
+            query = h[decide].float()
+            weight = self.lm_head.weight
+            if not self.training:
+                # Inference normalizes over candidates only. Selecting rows
+                # before projection avoids scoring the rest of the vocabulary.
+                weight = weight.index_select(0, self._verbalizer_index[:len(options)])
+            logits = F.linear(query.to(weight.device, weight.dtype), weight).float()
+            return logits if self.training or self.temperature == 1.0 else logits / self.temperature
+        indices = torch.tensor([decide, *options], device=h.device, dtype=torch.long)
+        selected = h.index_select(0, indices).to(device=self.head.q.weight.device, dtype=torch.float32)
+        return self.head(selected[0], selected[1:])
 
     def _readout(self, h, enc):
         return [self._question_readout(h, d, oi)
@@ -502,7 +511,7 @@ class DecisionModel(nn.Module):
             for r in brs:
                 rows.append((S + r["ids"], Sp + r["pos"])); readouts.append((b, len(S) + r["decide"], [len(S) + o for o in r["opts"]]))
         ids, pos, att = self._pad_rows(rows)
-        h = self.lm(input_ids=ids, position_ids=pos, attention_mask=att).last_hidden_state.float()
+        h = self.adapter.forward(self.lm, input_ids=ids, position_ids=pos, attention_mask=att, use_cache=False).last_hidden_state
         out = [[] for _ in encs]
         for i, (b, d, oi) in enumerate(readouts):
             out[b].append(self._question_readout(h[i], d, oi))
@@ -518,7 +527,7 @@ class DecisionModel(nn.Module):
         kwargs = media_to(enc["mm"], self.device)
         ids = torch.tensor([enc["ids"]], device=self.device)
         kwargs.setdefault("attention_mask", torch.ones_like(ids))
-        hidden = self.adapter.forward_media(self.lm, self.mm, {"input_ids": ids, **kwargs})[0].float()
+        hidden = self.adapter.forward_media(self.lm, self.mm, {"input_ids": ids, **kwargs})[0]
         return self._readout(hidden, enc)
 
     def forward_batch(self, encs):
@@ -526,7 +535,7 @@ class DecisionModel(nn.Module):
         if any(enc.get("multimodal") for enc in encs):
             return [self.forward_multimodal(enc) if enc.get("multimodal") else self.forward_rows_batch([enc])[0] for enc in encs]
         if self.branch_mode == "rows": return self.forward_rows_batch(encs)
-        hs = self.hidden_batch(encs)
+        hs = self._hidden_batch(encs)
         return [self._readout(hs[b], e) for b, e in enumerate(encs)]
 
     @torch.no_grad()
@@ -544,7 +553,8 @@ class DecisionModel(nn.Module):
         cache = copy.deepcopy(cache); cache.reorder_cache(torch.zeros(Q, dtype=torch.long, device=self.device))
         ids, pos, att = self._pad_rows([(r["ids"], r["pos"]) for r in rows])
         att = torch.cat([torch.ones((Q, len(S)), dtype=torch.long, device=self.device), att], 1)   # the cached state tokens are all real
-        h = self.lm(input_ids=ids, position_ids=pos, attention_mask=att, past_key_values=cache, use_cache=True).last_hidden_state.float()
+        h = self.adapter.forward(self.lm, input_ids=ids, position_ids=pos, attention_mask=att,
+                                 past_key_values=cache, use_cache=True).last_hidden_state
         return [F.softmax(self._question_readout(h[i], r["decide"], r["opts"]), -1).cpu()
                 for i, r in enumerate(rows)]
 
@@ -561,8 +571,9 @@ class DecisionModel(nn.Module):
         Ls = enc["seg"].count(0)
         ids = torch.tensor([enc["ids"][:Ls]], device=self.device); pos = torch.tensor([enc["pos"][:Ls]], device=self.device)
         # the cache must know the layer types (hybrid backbones keep recurrent + conv states per DeltaNet layer)
-        out = self.lm(input_ids=ids, position_ids=pos, past_key_values=self.adapter.new_cache(self.lm), use_cache=True)
-        return Ls, out.past_key_values, out.last_hidden_state[0].float()
+        out = self.adapter.forward(self.lm, input_ids=ids, position_ids=pos,
+                                   past_key_values=self.adapter.new_cache(self.lm), use_cache=True)
+        return Ls, out.past_key_values, out.last_hidden_state[0]
 
     @torch.no_grad()
     def probs_and_prefix(self, enc):
@@ -578,8 +589,9 @@ class DecisionModel(nn.Module):
         ids = torch.tensor([enc["ids"]], device=self.device); pos = torch.tensor([enc["pos"]], device=self.device)
         dt = next(self.lm.parameters()).dtype
         mask = branch_mask_batch([enc["seg"]], self.device, dtype=dt, opts=[enc["opt"]] if enc.get("option_isolation") else None)
-        out = self.lm(input_ids=ids, position_ids=pos, attention_mask=mask, past_key_values=self.adapter.new_cache(self.lm), use_cache=True)
-        h = out.last_hidden_state[0].float()
+        out = self.adapter.forward(self.lm, input_ids=ids, position_ids=pos, attention_mask=mask,
+                                   past_key_values=self.adapter.new_cache(self.lm), use_cache=True)
+        h = out.last_hidden_state[0]
         out.past_key_values.crop(-(len(enc["ids"]) - Ls))     # keep the state only (negative = drop that many trailing tokens; positive form deprecated in transformers 5)
         return [F.softmax(z, -1).cpu() for z in self._readout(h, enc)], (Ls, out.past_key_values, h[:Ls].clone())
 
@@ -596,8 +608,9 @@ class DecisionModel(nn.Module):
         dt = next(self.lm.parameters()).dtype
         mask = branch_mask_batch([enc["seg"]], self.device, dtype=dt, opts=[enc["opt"]] if enc.get("option_isolation") else None)[:, :, Ls:, :]
         try:
-            out = self.lm(input_ids=ids, position_ids=pos, past_key_values=cache, attention_mask=mask, use_cache=True)
-            h = torch.cat([h_state, out.last_hidden_state[0].float()], 0)
+            out = self.adapter.forward(self.lm, input_ids=ids, position_ids=pos,
+                                       past_key_values=cache, attention_mask=mask, use_cache=True)
+            h = torch.cat([h_state, out.last_hidden_state[0]], 0)
         finally:
             cache.crop(-(len(enc["ids"]) - Ls))
         return [F.softmax(z, -1).cpu() for z in self._readout(h, enc)]

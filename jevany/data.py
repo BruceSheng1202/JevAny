@@ -99,38 +99,39 @@ def none_pair(request, rng):
     return [{**common, "questions": {question_id: present}}, {**common, "questions": {question_id: absent}}]
 
 
-def load_records(path, source="custom"):
+def load_records(path: str | Path, source: str = "custom") -> list[dict]:
     """Load one labelled System One request per JSONL line."""
     records = []
-    for index, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines()):
-        if not line.strip():
-            continue
-        try:
-            record = json.loads(line)
-            if not isinstance(record, dict) or "state" not in record or not isinstance(record.get("questions"), dict) or not record["questions"]:
-                raise ValueError("a record needs a state and non-empty questions")
-            for question_id, question in record["questions"].items():
-                if not isinstance(question, dict) or "label" not in question:
-                    raise ValueError(f"question {question_id!r} has no label")
-                question.setdefault("src", f"{source}_{question.get('type', 'unknown')}")
-            materialize(record)
-            if not isinstance(record.get("_meta", {}), dict):
-                raise ValueError("_meta must be an object")
-        except (ValueError, TypeError, KeyError) as error:
-            raise ValueError(f"{path}:{index + 1}: {error}") from error
-        resolve_media(record, Path(path).parent)
-        text = record["state"] if isinstance(record["state"], str) else json.dumps(record["state"], sort_keys=True, ensure_ascii=False)
-        defaults = {
-            "source": source,
-            "variant": "clean",
-            "id": f"{source}/{index}",
-            "group_id": f"{source}/{index}",
-            "row": index,
-            "split": "custom",
-            "text_sha256": hashlib.sha256(" ".join(text.casefold().split()).encode()).hexdigest(),
-        }
-        record["_meta"] = {**defaults, **record.get("_meta", {})}
-        records.append(record)
+    with Path(path).open(encoding="utf-8") as stream:
+        for index, line in enumerate(stream):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+                if not isinstance(record, dict) or "state" not in record or not isinstance(record.get("questions"), dict) or not record["questions"]:
+                    raise ValueError("a record needs a state and non-empty questions")
+                for question_id, question in record["questions"].items():
+                    if not isinstance(question, dict) or "label" not in question:
+                        raise ValueError(f"question {question_id!r} has no label")
+                    question.setdefault("src", f"{source}_{question.get('type', 'unknown')}")
+                materialize(record)
+                if not isinstance(record.get("_meta", {}), dict):
+                    raise ValueError("_meta must be an object")
+            except (ValueError, TypeError, KeyError) as error:
+                raise ValueError(f"{path}:{index + 1}: {error}") from error
+            resolve_media(record, Path(path).parent)
+            text = record["state"] if isinstance(record["state"], str) else json.dumps(record["state"], sort_keys=True, ensure_ascii=False)
+            defaults = {
+                "source": source,
+                "variant": "clean",
+                "id": f"{source}/{index}",
+                "group_id": f"{source}/{index}",
+                "row": index,
+                "split": "custom",
+                "text_sha256": hashlib.sha256(" ".join(text.casefold().split()).encode()).hexdigest(),
+            }
+            record["_meta"] = {**defaults, **record.get("_meta", {})}
+            records.append(record)
     if not records:
         raise ValueError(f"{path}: no records")
     return records
@@ -184,6 +185,11 @@ def materialize(request):
 def validate_dataset(path: str | Path) -> dict:
     """Validate labelled JSONL without loading weights; return counts by type/source."""
     records = load_records(path)
+    return _dataset_summary(records, path)
+
+
+def _dataset_summary(records: list[dict], path: str | Path) -> dict:
+    """Validate media and summarize records that already passed load_records."""
     missing = [item["uri"] for record in records for item in record.get("media", [])
                if "://" not in item["uri"] and not Path(item["uri"]).is_file()]
     if missing:
