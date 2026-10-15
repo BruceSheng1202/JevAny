@@ -138,6 +138,49 @@ def test_calibration_uses_log_masses_before_raw_softmax_underflow():
     assert math.log(readout.calibrated_probabilities["B"]) == pytest.approx(-500.0)
 
 
+@pytest.mark.parametrize("temperature", [1e-309, math.ulp(0.0)])
+@pytest.mark.parametrize("probabilities, expected", [
+    ({"C": 0.5, "A": 0.5, "B": 0.0}, {"C": 0.5, "A": 0.5, "B": 0.0}),
+    ({"C": 0.2, "A": 0.7, "B": 0.1}, {"C": 0.0, "A": 1.0, "B": 0.0}),
+])
+def test_tiny_temperature_preserves_maxima_and_zero_probability(temperature, probabilities, expected):
+    calibrated = temper_probabilities(probabilities, temperature)
+
+    assert calibrated == pytest.approx(expected)
+    assert list(calibrated) == list(probabilities)
+    assert all(math.isfinite(value) for value in calibrated.values())
+    assert sum(calibrated.values()) == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("temperature", [1e-309, math.ulp(0.0)])
+@pytest.mark.parametrize("offset", [-1000.0, 0.0, 1000.0])
+@pytest.mark.parametrize("logits, expected", [
+    ([0.0, 0.0, -1.0], {"C": 0.5, "A": 0.5, "B": 0.0}),
+    ([-1.0, 0.0, -2.0], {"C": 0.0, "A": 1.0, "B": 0.0}),
+])
+def test_tiny_readout_temperature_is_stable_under_logit_offsets(temperature, offset, logits, expected):
+    readout = read_letter_distribution(
+        [logit + offset for logit in logits],
+        {"C": (0,), "A": (1,), "B": (2,)},
+        temperature=temperature,
+    )
+
+    assert readout.calibrated_probabilities == pytest.approx(expected)
+    assert list(readout.calibrated_probabilities) == ["C", "A", "B"]
+    assert all(math.isfinite(value) for value in readout.calibrated_probabilities.values())
+    assert sum(readout.calibrated_probabilities.values()) == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("temperature", [0.5, 1.0])
+def test_readout_temperature_preserves_distribution_for_large_finite_logits(temperature):
+    readout = read_letter_distribution(
+        [1e308, -1e308], {"A": (0,), "B": (1,)}, temperature=temperature * 1e308,
+    )
+
+    expected_b = 1.0 / (1.0 + math.exp(2.0 / temperature))
+    assert readout.calibrated_probabilities == pytest.approx({"A": 1.0 - expected_b, "B": expected_b})
+
+
 def test_temperature_one_is_an_exact_identity_and_order_is_preserved():
     probabilities = {"C": 0.7, "A": 0.2, "B": 0.1}
 
