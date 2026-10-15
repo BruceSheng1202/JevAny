@@ -1,0 +1,98 @@
+"""Copy the facts and records shown in the film from the repository evidence.
+
+Usage: python scripts/extract_data.py
+Writes src/data.js. Every number and record on screen comes from this file.
+"""
+
+import hashlib
+import json
+import tomllib
+from pathlib import Path
+
+FILM = Path(__file__).resolve().parents[1]
+REPO = FILM.parents[1]
+SOURCES = {
+    "cases": "docs/demos/case-showcase.json",
+    "playground": "docs/demos/playground-format.json",
+    "traces": "docs/demos/jev-agent-harness-traces.json",
+    "family": "results/model-family-v2.json",
+    "latency": "results/efficiency-h200-best-v1.json",
+    "models": "docs/supported-models.json",
+    "recipe": "recipes/sft.toml",
+    "rlcr": "recipes/rlcr.toml",
+    "train": "examples/train.jsonl",
+}
+# Demo wall order: robots first, then software, mobility, games.
+WALL = ["pg-arm", "block_stacking", "frontend", "drawer_opening", "research", "conveyor_sorting", "sql", "assembly", "pg-doom",
+        "inbox", "peg_insertion", "ci", "control_panel", "drone", "calendar", "obstacle_push", "pg-crafter", "lab", "spreadsheet",
+        "driving", "warehouse_rover"]
+SHORT = {
+    "SimpleJev/JevAny-Qwen3.8-27B-LoRA": "Qwen3.8-27B",
+    "SimpleJev/JevAny-Muse-Glimmer-30B-LoRA": "Muse-Glimmer-30B",
+    "SimpleJev/JevAny-Qwen3.5-4B-LoRA": "Qwen3.5-4B",
+    "SimpleJev/JevAny-Qwen3.5-4B-Direct-Token-LoRA": "Qwen3.5-4B Direct-Token",
+    "SimpleJev/JevAny-Gemma-4B-LoRA": "Gemma-4B",
+}
+
+
+def load(key):
+    path = REPO / SOURCES[key]
+    return path.read_text() if path.suffix in (".toml", ".jsonl") else json.loads(path.read_text())
+
+
+def main() -> None:
+    cases = load("cases")
+    playground = {c["case"]: c for c in load("playground")["cases"]}
+    wall = []
+    for name in WALL:
+        if name.startswith("pg-"):
+            case = playground[name[3:]]
+            assert case["controller"] == "model" and case["success"]
+            wall.append({"clip": name, "kind": "playground replay", "title": {"arm": "Robot peg insertion", "doom": "Doom corridor", "crafter": "Crafter survival"}[name[3:]]})
+        else:
+            info = cases["cases"][name]
+            wall.append({"clip": name, "kind": info["visual"], "title": info["title"]})
+
+    family = load("family")
+    checkpoints = []
+    for m in sorted(family["released_models"], key=lambda m: -m["transfer_v9_accuracy"]):
+        checkpoints.append({
+            "repository": m["repository"], "name": SHORT[m["repository"]], "readout": m["readout"],
+            "transfer": round(m["transfer_v9_accuracy"], 6), "jevbench": round(m["jevbench_public_accuracy"], 6),
+            "nll": round(m["transfer_v9_nll"], 4), "brier": round(m["transfer_v9_brier"], 4), "ece": round(m["transfer_v9_ece"], 4),
+        })
+    latency = next(r for r in load("latency")["rows"] if r["model"] == "JevAny-Qwen3.8-27B")
+    models = load("models")["models"]
+    recipe = tomllib.loads(load("recipe"))
+    rlcr = tomllib.loads(load("rlcr"))
+    record = load("train").splitlines()[0]
+    json.loads(record)
+    shop = load("traces")["webshop"]
+
+    data = {
+        "provenance": {k: {"path": v, "sha256": hashlib.sha256((REPO / v).read_bytes()).hexdigest()} for k, v in SOURCES.items()},
+        "wall": wall,
+        "checkpoints": checkpoints,
+        "training": {"records": family["training_data"]["records"], "decisions": family["training_data"]["questions"],
+                     "gpu_hours": round(family["training_compute"]["total_gpu_hours"]), "max_gpus": family["training_compute"]["maximum_parallel_gpus_per_run"],
+                     "hardware": family["training_compute"]["hardware"]},
+        "protocols": {"transfer": family["protocols"]["transfer_v9"]["questions"], "jevbench": family["protocols"]["jevbench_public"]["questions"]},
+        "supported": {"count": len(models), "families": sorted({m["family"] for m in models})},
+        "recipe": {k: recipe[k] for k in ("base", "data", "out", "device", "dtype", "lora", "epochs", "lr")},
+        "rlcr": {k: rlcr[k] for k in ("init_from", "rlcr", "rlcr_group_size", "epochs")},
+        "record": record,
+        "latency": {"model": latency["model"], "hardware": latency["hardware"], "suite": latency["panel"]["suite"], "records": latency["panel"]["records"],
+                    "before_ms": latency["before"]["median_ms"], "after_ms": latency["after"]["median_ms"], "speedup": latency["median_speedup"],
+                    "correct_before": latency["before"]["correct"], "correct_after": latency["after"]["correct"],
+                    "before_config": latency["before"]["configuration"], "after_config": latency["after"]["configuration"]},
+        "webshop": {"llm_calls": [shop["baseline"]["llm_calls"], shop["jev_harness"]["llm_calls"]], "reward": [shop["baseline"]["reward"], shop["jev_harness"]["reward"]],
+                    "selection": shop["selection"]},
+    }
+    out = FILM / "src/data.js"
+    out.write_text("// Generated by scripts/extract_data.py; do not edit by hand.\nwindow.FILM_DATA = " + json.dumps(data, indent=1, ensure_ascii=True) + ";\n")
+    print(json.dumps({"checkpoints": [(c["name"], c["transfer"], c["jevbench"]) for c in checkpoints], "supported": data["supported"], "training": data["training"],
+                      "latency": data["latency"]["before_ms"], "wall": len(wall)}, indent=1))
+
+
+if __name__ == "__main__":
+    main()

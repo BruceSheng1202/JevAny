@@ -13,7 +13,7 @@ from .checkpoint import Checkpoint, LoadOptions
 from .client import DecisionClient
 from .device import default_device, sync
 from .inference import InferenceOptions
-from .model import DecisionModel
+from .model import ContextLengthError, DecisionModel
 from .readout import resolve_readout_options
 
 DEFAULT_CHECKPOINT = "SimpleJev/JevAny-Qwen3.8-27B-LoRA"
@@ -74,7 +74,8 @@ class DecisionRuntime:
                     "linear_attention_kernels": (linear_attention_kernels()
                                                  if getattr(self.model, "hybrid", False) else None),
                 },
-                "capabilities": asdict(capabilities), "limits": self.limits,
+                "capabilities": {**asdict(capabilities), "media_types": list(capabilities.media_types)},
+                "limits": self.limits,
                 "prefix_cache": {
                     "enabled": self.inference_options.prefix_cache_size > 0 and capabilities.prefix_cache,
                     "size": self.inference_options.prefix_cache_size,
@@ -105,9 +106,11 @@ class DecisionRuntime:
                 self.tok, record, max_state=limits["state_tokens"], max_branch=limits["branch_tokens"], strict=True,
             )
             if len(encoding["ids"]) > limits["packed_tokens"]:
-                raise ValueError(f"request exceeds {limits['packed_tokens']} packed tokens: {len(encoding['ids'])}")
+                raise ContextLengthError(
+                    f"request exceeds {limits['packed_tokens']} packed tokens: {len(encoding['ids'])}")
             if capabilities.context_window is not None and max(encoding["pos"]) >= capabilities.context_window:
-                raise ValueError(f"request exceeds backbone context window of {capabilities.context_window} tokens")
+                raise ContextLengthError(
+                    f"request exceeds backbone context window of {capabilities.context_window} tokens")
             state_tokens = encoding["seg"].count(0)
             key = (tuple(encoding["ids"][:state_tokens]), bool(encoding.get("option_isolation")))
             cache, hit = self.prefix_cache, False
@@ -213,6 +216,8 @@ class JevModel(DecisionClient):
             options = replace(options, attn="sdpa")
         if readout == "choice" and options.cuda_graphs:
             raise ValueError("CUDA graph capture is available only for native readout")
+        if readout == "choice" and options.fused_kernels:
+            raise ValueError("fused kernels are available only for native readout")
         if readout == "choice" and options.temperature is not None:
             raise ValueError("JEVANY_TEMPERATURE applies to the native head; use choice_temperature")
         predictor = None
@@ -247,6 +252,10 @@ class JevModel(DecisionClient):
     def describe(self) -> dict[str, Any]:
         """Return identity, backbone capabilities, effective limits and cache statistics."""
         return self.runtime.describe()
+
+    def models(self) -> list[dict[str, Any]]:
+        """List this local model using the same discovery method as JevClient."""
+        return [self.describe()]
 
     def clear_cache(self) -> None:
         """Release this model's cached state prefixes."""

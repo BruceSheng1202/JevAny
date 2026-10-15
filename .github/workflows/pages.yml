@@ -1,4 +1,6 @@
 name: Deploy homepage
+run-name: >-
+  ${{ github.event_name == 'pull_request' && format('PR #{0} | base {1} | head {2}', github.event.pull_request.number, github.event.pull_request.base.sha, github.event.pull_request.head.sha) || format('{0} {1}', github.event_name, github.sha) }}
 
 on:
   push:
@@ -11,6 +13,12 @@ on:
       - 'README*.md'
       - 'CONTRIBUTING.md'
       - 'LICENSE'
+      - 'NOTICE'
+      - 'ACKNOWLEDGEMENTS.md'
+      - 'CITATION.cff'
+      - 'jevany/**'
+      - 'scripts/**'
+      - 'infra/**'
       - 'examples/**'
       - 'recipes/**'
       - '.github/workflows/pages.yml'
@@ -23,6 +31,12 @@ on:
       - 'README*.md'
       - 'CONTRIBUTING.md'
       - 'LICENSE'
+      - 'NOTICE'
+      - 'ACKNOWLEDGEMENTS.md'
+      - 'CITATION.cff'
+      - 'jevany/**'
+      - 'scripts/**'
+      - 'infra/**'
       - 'examples/**'
       - 'recipes/**'
       - '.github/workflows/pages.yml'

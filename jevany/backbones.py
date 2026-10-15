@@ -159,6 +159,23 @@ def linear_attention_kernels() -> dict[str, bool]:
     return status
 
 
+def peft_expert_remapped_leaves(model_type: str) -> set[str]:
+    """Linear leaf names PEFT rewrites to fused-expert parameters for this model type.
+
+    PEFT's Transformers v5 MoE conversion redirects every target ending in these
+    names, including dense and shared-expert ``nn.Linear`` layers, to 3-D expert
+    parameters that reject LoRA dropout. Without these private names (a PEFT release
+    that dropped the conversion) nothing is excluded, matching earlier behaviour.
+    """
+    try:
+        from peft.utils.transformers_weight_conversion import (
+            _MODEL_TO_CONVERSION_PATTERN, _MOE_TARGET_MODULE_MAPPING,
+        )
+    except ImportError:
+        return set()
+    return set(_MOE_TARGET_MODULE_MAPPING.get(_MODEL_TO_CONVERSION_PATTERN.get(model_type), {}))
+
+
 class BackboneAdapter:
     """Transformers text backbone contract; override methods for other layouts.
 
@@ -191,10 +208,14 @@ class BackboneAdapter:
             return decoder, None
         causal = AutoModelForCausalLM.from_pretrained(name, revision=revision, dtype=dtype,
                                                      attn_implementation=attn, **kwargs)
-        if causal.base_model is causal:
-            raise ValueError("causal model does not expose its base_model; provide a custom backbone_adapter")
+        decoder = causal.base_model
+        if decoder is causal:
+            # Llama 4 declares a base_model_prefix that does not name its decoder attribute.
+            decoder = getattr(causal, "model", None)
+            if not isinstance(decoder, PreTrainedModel) or decoder is causal:
+                raise ValueError("causal model does not expose its base_model; provide a custom backbone_adapter")
         self._output_embeddings = causal.get_output_embeddings()
-        return causal.base_model, None
+        return decoder, None
 
     def output_embeddings(self, language_model, multimodal_model):
         """Return the base model's original frozen vocabulary projection."""
@@ -210,17 +231,23 @@ class BackboneAdapter:
             and not getattr(config, "sliding_window", None)
         )
 
-    def lora_modules(self, model: nn.Module, preset: str, explicit: str = "") -> str | list[str]:
+    def lora_modules(self, model: nn.Module, preset: str, explicit: str = "",
+                     lora_dropout: float = 0.05) -> str | list[str]:
         """Resolve a preset against actual modules, including fused projections."""
         if preset not in ("all", "dense", "attn", "qv"):
             raise ValueError("lora_targets must be all, dense, attn, or qv")
         linear = {name for name, module in model.named_modules() if isinstance(module, (nn.Linear, Conv1D))}
         # Mamba's fused kernel bypasses out_proj.forward. PEFT 0.21 remaps even
         # GLM's fully qualified dense MLP targets to incompatible fused experts.
+        # Llama 4's router subclasses nn.Linear but returns a tuple. Layers PEFT would
+        # remap to fused experts only fail with dropout; zero-dropout runs keep PEFT's remap.
         excluded_leaves = {
             "nemotron_h": {"out_proj"},
             "glm4_moe_lite": {"gate_proj", "up_proj", "down_proj"},
+            "llama4_text": {"router"},
         }.get(model.config.model_type, set())
+        if lora_dropout:
+            excluded_leaves = excluded_leaves | peft_expert_remapped_leaves(model.config.model_type)
         excluded = {name for name in linear if name.rsplit(".", 1)[-1] in excluded_leaves}
         if explicit:
             targets = [name.strip() for name in explicit.split(",")]
@@ -418,6 +445,21 @@ class Gemma4VisionAdapter(VisionAdapter):
     name = "gemma4_vision"
     media_types = frozenset({"image", "video"})
 
+    def forward_media(self, language_model, multimodal_model, inputs: dict) -> torch.Tensor:
+        if "num_frames_per_video" in inputs:
+            # Transformers 5.19 omits frame counts in forward's video encoder call.
+            inputs = dict(inputs)
+            features = {"video": multimodal_model.get_video_features(
+                inputs.pop("pixel_values_videos"), inputs.pop("video_position_ids", None),
+                num_frames_per_video=inputs.pop("num_frames_per_video"), return_dict=True,
+            )}
+            if inputs.get("pixel_values") is not None:
+                features["image"] = multimodal_model.get_image_features(
+                    inputs.pop("pixel_values"), inputs.pop("image_position_ids", None), return_dict=True,
+                )
+            inputs["mm_encoder_outputs"] = features
+        return super().forward_media(language_model, multimodal_model, inputs)
+
     def process_media(self, processor, media: list[dict], text: str):
         prefix, images, videos = [], [], []
         for item in media:
@@ -498,7 +540,11 @@ def get_backbone_adapter(name: str = "auto", *, multimodal: bool = False,
     module, separator, attribute = name.partition(":")
     if not separator or not module or not attribute:
         raise ValueError(f"backbone_adapter must be auto, {', '.join(builtins)}, or module:Class")
-    adapter_class = getattr(importlib.import_module(module), attribute)
+    try:
+        adapter_class = getattr(importlib.import_module(module), attribute)
+    except (ImportError, AttributeError) as error:
+        raise ValueError(f"cannot load backbone_adapter {name!r}: {error}; "
+                         "check the module:Class name and install the adapter's dependencies") from error
     if not isinstance(adapter_class, type) or not issubclass(adapter_class, BackboneAdapter):
         raise ValueError(f"{name} must subclass jevany.backbones.BackboneAdapter")
     return adapter_class()
