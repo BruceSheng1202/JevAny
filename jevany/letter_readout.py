@@ -304,15 +304,13 @@ def temper_probabilities(
     if temperature == 1.0:
         return {key: value for key, value in zip(probabilities, values, strict=True)}
 
-    # This is algebraically p ** (1 / T), evaluated in log space so a valid
-    # but very small temperature cannot underflow every option to zero.
-    scaled_logs = [
-        math.log(probability) / temperature if probability > 0 else _NEGATIVE_INFINITY
-        for probability in values
-    ]
-    pivot = max(scaled_logs)
-    weights = [math.exp(value - pivot) if value != _NEGATIVE_INFINITY else 0.0
-               for value in scaled_logs]
+    # Center before dividing so even the smallest positive temperature leaves
+    # at least one finite, zero log weight.
+    logs = [math.log(probability) if probability > 0 else _NEGATIVE_INFINITY
+            for probability in values]
+    pivot = max(logs)
+    weights = [math.exp((value - pivot) / temperature) if value != _NEGATIVE_INFINITY else 0.0
+               for value in logs]
     normalizer = sum(weights)
     return {key: weight / normalizer for key, weight in zip(probabilities, weights, strict=True)}
 
@@ -329,13 +327,20 @@ def read_letter_distribution(
     raw = probabilities_from_log_masses(masses)
     if temperature == 1.0:
         calibrated = dict(raw)
-    else:
-        # softmax(log_mass / T) is exactly p ** (1/T), with the common raw
-        # normalizer cancelled.  Calibrating before materializing tiny raw
-        # probabilities avoids losing recoverable mass to float underflow.
+    elif temperature > 1.0:
+        # Scaling first avoids overflow when subtracting large opposite-signed
+        # masses. Use log masses to retain recoverable raw-softmax underflow.
         calibrated = probabilities_from_log_masses(
             {letter: mass / temperature for letter, mass in masses.items()}
         )
+    else:
+        # Non-maximal centered masses may scale to -inf, which is a valid zero
+        # weight; maxima stay at zero even for subnormal temperatures.
+        pivot = max(masses.values())
+        weights = {letter: math.exp((mass - pivot) / temperature)
+                   for letter, mass in masses.items()}
+        normalizer = sum(weights.values())
+        calibrated = {letter: weight / normalizer for letter, weight in weights.items()}
     return LetterReadout(
         raw_log_masses=masses,
         raw_probabilities=raw,

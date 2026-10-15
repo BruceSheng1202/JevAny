@@ -8,16 +8,19 @@ Use ``--readout choice`` for the training-free choice-token deployment path.
 TypeSafe-compatible: POST /v1/systemone and GET /v1/models (no auth). JEVANY_PREFIX_CACHE /
 JEVANY_PREFIX_MIN_TOKENS size the state-prefix cache; JEVANY_DATE_FACTS=1 enables deterministic date preprocessing.
 """
-import argparse, os
+import argparse, math, os
 from contextlib import asynccontextmanager
 from dataclasses import fields, replace
 from pathlib import Path
 from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from .api import SystemOneRequest, with_date_facts
 from .checkpoint import LoadOptions, add_placement_arguments, load_options_from_args
 from .inference import InferenceOptions, add_inference_arguments, inference_options_from_args
+from .model import ContextLengthError
 from .readout import (
     ChoiceReadoutOptions,
     LetterReadoutOptions,
@@ -126,6 +129,10 @@ def systemone(req: SystemOneRequest, request: Request):
     runtime = server(request)
     try:
         return runtime.answer(prepare(req))
+    except ContextLengthError as error:
+        raise HTTPException(422, str(error), headers={
+            "X-JevAny-Error-Code": "context_length_exceeded",
+        }) from error
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
 
@@ -206,6 +213,15 @@ def create_app(
                 local.clear_cache()
 
     application = FastAPI(title="JevAny", lifespan=lifespan)
+
+    @application.exception_handler(RequestValidationError)
+    async def invalid_request(_request: Request, error: RequestValidationError):
+        # Invalid input can contain NaN/Infinity, which JSONResponse cannot encode.
+        detail = jsonable_encoder(error.errors(), custom_encoder={
+            float: lambda value: value if math.isfinite(value) else str(value),
+        })
+        return JSONResponse(status_code=422, content={"detail": detail})
+
     application.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
     application.include_router(routes)
     return application
@@ -226,6 +242,9 @@ def main(argv=None):
                     help="capture CUDA graphs at startup (row-mode backbones on one GPU); same as JEVANY_CUDA_GRAPHS=1")
     ap.add_argument("--cuda-graph-max-tokens", type=int,
                     help="largest captured row; longer rows run eagerly (default 2048)")
+    ap.add_argument("--fused-kernels", action="store_true",
+                    help="fused Qwen3.5 inference kernels (merged LoRA, one GPU, flash-linear-attention); "
+                         "same as JEVANY_FUSED_KERNELS=1")
     add_inference_arguments(ap)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8008)
@@ -240,12 +259,16 @@ def main(argv=None):
     ):
         ap.error("CUDA graph and native inference-limit flags cannot be used with --readout choice; "
                  "use --choice-max-tokens")
+    if choice_options is not None and a.fused_kernels:
+        ap.error("--fused-kernels applies only to native readout")
     options = load_options_from_args(a)
     if a.cuda_graphs or a.cuda_graph_max_tokens is not None:
         options = options or LoadOptions.from_env()
         options = replace(options, cuda_graphs=True,
                           cuda_graph_max_tokens=(a.cuda_graph_max_tokens if a.cuda_graph_max_tokens is not None
                                                  else options.cuda_graph_max_tokens))
+    if a.fused_kernels:
+        options = replace(options or LoadOptions.from_env(), fused_kernels=True)
     application = create_app(a.run, device=a.device, dtype=a.dtype, model_name=a.model_name,
                              options=options,
                              inference_options=(inference_options_from_args(a)
