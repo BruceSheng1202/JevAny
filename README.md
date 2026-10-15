@@ -48,77 +48,33 @@ try your own inputs and see its choices and probabilities.
 
 ### ⚡ Jev inside LLM agent loops
 
-Jev chooses among bounded candidate actions supplied by the environment or
-proposed by the LLM, which handles planning, recovery, and completion. The
-animations compare LLM only (left) with LLM + Jev (right) at equal reward.
-Steps are illustrated; accelerated playback preserves each pair's measured
-completion-time ratio. Click an animation to enlarge it.
+The LLM plans, recovers and finishes the task; Jev picks the next action
+wherever the loop offers a bounded set of candidates. Each animation replays
+one recorded pair, LLM only on the left and LLM + Jev on the right, with the
+measured totals on the clocks and schematic step artwork.
 
-**Golden rules**
+**1. [WebShop](https://simplejev.org/JevAny/files/docs/demos/jev-agent-harness-traces.json).**
+Jev picks the requested color and size from menus the LLM generated, and the
+LLM buys the product.
 
-**Delegate the selection bottleneck, not the task.** Jev should either replace
-repeated LLM reasoning or correct a measured local ranking error; otherwise it
-is overhead.
+![WebShop: LLM only needs nine actions and 18.54 seconds; LLM + Jev buys the same blazer in five actions and 7.83 seconds](docs/demos/jev-decision-webshop-v2.gif)
 
-- Give Jev **2–4 valid branches** with distinct, observable outcomes and the
-  correct action included.
-- Reuse one LLM plan across reversible choices; return control on novelty,
-  stale candidates, delayed feedback, recovery, or completion.
-- Scale autonomy only with paired reward/cost evidence: D0 LLM-only → D1 shadow
-  → D2 one-step → D3 routine default → D4 bounded subgoal. Coverage is not
-  success.
+**2. [FrozenLake](https://simplejev.org/JevAny/files/docs/demos/jev-agent-harness-traces.json).**
+One LLM plan, then Jev compares the four moves at each new state.
 
-<table>
-  <tr>
-    <td width="64%" valign="middle">
-      <a href="https://simplejev.org/JevAny/assets/media/docs/jev-decision-webshop-v2.mp4"><img src="docs/demos/jev-decision-webshop-v2.gif" alt="WebShop: LLM only and LLM + Jev run side by side; Jev-assisted purchase completes in 7.83 seconds versus 18.54 seconds" width="100%"></a>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>1. <a href="https://simplejev.org/JevAny/files/docs/demos/jev-agent-harness-traces.json">WebShop</a></strong><br>
-      Jev selects the requested color and size from LLM-generated menus before the
-      LLM buys the product. Actions fall from 9 to 5, LLM calls from 9 to 4,
-      tokens from 38,852 to 14,256, and time from 18.54 to 7.83 seconds.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="64%" valign="middle">
-      <a href="https://simplejev.org/JevAny/assets/media/docs/jev-decision-frozen-lake-v2.mp4"><img src="docs/demos/jev-decision-frozen-lake-v2.gif" alt="FrozenLake: the LLM chooses every move on the left; one LLM plan and Jev decisions reach the same goal in 16.7 seconds versus 19.7 seconds on the right" width="100%"></a>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>2. <a href="https://simplejev.org/JevAny/files/docs/demos/jev-agent-harness-traces.json">FrozenLake</a></strong><br>
-      After one LLM plan, Jev checks each new state and chooses among four directions.
-      Both runs reach the goal in 4 moves; LLM decision calls fall from 4 to 1,
-      tokens from 2,338 to 663, and time from 19.7 to 16.7 seconds.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="64%" valign="middle">
-      <a href="https://simplejev.org/JevAny/assets/media/docs/jev-decision-terminal-v2.mp4"><img src="docs/demos/jev-decision-terminal-v2.gif" alt="SQLite recovery: LLM only and LLM + Jev run side by side; both recover ten rows, finishing in 187.9 and 144.7 seconds respectively" width="100%"></a>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>3. <a href="https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html#h1-sqlite-recovery-a-meaningful-three-way-decision">Terminal-Bench</a></strong><br>
-      For <code>sqlite-db-truncate</code>, Jev selects raw-page inspection from three
-      commands, then the LLM recovers and verifies ten rows. Tool commands fall
-      from 13 to 7, LLM calls from 15 to 8, tokens from 202,050 to 121,293, and
-      time from 187.9 to 144.7 seconds.</p>
-    </td>
-  </tr>
-</table>
+![FrozenLake: both runs reach the goal in four moves; LLM only spends four LLM calls and 19.7 seconds, LLM + Jev one call and 16.7 seconds](docs/demos/jev-decision-frozen-lake-v2.gif)
 
-Watch all three in the [nine-second overview](https://simplejev.org/JevAny/assets/media/docs/jev-agent-harness.mp4),
-or open the [agent harness demos](https://simplejev.org/JevAny/docs/agent-harness.html).
+**3. [Terminal-Bench](https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html#h1-sqlite-recovery-a-meaningful-three-way-decision).**
+On `sqlite-db-truncate`, Jev picks raw-page inspection out of three probes, and
+the LLM recovers and verifies ten rows.
 
-Broader paired evaluations show that gains vary by task. The [full results](https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html),
-[delegation protocol](https://simplejev.org/JevAny/docs/experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html), and
-[technical report](https://simplejev.org/JevAny/files/reports/JevAny_Tech_Report.pdf) describe
-where Jev helps and when to return control to the LLM.
+![Terminal-Bench sqlite-db-truncate: both runs recover ten rows; LLM only needs thirteen commands and 187.9 seconds, LLM + Jev seven commands and 144.7 seconds](docs/demos/jev-decision-terminal-v2.gif)
 
-| Task | Success | Efficiency |
-|---|---:|---:|
-| FrozenLake (GPT-5.6-sol, 10 pairs) | 100% → 100% | LLM calls −64.4%, tokens −63.1%, time −37.6% |
-| WebShop (LLM-generated menus, 3 pairs) | 67% → 100% | LLM calls −21.4%, tokens −14.3%, time −15.0% |
-| WebArena (6 pairs) | 50% → 50% | LLM calls +5.6%, tokens +28.2%, time −0.4% |
-| Terminal-Bench (6 pairs) | 1/6 → 3/6 | LLM calls −9.0% |
+[Overview](https://simplejev.org/JevAny/assets/media/docs/jev-agent-harness.mp4) · [All demos](https://simplejev.org/JevAny/docs/agent-harness.html)
+
+[Full results](https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html),
+[delegation protocol](https://simplejev.org/JevAny/docs/experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html)
+and [technical report](https://simplejev.org/JevAny/files/reports/JevAny_Tech_Report.pdf).
 
 ## 📑 Table of Contents
 

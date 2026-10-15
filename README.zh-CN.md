@@ -45,70 +45,30 @@
 
 ### ⚡ Jev 加入 LLM Agent 循环
 
-候选动作由环境提供或由 LLM 生成；Jev 做局部选择，规划、失败恢复和最终完成仍由 LLM 负责。
-下方动图对比左侧纯 LLM 与右侧 LLM + Jev，两侧 reward 相同；步骤为示意，
-加速播放保留各组记录的实测耗时比例，点击可放大查看。
+规划、失败恢复和最终完成由 LLM 负责；当循环中出现有界候选动作时，由 Jev 选择下一步。
+每张动图回放一组实测配对，左侧纯 LLM，右侧 LLM + Jev，计时为实测总耗时的加速回放，
+步骤画面为示意。
 
-**快速判断原则**
+**1. [WebShop](https://simplejev.org/JevAny/files/docs/demos/jev-agent-harness-traces.json)。**
+Jev 从 LLM 生成的候选中选出所需颜色和尺寸，LLM 随后完成购买。
 
-**委托“选择瓶颈”，而不是委托整个任务。** Jev 要么替代重复的 LLM 推理，
-要么修正已经测出的局部排序错误；两者都做不到时，它就只是额外开销。
+![WebShop：纯 LLM 用 9 个动作、18.54 秒；LLM + Jev 用 5 个动作、7.83 秒买到同一件外套](docs/demos/jev-decision-webshop-v2.gif)
 
-- 给 Jev **2–4 个有效分支**，各分支结果不同且可观察，并包含正确动作。
-- 让一次 LLM 计划在多个可回退的选择间复用；遇到新状态、候选失效、
-  延迟反馈、失败恢复或任务完成时交回控制权。
-- 只凭配对的 reward/成本证据提升自治层级：D0 纯 LLM → D1 shadow →
-  D2 单步 → D3 常规决策默认委托 → D4 有界子任务。覆盖率不等于成功。
+**2. [FrozenLake](https://simplejev.org/JevAny/files/docs/demos/jev-agent-harness-traces.json)。**
+LLM 规划一次路线，之后由 Jev 在每个新状态比较四个方向。
 
-<table>
-  <tr>
-    <td width="64%" valign="middle">
-      <a href="https://simplejev.org/JevAny/assets/media/docs/jev-decision-webshop-v2.mp4"><img src="docs/demos/jev-decision-webshop-v2.gif" alt="WebShop：左侧纯 LLM 与右侧 LLM + Jev 并排执行，分别在 18.54 秒和 7.83 秒完成购买" width="100%"></a>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>1. <a href="https://simplejev.org/JevAny/files/docs/demos/jev-agent-harness-traces.json">WebShop</a></strong><br>
-      Jev 从 LLM 生成的候选中选中所需颜色和尺寸，LLM 随后完成购买。
-      动作从 9 步降至 5 步，LLM 调用从 9 次降至 4 次，tokens 从 38,852
-      降至 14,256，用时从 18.54 秒降至 7.83 秒。</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="64%" valign="middle">
-      <a href="https://simplejev.org/JevAny/assets/media/docs/jev-decision-frozen-lake-v2.mp4"><img src="docs/demos/jev-decision-frozen-lake-v2.gif" alt="FrozenLake：左侧 LLM 逐步决策，右侧 LLM 规划后由 Jev 比较四个方向，分别在 19.7 秒和 16.7 秒到达同一目标" width="100%"></a>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>2. <a href="https://simplejev.org/JevAny/files/docs/demos/jev-agent-harness-traces.json">FrozenLake</a></strong><br>
-      LLM 规划一次路线，Jev 在每个新状态下从四个方向中选择下一步。
-      两侧均用 4 步到达目标；LLM 决策调用从 4 次降至 1 次，tokens 从
-      2,338 降至 663，用时从 19.7 秒降至 16.7 秒。</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="64%" valign="middle">
-      <a href="https://simplejev.org/JevAny/assets/media/docs/jev-decision-terminal-v2.mp4"><img src="docs/demos/jev-decision-terminal-v2.gif" alt="SQLite 恢复：左侧纯 LLM 与右侧 LLM + Jev 都恢复十行数据，分别在 187.9 秒和 144.7 秒完成" width="100%"></a>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>3. <a href="https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html#h1-sqlite-recovery-a-meaningful-three-way-decision">Terminal-Bench</a></strong><br>
-      在 <code>sqlite-db-truncate</code> 任务中，Jev 从三个命令中选择原始页面检查，
-      LLM 随后恢复并验证十行数据。工具命令从 13 步降至 7 步，LLM 调用从
-      15 次降至 8 次，tokens 从 202,050 降至 121,293，用时从 187.9 秒降至 144.7 秒。</p>
-    </td>
-  </tr>
-</table>
+![FrozenLake：两侧都用 4 步到达目标；纯 LLM 为 4 次 LLM 调用、19.7 秒，LLM + Jev 为 1 次调用、16.7 秒](docs/demos/jev-decision-frozen-lake-v2.gif)
 
-三个案例也可在[九秒总览](https://simplejev.org/JevAny/assets/media/docs/jev-agent-harness.mp4)中连续观看，或打开
-[Agent harness 演示页](https://simplejev.org/JevAny/docs/agent-harness.html)查看单独回放。
+**3. [Terminal-Bench](https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html#h1-sqlite-recovery-a-meaningful-three-way-decision)。**
+在 `sqlite-db-truncate` 任务中，Jev 从三条探查命令里选择原始页面检查，LLM 随后恢复并验证十行数据。
 
-下表展示更多配对评测结果，收益随任务而变化。[完整结果](https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html)、
-[委托协议](https://simplejev.org/JevAny/docs/experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html)和
-[技术报告](https://simplejev.org/JevAny/files/reports/JevAny_Tech_Report.pdf)说明了 Jev 适合处理哪些选择，以及何时交回 LLM。
+![Terminal-Bench sqlite-db-truncate：两侧都恢复十行数据；纯 LLM 为 13 条命令、187.9 秒，LLM + Jev 为 7 条命令、144.7 秒](docs/demos/jev-decision-terminal-v2.gif)
 
-| 任务 | 成功率 | 效率 |
-|---|---:|---:|
-| FrozenLake（GPT-5.6-sol，10 组配对） | 100% → 100% | LLM 调用 −64.4%，tokens −63.1%，用时 −37.6% |
-| WebShop（LLM 生成候选，3 组配对） | 67% → 100% | LLM 调用 −21.4%，tokens −14.3%，用时 −15.0% |
-| WebArena（6 组配对） | 50% → 50% | LLM 调用 +5.6%，tokens +28.2%，用时 −0.4% |
-| Terminal-Bench（6 组配对） | 1/6 → 3/6 | LLM 调用 −9.0% |
+[总览](https://simplejev.org/JevAny/assets/media/docs/jev-agent-harness.mp4) · [演示页](https://simplejev.org/JevAny/docs/agent-harness.html)
+
+[完整结果](https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html)、
+[委托协议](https://simplejev.org/JevAny/docs/experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html)、
+[技术报告](https://simplejev.org/JevAny/files/reports/JevAny_Tech_Report.pdf)。
 
 ## 📑 目录
 

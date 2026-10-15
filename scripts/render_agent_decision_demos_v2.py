@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Render paired README animations from recorded totals and illustrated steps.
+"""Render the paired README animations for Jev inside LLM agent loops.
 
-Both lanes share a clock and playback rate. Only total wall times are measured;
-step durations are schematic. A completed lane stays frozen until the loop ends.
+Both lanes of a pair share one clock and one playback rate, so the moment each
+lane stops matches the recorded wall-clock ratio. Only the totals are measured;
+the per-step artwork is schematic. A finished lane freezes until the loop ends.
 """
 
 from __future__ import annotations
@@ -12,371 +13,383 @@ from dataclasses import dataclass
 from functools import lru_cache
 import json
 from pathlib import Path
-import shutil
-import subprocess
 
 from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageFont
 
-from render_agent_harness_demo import ACCENT, AMBER, BLUE, BORDER, MUTED, PANEL, PANEL_2, TEXT
-from render_agent_robot_icons import ROBOT_COLORS, actor_icon
 
+WIDTH, HEIGHT = 1120, 552
+MARGIN = 36
+CARD_W, CARD_H = 512, 420
+CARD_Y, HEADER_H = 70, 56
+PAD = 28
+SCENE_Y, SCENE_H = 142, 278
+SCENE_W = CARD_W - 2 * PAD
 
-WIDTH, HEIGHT = 1080, 700
-PLAY_MS = 2400
-FRAME_MS = 40
-END_HOLD_MS = 600
-BACKGROUND = "#070b14"
-GREEN_PANEL = "#0b2426"
-BLUE_PANEL = "#14223a"
-AMBER_PANEL = "#292313"
-TASK_CONTEXT = {
-    "webshop": "z-dark green · small · under $80",
-    "frozen_lake": "Start [1, 0] → goal [0, 3]",
-    "sqlite": "Target: 10 verified rows",
+PLAY_MS = 4000
+FRAME_MS = 80
+END_HOLD_MS = 1000
+
+PAGE = "#f3f5fb"
+CARD = "#ffffff"
+HAIRLINE = "#e2e8f4"
+SURFACE = "#eef2f9"
+SUNKEN = "#e3e9f4"
+INK = "#1f2a44"
+MUTED = "#5f6d86"
+DIM = "#95a2b8"
+SLATE = "#6e7d99"
+JEV = "#6b4fbb"
+ICE = "#d6e1f2"
+ICE_GOAL = "#d6ecdf"
+ICE_HOLE = "#aab6cc"
+FLAG = "#2f7d66"
+TERM_BG = "#1d2438"
+TERM_INK = "#e9edf8"
+TERM_DIM = "#8d99b2"
+
+FONT_DIR = Path(__file__).resolve().parents[1] / "site/assets/fonts"
+
+TITLES = {
+    "webshop": ("WebShop", "buy the matching blazer"),
+    "frozen_lake": ("FrozenLake", "reach the goal"),
+    "sqlite": ("Terminal-Bench", "recover the truncated SQLite rows"),
 }
+OUTCOMES = {"webshop": "purchased", "frozen_lake": "goal reached",
+            "sqlite": "10 rows recovered"}
 
 
 @lru_cache
-def font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.FreeTypeFont:
-    family = "DejaVuSansMono" if mono else "DejaVuSans"
-    suffix = "-Bold" if bold else ""
-    return ImageFont.truetype(f"/usr/share/fonts/truetype/dejavu/{family}{suffix}.ttf", size)
+def font(size: int, bold: bool = False, display: bool = False) -> ImageFont.FreeTypeFont:
+    name = "ibm-plex-sans-condensed-medium.woff2" if display else "dm-sans-latin.woff2"
+    face = ImageFont.truetype(str(FONT_DIR / name), size)
+    if not display:
+        face.set_variation_by_axes([min(40, max(9, size)), 500 if bold else 400])
+    return face
+
+
+def blend(base: str, other: str, weight: float) -> tuple[int, int, int]:
+    first, second = ImageColor.getrgb(base), ImageColor.getrgb(other)
+    return tuple(round(a + (b - a) * weight) for a, b in zip(first, second))
+
+
+def text(draw: ImageDraw.ImageDraw, xy: tuple[float, float], value: str, size: int = 24,
+         color=INK, bold: bool = False, tabular: bool = False, anchor: str = "la",
+         display: bool = False) -> None:
+    draw.text(xy, value, font=font(size, bold, display), fill=color, anchor=anchor,
+              features=["tnum"] if tabular else None)
+
+
+def width_of(draw: ImageDraw.ImageDraw, value: str, size: int, bold: bool = False,
+             tabular: bool = False, display: bool = False) -> float:
+    return draw.textlength(value, font=font(size, bold, display),
+                           features=["tnum"] if tabular else None)
+
+
+def run(draw: ImageDraw.ImageDraw, x: float, y: float, parts, size: int = 24) -> float:
+    """Draw coloured segments on one baseline and return the end of the line."""
+    for value, color, bold in parts:
+        draw.text((x, y), value, font=font(size, bold), fill=color)
+        x += width_of(draw, value, size, bold)
+    return x
+
+
+def thousands(value: int) -> str:
+    if value < 1000:
+        return str(value)
+    return f"{value / 1000:.1f}k" if value < 100_000 else f"{value / 1000:.0f}k"
+
+
+def tick_mark(draw: ImageDraw.ImageDraw, cx: float, cy: float, size: float, color) -> None:
+    draw.line([(cx - size, cy + size * 0.1), (cx - size * 0.3, cy + size * 0.8),
+               (cx + size, cy - size * 0.8)], fill=color,
+              width=max(2, round(size / 4)), joint="curve")
+
+
+def arrow(draw: ImageDraw.ImageDraw, cx: float, cy: float, direction: str,
+          color, size: int = 12) -> None:
+    dx, dy = {"Left": (-1, 0), "Right": (1, 0), "Up": (0, -1), "Down": (0, 1)}[direction]
+    tip = (cx + dx * size, cy + dy * size)
+    base = (cx - dx * size * 0.7, cy - dy * size * 0.7)
+    wing = (-dy * size * 0.85, dx * size * 0.85)
+    draw.polygon([tip, (base[0] + wing[0], base[1] + wing[1]),
+                  (base[0] - wing[0], base[1] - wing[1])], fill=color)
+
+
+def panel(draw: ImageDraw.ImageDraw, box, radius: int = 14, fill=SURFACE, outline=None) -> None:
+    draw.rounded_rectangle(box, radius, fill=fill, outline=outline)
 
 
 @dataclass(frozen=True)
 class Step:
     actor: str
     title: str
-    detail: str
     state: int
 
 
 def steps_for(key: str, trace: dict, assisted: bool) -> list[Step]:
     if key == "webshop":
-        opening = [
-            Step("LLM", "Search for a blazer", "Long sleeve, under $80", 0),
-            Step("LLM", "Open product", "Generate color + size menus" if assisted else "Inspect product options", 1),
-        ]
-        choices = [
-            Step("Jev" if assisted else "LLM", "Select z-dark green", "3 colors → exact match" if assisted else "Choose the requested color", 2),
-            Step("Jev" if assisted else "LLM", "Select small", "3 sizes → exact match" if assisted else "Choose the requested size", 3),
-        ]
-        recheck = [] if assisted else [
-            Step("LLM", "Inspect features", "Check product details", 3),
-            Step("LLM", "Repeat color + size", "Return to the product", 3),
-        ]
-        return opening + choices + recheck + [Step("LLM", "Buy now", "Complete the purchase", 3)]
+        if assisted:
+            actors = ["LLM", "LLM", "Jev", "Jev", "LLM"]
+            titles = [item["action"] for item in trace["jev_harness"]["path"]]
+            states = [0, 1, 2, 3, 3]
+        else:
+            titles = trace["baseline"]["path"]
+            actors = ["LLM"] * len(titles)
+            states = [0, 1, 2, 3, 3, 3, 3]
+        return [Step(a, t, s) for a, t, s in zip(actors, titles, states)]
     if key == "frozen_lake":
-        steps = [Step("LLM", "Plan a route", "Delegate; check every new state", 0)] if assisted else []
-        return steps + [
-            Step("Jev" if assisted else "LLM", f"Move {step['action'].lower()}",
-                 "Compare 4 directions" if assisted else "Read state; choose next move", i + 1)
-            for i, step in enumerate(trace["steps"])
-        ]
+        moves = [Step("Jev" if assisted else "LLM", f"move {item['action'].lower()}", index + 1)
+                 for index, item in enumerate(trace["steps"])]
+        return [Step("LLM", "plan the route", 0)] + moves if assisted else moves
     if assisted:
-        return [
-            Step("LLM", "Propose 3 commands", "Raw page, schema, tools", 0),
-            Step("Jev", "Choose raw page", "Run od; read page bytes", 1),
-            Step("LLM", "Parse cell pointers", "Recover records from raw bytes", 2),
-            Step("LLM", "Write recover.json", "Check the recovered output", 3),
-        ]
-    return [
-        Step("LLM", "Inspect database", "Choose diagnostic commands", 0),
-        Step("LLM", "Read page structure", "Read and interpret observations", 1),
-        Step("LLM", "Parse cell pointers", "Recover records from raw bytes", 2),
-        Step("LLM", "Write recover.json", "Check the recovered output", 3),
-    ]
+        return [Step("LLM", "propose 3 probes", 0), Step("Jev", "pick the raw-page dump", 1),
+                Step("LLM", "parse cell pointers", 2), Step("LLM", "write recover.json", 3)]
+    return [Step("LLM", "read the schema", 0), Step("LLM", "dump the raw page", 1),
+            Step("LLM", "parse cell pointers", 2), Step("LLM", "write recover.json", 3)]
 
 
-def text(draw: ImageDraw.ImageDraw, x: float, y: float, value: str,
-         size: int = 24, color: str = TEXT, bold: bool = False, mono: bool = False) -> None:
-    draw.text((x, y), value, font=font(size, bold, mono), fill=color)
-
-
-def right_text(draw: ImageDraw.ImageDraw, right: float, y: float, value: str,
-               size: int = 18, color: str = MUTED, bold: bool = False) -> None:
-    text(draw, right - draw.textlength(value, font=font(size, bold)), y,
-         value, size, color, bold)
-
-
-def actor_style(actor: str) -> tuple[str, str]:
-    return (ACCENT, GREEN_PANEL) if actor == "Jev" else (
-        (BLUE, BLUE_PANEL) if actor == "LLM" else (AMBER, AMBER_PANEL)
-    )
-
-
-def wrapped_text(draw: ImageDraw.ImageDraw, x: int, y: int, value: str,
-                 width: int, size: int = 17, color: str = MUTED) -> None:
-    lines = [""]
-    for word in value.split():
-        candidate_line = f"{lines[-1]} {word}".strip()
-        if draw.textlength(candidate_line, font=font(size)) > width and lines[-1]:
-            lines.append(word)
-        else:
-            lines[-1] = candidate_line
-    for index, line in enumerate(lines):
-        text(draw, x, y + index * 20, line, size, color)
-
-
-def phase_panel(image: Image.Image, draw: ImageDraw.ImageDraw, x: int, key: str,
-                step: Step, index: int, count: int, finished: bool, tick: int) -> None:
-    actor = ("Verifier" if key == "sqlite" else "Env") if finished else step.actor
-    color, fill = actor_style(actor)
-    draw.rounded_rectangle((x + 20, 414, x + 484, 533), 12, fill=PANEL_2)
-    draw.rounded_rectangle((x + 29, 423, x + 123, 524), 10,
-                           fill=fill, outline=color, width=2)
-    portrait = actor_icon(actor, 78, phase=0 if finished else tick // 100 % 6)
-    image.paste(portrait, (x + 37, 424), portrait)
-    label = "CHECK" if actor == "Verifier" else "RESULT" if actor == "Env" else actor.upper()
-    center = x + 76
-    text(draw, center - draw.textlength(label, font=font(13, True)) / 2,
-         503, label, 13, color, True)
-    text(draw, x + 141, 429,
-         "VERIFIED RESULT" if finished else f"PHASE {index + 1} / {count}", 13, MUTED)
-    title = "✓ Task complete" if finished else step.title
-    text(draw, x + 141, 452, title, 24, ACCENT if finished else TEXT, True)
-    outcome = {"webshop": "Purchased, reward 1", "frozen_lake": "Goal reached, reward 1",
-               "sqlite": "10 rows recovered, reward 1"}[key]
-    wrapped_text(draw, x + 141, 491, outcome if finished else step.detail, 322)
-
-
-def actor_rail(image: Image.Image, draw: ImageDraw.ImageDraw, x: int, steps: list[Step],
-               current: int, finished: bool, tick: int) -> None:
-    # Each controller keeps one position, including when it regains control.
-    actors = list(dict.fromkeys(step.actor for step in steps))
-    gap = 8
-    width = (460 - gap * (len(actors) - 1)) / len(actors)
-    for index, actor in enumerate(actors):
-        left = x + 22 + index * (width + gap)
-        color, fill = actor_style(actor)
-        active = not finished and steps[current].actor == actor
-        draw.rounded_rectangle((left, 546, left + width, 589), 9,
-                               fill=fill if active else PANEL,
-                               outline=color if active else BORDER, width=2 if active else 1)
-        portrait = actor_icon(actor, 36, active, tick // 100 % 6 if active else 0)
-        image.paste(portrait, (round(left + 10), 548), portrait)
-        text(draw, left + 55, 557, actor.upper(), 15, color if active else MUTED, True)
-        if active:
-            draw.ellipse((left + width - 18, 564, left + width - 12, 570), fill=color)
-            text(draw, left + width - 69, 561, "ACTIVE", 9, color, True)
-    text(draw, x + 22, 594, "TASK COMPLETE" if finished else "ACTIVE CONTROLLER", 10, MUTED)
-
-
-def savings_strip(draw: ImageDraw.ImageDraw, baseline: dict, assisted: dict) -> None:
-    # Static totals from this recorded pair; percentages use the baseline.
-    tokens_saved = baseline["tokens"] - assisted["tokens"]
-    time_saved = baseline["wall_time_seconds"] - assisted["wall_time_seconds"]
-    rewards = baseline["reward"], assisted["reward"]
-    both_succeeded = all(reward == 1 for reward in rewards)
-    outcome = "Both succeeded" if both_succeeded else (
-        "Same reward" if rewards[0] == rewards[1] else "Reward changed"
-    )
-    cards = [
-        ("LLM TOKENS SAVED", f"{tokens_saved:,}",
-         f"{tokens_saved / baseline['tokens']:.1%}",
-         f"{baseline['tokens']:,} → {assisted['tokens']:,}", ACCENT),
-        ("TIME SAVED", f"{time_saved:g} s",
-         f"{time_saved / baseline['wall_time_seconds']:.1%}",
-         f"{baseline['wall_time_seconds']:g} s → {assisted['wall_time_seconds']:g} s", ACCENT),
-        ("TASK RESULT", outcome, "✓" if both_succeeded else "",
-         f"Reward {rewards[0]:g} → {rewards[1]:g}", AMBER),
-    ]
-    for index, (label, value, badge, detail, color) in enumerate(cards):
-        x = 24 + index * 348
-        metric = index < 2
-        draw.rounded_rectangle((x, 616, x + 336, 676), 10,
-                               fill=GREEN_PANEL if metric else PANEL,
-                               outline=ACCENT if metric else BORDER)
-        text(draw, x + 14, 619, label, 14, MUTED, True)
-        if metric:
-            text(draw, x + 14, 631, badge, 42, color, True)
-            right_text(draw, x + 322, 620, value, 28, TEXT, True)
-            right_text(draw, x + 322, 651, detail, 15)
-        else:
-            text(draw, x + 14, 632, value, 26, TEXT, True)
-            right_text(draw, x + 322, 637, badge, 24, color, True)
-            text(draw, x + 14, 657, detail, 15, MUTED)
-
-
-def candidate(draw: ImageDraw.ImageDraw, x: int, y: int, width: int,
-              label: str, selected: bool, color: str = ACCENT) -> None:
-    fill = BLUE_PANEL if color == BLUE else GREEN_PANEL
-    draw.rounded_rectangle((x, y, x + width, y + 41), 8,
-                           fill=fill if selected else PANEL_2,
-                           outline=color if selected else BORDER, width=2)
-    text(draw, x + 13, y + 7, label, 21, color if selected else MUTED, selected)
-    if selected:
-        text(draw, x + width - 32, y + 5, "✓", 23, color, True)
-
-
-def webshop_scene(draw: ImageDraw.ImageDraw, x: int, trace: dict, step: Step,
-                   assisted: bool, finished: bool, color: str) -> None:
-    state = step.state
+def webshop_scene(draw: ImageDraw.ImageDraw, x: int, y: int, state: int, color: str) -> None:
     if state == 0:
-        text(draw, x + 22, 220, "SEARCH", 22, MUTED, True)
-        draw.rounded_rectangle((x + 20, 264, x + 444, 324), 12, fill=PANEL_2, outline=BORDER)
-        text(draw, x + 38, 279, "Women's green blazer", 26)
-        text(draw, x + 22, 350, "small, long sleeve, < $80", 24, MUTED)
+        panel(draw, (x, y + 16, x + SCENE_W, y + 80), 16, SURFACE)
+        draw.ellipse((x + 26, y + 36, x + 52, y + 62), outline=MUTED, width=3)
+        draw.line((x + 50, y + 60, x + 60, y + 70), fill=MUTED, width=3)
+        text(draw, (x + 76, y + 35), "green blazer, small", 26)
+        text(draw, (x + 4, y + 100), "long sleeve, under $80", 22, MUTED)
+        for row in range(2):
+            top = y + 142 + row * 62
+            panel(draw, (x, top, x + SCENE_W, top + 50), 12, SURFACE)
+            panel(draw, (x + 12, top + 9, x + 54, top + 41), 8, SUNKEN)
+            panel(draw, (x + 70, top + 14, x + 306, top + 22), 4, SUNKEN)
+            panel(draw, (x + 70, top + 31, x + 218, top + 37), 3, blend(SUNKEN, SURFACE, 0.5))
         return
-    # A simple product sketch keeps the environment legible at README width.
-    jacket = [
-        (x + 55, 224), (x + 93, 216), (x + 126, 224),
-        (x + 152, 265), (x + 131, 284), (x + 121, 267),
-        (x + 125, 368), (x + 57, 368), (x + 61, 267),
-        (x + 50, 284), (x + 28, 265),
-    ]
-    draw.polygon(jacket, fill="#277464" if state >= 2 else "#3d4e67")
-    draw.line((x + 93, 222, x + 91, 357), fill="#9fbab5", width=3)
-    if assisted and step.actor == "Jev" and not finished:
-        decision = trace["candidate_groups"][state - 2]
-        kind = "color" if state == 2 else "size"
-        text(draw, x + 179, 216, f"LLM {kind} menu", 24, BLUE, True)
-        for index, action in enumerate(decision["actions"]):
-            candidate(draw, x + 176, 256 + index * 47, 265,
-                      action.removeprefix("click[").removesuffix("]"),
-                      action == decision["selected"])
-        text(draw, x + 29, 377, "3 alternatives", 17, MUTED)
-        return
-    text(draw, x + 179, 216, "Women's blazer", 26, bold=True)
-    for y, label, selected in ((265, "z-dark green", state >= 2), (327, "small", state >= 3)):
-        draw.rounded_rectangle((x + 176, y, x + 441, y + 48), 10,
-                               fill=(GREEN_PANEL if assisted else BLUE_PANEL) if selected else PANEL_2,
-                               outline=color if selected else BORDER, width=2)
-        text(draw, x + 192, y + 9, label, 24, color if selected else MUTED)
-        if selected:
-            text(draw, x + 407, y + 7, "✓", 26, color, True)
+
+    panel(draw, (x, y + 4, x + 196, y + 248), 16, SURFACE)
+    chosen = state >= 2
+    cloth = "#3f7a63" if chosen else "#9aa7bd"
+    shade = blend(cloth, INK, 0.22)
+    mid, top, hem = x + 98, y + 36, y + 224
+    # A long-sleeve blazer: shoulders, sleeves down to the hem, then the lapels.
+    draw.polygon([(mid - 26, top), (mid + 26, top), (mid + 52, top + 14), (mid + 44, top + 54),
+                  (mid + 44, hem), (mid - 44, hem), (mid - 44, top + 54), (mid - 52, top + 14)],
+                 fill=cloth)
+    for side in (-1, 1):
+        draw.polygon([(mid + side * 44, top + 14), (mid + side * 62, top + 30),
+                      (mid + side * 58, top + 150), (mid + side * 38, top + 150),
+                      (mid + side * 42, top + 40)], fill=shade)
+        draw.polygon([(mid + side * 24, top + 2), (mid + side * 6, top + 96),
+                      (mid, top + 60)], fill=shade)
+    draw.line((mid, top + 96, mid, hem - 8), fill=blend(cloth, "#ffffff", 0.4), width=3)
+    for button in (top + 112, top + 146):
+        draw.ellipse((mid - 5, button - 5, mid + 5, button + 5),
+                     fill=blend(cloth, "#ffffff", 0.55))
+
+    right = x + 216
+    text(draw, (right, y + 4), "Women's blazer", 26)
+    text(draw, (right, y + 40), "long sleeve, under $80", 21, MUTED)
+    text(draw, (right, y + 70), "COLOR", 19, DIM)
+    for index, swatch in enumerate(("#2f6b55", "#6f7a4c", "#c0ad88")):
+        cx, cy = right + 22 + index * 64, y + 124
+        draw.ellipse((cx - 20, cy - 20, cx + 20, cy + 20), fill=swatch)
+        if chosen and index == 0:
+            draw.ellipse((cx - 28, cy - 28, cx + 28, cy + 28), outline=color, width=3)
+    if chosen:
+        text(draw, (right, y + 152), "z-dark green", 22, color)
+        tick_mark(draw, right + width_of(draw, "z-dark green", 22) + 20, y + 164, 9, color)
+    text(draw, (right, y + 190), "SIZE", 19, DIM)
+    for index, label in enumerate(("XS", "S", "M")):
+        left = right + index * 80
+        picked = state >= 3 and index == 1
+        panel(draw, (left, y + 216, left + 68, y + 260), 12,
+              blend(color, CARD, 0.88) if picked else SURFACE, color if picked else None)
+        text(draw, (left + 34, y + 238), label, 23, color if picked else MUTED, anchor="mm")
 
 
-def lake_scene(draw: ImageDraw.ImageDraw, x: int, trace: dict, step: Step,
+def flag(draw: ImageDraw.ImageDraw, left: int, top: int) -> None:
+    draw.line((left + 20, top + 12, left + 20, top + 44), fill=FLAG, width=3)
+    draw.polygon([(left + 22, top + 12), (left + 44, top + 21), (left + 22, top + 30)], fill=FLAG)
+
+
+def lake_scene(draw: ImageDraw.ImageDraw, x: int, y: int, trace: dict, step: Step,
                fraction: float, finished: bool, color: str, assisted: bool) -> None:
-    positions = [tuple(s["player"]) for s in trace["steps"]] + [(0, 3)]
+    cell, pitch = 56, 61
+    places = [tuple(item["player"]) for item in trace["steps"]] + [(0, 3)]
     state = step.state
-    player = positions[state]
-    if state and not finished:
-        start, target = positions[state - 1], positions[state]
-        move = min(1.0, max(0.0, (fraction - 0.45) / 0.4))
-        player = tuple(a + (b - a) * move for a, b in zip(start, target))
-    gx, gy, cell = x + 26, 208, 46
+    goal_at = (0, 3)
     for row in range(4):
         for col in range(4):
-            left, top = gx + col * cell, gy + row * cell
-            goal, hole = (row, col) == (0, 3), (row, col) == (3, 3)
-            fill = GREEN_PANEL if goal else "#29161f" if hole else PANEL_2
-            draw.rounded_rectangle((left, top, left + 39, top + 39), 7, fill=fill, outline=BORDER)
-            if goal or hole:
-                text(draw, left + 10, top + 4, "G" if goal else "×", 23, ACCENT if goal else "#fb7185", True)
-    cy, cx = gy + player[0] * cell + 19, gx + player[1] * cell + 19
-    draw.ellipse((cx - 15, cy - 15, cx + 15, cy + 15), fill=color)
-    text(draw, x + 241, 216, "1 LLM plan" if assisted else "4 directions",
-         24, BLUE if assisted else MUTED)
-    for i, action in enumerate(trace["action_menu"]):
-        left, top = x + 238 + (i % 2) * 105, 262 + (i // 2) * 57
-        selected = state > 0 and action == trace["steps"][state - 1]["action"]
-        draw.rounded_rectangle((left, top, left + 96, top + 44), 9,
-                               fill=(GREEN_PANEL if assisted else BLUE_PANEL) if selected else PANEL_2,
-                               outline=color if selected else BORDER, width=2)
-        text(draw, left + 12, top + 8, action, 23, color if selected else MUTED, selected)
+            left, top = x + col * pitch, y + 12 + row * pitch
+            goal, hole = (row, col) == goal_at, (row, col) == (3, 3)
+            panel(draw, (left, top, left + cell, top + cell), 12,
+                  ICE_GOAL if goal else ICE_HOLE if hole else ICE)
+            if goal:
+                flag(draw, left, top)
+            elif hole:
+                draw.ellipse((left + 13, top + 13, left + 43, top + 43), fill="#6f7c95")
+    if assisted and state:
+        for row, col in places[1:-1]:
+            cx, cy = x + col * pitch + 28, y + 12 + row * pitch + 28
+            draw.ellipse((cx - 5, cy - 5, cx + 5, cy + 5), fill=blend(color, ICE, 0.4))
+    spot = places[state]
+    if state and not finished:
+        start, target = places[state - 1], places[state]
+        shift = min(1.0, max(0.0, (fraction - 0.35) / 0.45))
+        spot = tuple(a + (b - a) * shift for a, b in zip(start, target))
+    cx, cy = x + spot[1] * pitch + 28, y + 12 + spot[0] * pitch + 28
+    draw.ellipse((cx - 23, cy - 23, cx + 23, cy + 23), fill=blend(color, CARD, 0.84))
+    draw.ellipse((cx - 14, cy - 14, cx + 14, cy + 14), fill=color)
+    # Keep the goal visible once the agent stands on it.
+    flag(draw, x + goal_at[1] * pitch, y + 12 + goal_at[0] * pitch)
+
+    center = x + 353
+    text(draw, (center, y + 14), "4 candidate moves", 21, DIM, anchor="ma")
+    taken = trace["steps"][state - 1]["action"] if state else None
+    for direction, (dx, dy) in (("Up", (0, -52)), ("Down", (0, 52)),
+                                ("Left", (-64, 0)), ("Right", (64, 0))):
+        bx, by = center + dx, y + 152 + dy
+        picked = direction == taken
+        panel(draw, (bx - 31, by - 23, bx + 31, by + 23), 12,
+              blend(color, CARD, 0.86) if picked else SURFACE, color if picked else None)
+        arrow(draw, bx, by, direction, color if picked else DIM)
 
 
-def terminal_scene(draw: ImageDraw.ImageDraw, x: int, trace: dict, state: int,
-                   assisted: bool, finished: bool) -> None:
-    draw.rounded_rectangle((x + 20, 207, x + 444, 393), 12, fill="#080e1b", outline=BORDER)
-    if assisted and state < 2:
-        text(draw, x + 38, 220, "trunc.db · 3 inspections", 19, MUTED, mono=True)
-        for index, option in enumerate(trace["options"]):
-            candidate(draw, x + 32, 250 + index * 46, 398, option["name"],
-                      state == 1 and option["name"] == trace["jev_choice"])
+def terminal_scene(draw: ImageDraw.ImageDraw, x: int, y: int, options: list[dict], state: int,
+                   assisted: bool, finished: bool, color: str) -> None:
+    panel(draw, (x, y + 4, x + SCENE_W, y + 254), 14, TERM_BG)
+    for index in range(3):
+        cx = x + 30 + index * 20
+        draw.ellipse((cx - 5, y + 25, cx + 5, y + 35), fill="#4a5572")
+    text(draw, (x + 104, y + 18), "trunc.db", 20, TERM_DIM, tabular=True)
+    draw.line((x + 1, y + 50, x + SCENE_W - 1, y + 50), fill="#2b3350")
+
+    if assisted and state <= 1:
+        picked = state == 1
+        for index, option in enumerate(options):
+            top = y + 78 + index * 56
+            label = option["display_command"].split(";")[0].split("|")[0].strip()
+            chosen = picked and index == 0
+            if chosen:
+                panel(draw, (x + 16, top - 10, x + SCENE_W - 16, top + 38), 10,
+                      blend(color, TERM_BG, 0.7))
+            mark = blend(color, "#ffffff", 0.4)
+            draw.ellipse((x + 30, top + 4, x + 48, top + 22), fill=mark if chosen else None,
+                         outline=mark if chosen else TERM_DIM, width=2)
+            text(draw, (x + 64, top + 1), label, 21,
+                 TERM_INK if chosen else TERM_DIM, tabular=True)
         return
-    text(draw, x + 38, 220, "trunc.db", 23, MUTED, mono=True)
-    if state == 0:
-        lines = ("damaged SQLite page", "LLM chooses inspections")
-    elif state == 1:
-        lines = ("inspect page bytes", "interpret page structure")
-    elif state == 2:
-        lines = ("cell pointers → records", "parse recoverable rows")
+
+    if assisted:
+        lines = [("$ od -A x -t x1z trunc.db", TERM_INK), ("0d 00 00 00 0a 0f 49 ...", TERM_DIM),
+                 ("cell pointers -> 10 records", TERM_INK), ("recover.json: 10 rows", TERM_INK)]
+        shown = lines[:state + 1]
     else:
-        lines = ("recover.json", "10 rows, verifier pass" if finished else "write rows; check output")
-    for i, line in enumerate(lines):
-        text(draw, x + 38, 271 + i * 55, line, 23, ACCENT if finished else TEXT, mono=True)
+        lines = [("$ sqlite3 trunc.db '.schema'", TERM_INK), ("$ od -A x -t x1z trunc.db", TERM_INK),
+                 ("cell pointers -> 10 records", TERM_INK), ("recover.json: 10 rows", TERM_INK)]
+        shown = lines[:state + 1]
+    if finished:
+        shown = shown[-3:] + [("verifier passed", "#64d8b6")]
+    shown = shown[-4:]
+    for index, (line, shade) in enumerate(shown):
+        last = index == len(shown) - 1
+        text(draw, (x + 30, y + 74 + index * 42), line, 21,
+             shade if last else TERM_DIM, tabular=True)
+    if not finished and len(shown) < 4:
+        top = y + 74 + len(shown) * 42
+        draw.rectangle((x + 30, top + 4, x + 42, top + 24), fill=blend(TERM_DIM, TERM_BG, 0.35))
 
 
 def pair_for(key: str, trace: dict) -> tuple[dict, dict]:
     pair = trace["pair"] if key == "frozen_lake" else trace
     baseline, assisted = pair["baseline"], pair["jev_harness"]
-    for run in (baseline, assisted):
-        if not 0 < run["wall_time_seconds"] < float("inf"):
+    for item in (baseline, assisted):
+        if not 0 < item["wall_time_seconds"] < float("inf"):
             raise ValueError(f"{key}: wall_time_seconds must be finite and positive")
     return baseline, assisted
 
 
-def finish_ms(run: dict, longest: float) -> int:
+def finish_ms(item: dict, longest: float) -> int:
     # GIF timestamps have 10 ms precision; include the actual finish boundary.
-    return round(PLAY_MS * run["wall_time_seconds"] / longest / 10) * 10
+    return round(PLAY_MS * item["wall_time_seconds"] / longest / 10) * 10
+
+
+def card_frame(draw: ImageDraw.ImageDraw, card: int, tint: str) -> None:
+    box = (card, CARD_Y, card + CARD_W, CARD_Y + CARD_H)
+    draw.rounded_rectangle(box, 20, fill=CARD, outline=HAIRLINE)
+    draw.rounded_rectangle((card + 1, CARD_Y + 1, card + CARD_W - 1, CARD_Y + HEADER_H),
+                           20, fill=tint)
+    draw.rectangle((card + 1, CARD_Y + HEADER_H - 20, card + CARD_W - 1, CARD_Y + HEADER_H),
+                   fill=tint)
+    draw.line((card + 1, CARD_Y + HEADER_H, card + CARD_W - 1, CARD_Y + HEADER_H), fill=HAIRLINE)
 
 
 def render_frame(key: str, trace: dict, tick: int) -> Image.Image:
     baseline, assisted = pair_for(key, trace)
-    longest = max(run["wall_time_seconds"] for run in (baseline, assisted))
-    titles = {
-        "webshop": "WebShop: buy the matching blazer",
-        "frozen_lake": "FrozenLake: reach the goal",
-        "sqlite": "Terminal-Bench: recover SQLite rows",
-    }
-    image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
+    longest = max(item["wall_time_seconds"] for item in (baseline, assisted))
+    image = Image.new("RGB", (WIDTH, HEIGHT), PAGE)
     draw = ImageDraw.Draw(image)
-    text(draw, 28, 21, titles[key], 28, bold=True)
-    right_text(draw, WIDTH - 28, 30, TASK_CONTEXT[key], 17)
-    for lane, run in enumerate((baseline, assisted)):
-        x = 24 + lane * 528
-        color = ACCENT if lane else BLUE
-        end = finish_ms(run, longest)
+    name, subject = TITLES[key]
+    text(draw, (MARGIN, 14), name, 34, INK, display=True)
+    text(draw, (MARGIN + width_of(draw, name, 34, display=True) + 20, 24), subject, 24, MUTED)
+
+    for lane, item in enumerate((baseline, assisted)):
+        card = MARGIN + lane * (CARD_W + 24)
+        inner = card + PAD
+        edge = card + CARD_W - PAD
+        color = JEV if lane else SLATE
+        end = finish_ms(item, longest)
         finished = tick >= end
-        elapsed = run["wall_time_seconds"] if finished else tick / PLAY_MS * longest
+        elapsed = item["wall_time_seconds"] if finished else tick / PLAY_MS * longest
         steps = steps_for(key, trace, bool(lane))
         progress = min(tick / end, 1.0)
         position = min(progress * len(steps), len(steps) - 0.000001)
-        index = int(position)
-        step, fraction = steps[index], position - index
+        step, fraction = steps[int(position)], position % 1
 
-        draw.rounded_rectangle((x, 73, x + 504, 608), 18, fill=PANEL, outline=color, width=2)
-        text(draw, x + 22, 90, "LLM + Jev" if lane else "LLM only", 30, color, True)
-        calls = str(run["llm_calls"])
-        text(draw, x + 22, 124, calls, 44, color, True)
-        label_x = x + 34 + draw.textlength(calls, font=font(44, True))
-        text(draw, label_x, 131, "RECORDED TOTAL", 10, MUTED)
-        text(draw, label_x, 149, "LLM call" if run["llm_calls"] == 1 else "LLM calls", 21, TEXT)
-        text(draw, x + 300, 105, "COMPLETED" if finished else "ELAPSED TIME",
-             11, ACCENT if finished else MUTED, True)
-        draw.rounded_rectangle((x + 300, 125, x + 484, 188), 10,
-                               fill=BACKGROUND, outline=BORDER)
-        text(draw, x + 314, 133,
-             f"{elapsed:.2f} s" if key == "webshop" else f"{elapsed:.1f} s", 29, TEXT, True)
-        draw.rounded_rectangle((x + 314, 178, x + 470, 182), 2, fill=BORDER)
-        length = round(156 * progress)
-        if length:
-            draw.rounded_rectangle((x + 314, 178, x + 314 + length, 182), 2, fill=color)
-        inner = x + 20
+        card_frame(draw, card, blend(color, CARD, 0.93))
+        text(draw, (inner, CARD_Y + 14), "LLM + Jev" if lane else "LLM only", 26, color, True)
+        clock = f"{elapsed:.2f} s" if key == "webshop" else f"{elapsed:.1f} s"
+        text(draw, (edge, CARD_Y + 12), clock, 32, INK, True, tabular=True, anchor="ra")
+        if finished:
+            tick_mark(draw, edge - width_of(draw, clock, 32, True, tabular=True) - 24,
+                      CARD_Y + 32, 11, color)
+
         if key == "webshop":
-            webshop_scene(draw, inner, trace, step, bool(lane), finished, color)
+            webshop_scene(draw, inner, SCENE_Y, step.state, color)
         elif key == "frozen_lake":
-            lake_scene(draw, inner, trace, step, fraction, finished, color, bool(lane))
+            lake_scene(draw, inner, SCENE_Y, trace, step, fraction, finished, color, bool(lane))
         else:
-            terminal_scene(draw, inner, trace, step.state, bool(lane), finished)
+            terminal_scene(draw, inner, SCENE_Y, trace["options"], step.state,
+                           bool(lane), finished, color)
 
-        phase_panel(image, draw, x, key, step, index, len(steps), finished, tick)
-        actor_rail(image, draw, x, steps, index, finished, tick)
-    savings_strip(draw, baseline, assisted)
-    text(draw, 28, 681,
-         f"One recorded pair · illustrated steps · measured totals at {longest * 1000 / PLAY_MS:.2f}× playback",
-         13, MUTED)
-    right_text(draw, WIDTH - 28, 681, "LLM only → LLM + Jev", 13)
+        if finished:
+            tick_mark(draw, inner + 11, CARD_Y + 376, 11, color)
+            text(draw, (inner + 34, CARD_Y + 362), OUTCOMES[key], 25, MUTED)
+        else:
+            run(draw, inner, CARD_Y + 362,
+                [(step.actor, color if step.actor == "Jev" else SLATE, True),
+                 ("  ", DIM, False), (step.title, INK, False)], 25)
+        track = CARD_Y + 400
+        draw.rounded_rectangle((inner, track, inner + SCENE_W, track + 7), 4, fill=SUNKEN)
+        # A finished lane freezes on its measured share, which rounding in
+        # finish_ms can place just before the current tick.
+        share = item["wall_time_seconds"] / longest if finished else tick / PLAY_MS
+        filled = round(SCENE_W * min(share, item["wall_time_seconds"] / longest))
+        if filled:
+            draw.rounded_rectangle((inner, track, inner + filled, track + 7), 4, fill=color)
+
+    run(draw, MARGIN, 512, [
+        (f"{baseline['steps']} -> ", MUTED, False), (str(assisted["steps"]), JEV, True),
+        (f" {baseline['step_label']}     ", DIM, False),
+        (f"{baseline['llm_calls']} -> ", MUTED, False), (str(assisted["llm_calls"]), JEV, True),
+        (" LLM calls     ", DIM, False),
+        (f"{thousands(baseline['tokens'])} -> ", MUTED, False),
+        (thousands(assisted["tokens"]), JEV, True), (" tokens", DIM, False),
+    ], 23)
     return image
 
 
 def save(path: str, key: str, trace: dict) -> None:
     pair = pair_for(key, trace)
-    longest = max(run["wall_time_seconds"] for run in pair)
-    finishes = {finish_ms(run, longest) for run in pair}
+    longest = max(item["wall_time_seconds"] for item in pair)
+    finishes = {finish_ms(item, longest) for item in pair}
     # Keep finish boundaries without introducing sub-20 ms frame delays.
     ticks = sorted(finishes | {
         tick for tick in range(0, PLAY_MS + 1, FRAME_MS)
@@ -384,34 +397,15 @@ def save(path: str, key: str, trace: dict) -> None:
     })
     durations = [b - a for a, b in zip(ticks, ticks[1:])] + [END_HOLD_MS]
     # A shared palette prevents flicker and lets GIF store just changed pixels.
-    samples = [render_frame(key, trace, tick).resize((270, 175)) for tick in ticks[::10]]
-    sheet = Image.new("RGB", (270, 175 * len(samples)))
-    for i, sample in enumerate(samples):
-        sheet.paste(sample, (0, 175 * i))
+    samples = [render_frame(key, trace, tick).resize((280, 138)) for tick in ticks[::8]]
+    sheet = Image.new("RGB", (280, 138 * len(samples)))
+    for index, sample in enumerate(samples):
+        sheet.paste(sample, (0, 138 * index))
     palette = sheet.quantize(colors=128)
-    # Keep controller and portrait colors exact even when small art is undersampled.
-    # Remaining entries retain the sampled colors for antialiased text and art.
-    theme = (BACKGROUND, PANEL, PANEL_2, BORDER, TEXT, MUTED, ACCENT, BLUE,
-             AMBER, GREEN_PANEL, BLUE_PANEL, AMBER_PANEL) + ROBOT_COLORS
-    colors = palette.getpalette()[:128 * 3]
-    colors += [channel for color in theme for channel in ImageColor.getrgb(color)]
-    colors += list(ImageColor.getrgb(BACKGROUND)) * ((768 - len(colors)) // 3)
-    palette.putpalette(colors)
-    frames = []
-    for tick in ticks:
-        original = render_frame(key, trace, tick)
-        frame = original.quantize(palette=palette, dither=Image.Dither.NONE)
-        # Quantization can reuse a nearby swatch even for an exact palette color.
-        # Pin flat theme pixels; retain sampled colors for antialiased edges.
-        channels = original.split()
-        for index, color in enumerate(theme, start=128):
-            masks = [
-                channel.point([255 if value == target else 0 for value in range(256)])
-                for channel, target in zip(channels, ImageColor.getrgb(color))
-            ]
-            mask = ImageChops.multiply(ImageChops.multiply(masks[0], masks[1]), masks[2])
-            frame.paste(index, mask=mask)
-        frames.append(frame)
+    frames = [
+        render_frame(key, trace, tick).quantize(palette=palette, dither=Image.Dither.NONE)
+        for tick in ticks
+    ]
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
     frames[0].save(output, save_all=True, append_images=frames[1:], duration=durations,
@@ -447,33 +441,44 @@ def save_overview(path: str, sources: list[str]) -> None:
 
 def save_site_media(sources: list[str]) -> None:
     """Export only this presentation's videos and posters at native resolution."""
-    executable = shutil.which("ffmpeg")
-    if not executable:
-        try:
-            from imageio_ffmpeg import get_ffmpeg_exe
-        except ImportError as error:
-            raise SystemExit("Install ffmpeg or imageio-ffmpeg to export site media.") from error
-        executable = get_ffmpeg_exe()
+    try:
+        import av
+    except ImportError as error:
+        raise SystemExit("Install av to export site media: python -m pip install av") from error
+
     directory = Path(__file__).resolve().parents[1] / "site/assets/media/docs"
     directory.mkdir(parents=True, exist_ok=True)
     for source in sources:
         name = Path(source).stem
-        common = [
-            executable, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-            "-ignore_loop", "1", "-i", source, "-an", "-vf", "setsar=1,fps=25",
-            "-pix_fmt", "yuv420p", "-threads", "2",
-        ]
-        subprocess.run(common + [
-            "-c:v", "libx264", "-crf", "26", "-preset", "fast",
-            "-movflags", "+faststart", str(directory / f"{name}.mp4"),
-        ], check=True)
-        subprocess.run(common + [
-            "-c:v", "libvpx-vp9", "-crf", "36", "-b:v", "0", "-cpu-used", "3",
-            "-row-mt", "1", str(directory / f"{name}.webm"),
-        ], check=True)
+        timeline = []
+        duration = 0
         with Image.open(source) as image:
-            image.seek(min(12, image.n_frames - 1))
-            image.convert("RGB").save(directory / f"{name}.webp", quality=88, method=6)
+            for index in range(image.n_frames):
+                image.seek(index)
+                timeline.append((duration, image.convert("RGB")))
+                duration += image.info["duration"]
+        for suffix, codec, options in (
+            ("mp4", "libx264", {"crf": "26", "preset": "fast"}),
+            ("webm", "libvpx-vp9", {"crf": "36", "b:v": "0", "cpu-used": "3", "row-mt": "1"}),
+        ):
+            container_options = {"movflags": "+faststart"} if suffix == "mp4" else {}
+            with av.open(str(directory / f"{name}.{suffix}"), "w", options=container_options) as output:
+                stream = output.add_stream(codec, rate=25)
+                stream.width, stream.height = timeline[0][1].size
+                stream.pix_fmt = "yuv420p"
+                stream.thread_count = 2
+                stream.options = options
+                cursor = 0
+                for tick in range(0, duration, 40):
+                    while cursor + 1 < len(timeline) and timeline[cursor + 1][0] <= tick:
+                        cursor += 1
+                    for packet in stream.encode(av.VideoFrame.from_image(timeline[cursor][1])):
+                        output.mux(packet)
+                for packet in stream.encode():
+                    output.mux(packet)
+        timeline[min(12, len(timeline) - 1)][1].save(
+            directory / f"{name}.webp", quality=88, method=6,
+        )
         print(f"Prepared site media: {name}")
 
 

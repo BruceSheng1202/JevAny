@@ -28,35 +28,21 @@ explicit source-code link; checkpoint download links point to Hugging Face.
 The README and `docs/agent-harness.html` use the same paired comparisons from
 `scripts/render_agent_decision_demos_v2.py`. Three individual GIFs show WebShop,
 FrozenLake, and SQLite recovery. `docs/demos/jev-agent-harness.gif` joins those
-replays in that order into a nine-second overview, preserving every frame and
+replays in that order into a fifteen-second overview, preserving every frame and
 its timing. The gallery uses matching MP4/WebM videos and WebP posters.
 
-Both lanes retain the measured completion-time ratio within each three-second loop.
-Recorded LLM call totals are prominent alongside each lane's clock. Task
-constraints stay visible; large actor panels identify the current phase,
-and recorded menus highlight the selected option. The footer shows LLM tokens
-saved, wall time saved, and the task result for this recorded pair. Large
-highlighted percentages lead the two savings cards, with absolute savings and
-original totals alongside them. Percentages use the LLM-only baseline. These
-are full-run measurements for one recorded pair.
-A fixed role bar shows each controller once and highlights only
-the current controller. When control returns to the LLM, the same LLM position
-lights up again. Both roles dim when the task completes, and completed lanes
-remain frozen.
-
-Shared robot portraits in `scripts/render_agent_robot_icons.py` distinguish the
-blue LLM from the smaller teal Jev. Planning lights and short motion trails
-animate only on the active controller; inactive portraits stay gray and still.
-These decorative animations do not represent measured inference time. Amber
-result symbols mark completion. Icons are drawn and antialiased locally with
-Pillow, so all three cases use the same artwork without external image assets.
+Each loop has four seconds of action and a one-second final hold. Both lanes
+retain the measured completion-time ratio, and a finished lane stays frozen.
+Light cards use slate for the LLM-only lane and purple for the assisted lane.
+The scene, current action and clock sit above one row of recorded steps,
+LLM calls and tokens. Typography uses the homepage's bundled DM Sans and
+IBM Plex Sans Condensed fonts; no system font installation is needed.
 
 `docs/agent-harness.html` leads with the overview, followed by the three individual
 replays and a short explanation of each delegation: choosing within LLM-provided
 menus, retaining one plan across local moves, and choosing useful evidence.
-It uses the same navy, blue, teal, and amber palette as the GIFs.
 Playback controls provide pause, seek, and fullscreen beneath the frame,
-keeping the savings visible even when paused. Native controls remain available
+keeping the comparison visible even when paused. Native controls remain available
 when JavaScript is disabled. Only the overview
 starts automatically; videos pause offscreen and when the tab is hidden, and
 only one plays at a time. Reduced-motion preferences disable automatic playback.
@@ -72,12 +58,12 @@ in the report. Rendering uses existing recordings and runs no model or environme
 Regenerate all four GIFs and their site media from the repository root:
 
 ```bash
-python3 -m pip install pillow imageio-ffmpeg
+python3 -m pip install pillow av
 python3 scripts/render_agent_decision_demos_v2.py --site-media
 ```
 
-Omit `--site-media` to export only GIFs. Video conversion uses ffmpeg;
-imageio-ffmpeg is optional when ffmpeg is already on PATH. The legacy command
+Omit `--site-media` to export only GIFs. Video conversion uses PyAV's H.264 and
+VP9 encoders. The legacy command
 `python3 scripts/render_agent_harness_demo.py` also exports this presentation.
 
 Regenerate the homepage's data sections and documentation from the repository:

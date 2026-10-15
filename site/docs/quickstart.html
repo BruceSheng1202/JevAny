@@ -61,98 +61,25 @@ JevAny checkpoint. The current default release is
 try your own inputs and see its choices and probabilities.</p>
 <p><a href="../index.html#case-library">Explore all 30 application replays →</a></p>
 <h3 id="jev-inside-llm-agent-loops">⚡ Jev inside LLM agent loops</h3>
-<p>Jev chooses among bounded candidate actions supplied by the environment or
-proposed by the LLM, which handles planning, recovery, and completion. The
-animations compare LLM only (left) with LLM + Jev (right) at equal reward.
-Steps are illustrated; accelerated playback preserves each pair's measured
-completion-time ratio. Click an animation to enlarge it.</p>
-<p><strong>Golden rules</strong></p>
-<p><strong>Delegate the selection bottleneck, not the task.</strong> Jev should either replace
-repeated LLM reasoning or correct a measured local ranking error; otherwise it
-is overhead.</p>
-<ul>
-<li>Give Jev <strong>2–4 valid branches</strong> with distinct, observable outcomes and the
-  correct action included.</li>
-<li>Reuse one LLM plan across reversible choices; return control on novelty,
-  stale candidates, delayed feedback, recovery, or completion.</li>
-<li>Scale autonomy only with paired reward/cost evidence: D0 LLM-only → D1 shadow
-  → D2 one-step → D3 routine default → D4 bounded subgoal. Coverage is not
-  success.</li>
-</ul>
-<div class="table-scroll" tabindex="0" role="region" aria-label="Documentation table"><table>
-  <tr>
-    <td width="64%" valign="middle">
-      <video class="doc-video" controls playsinline preload="none" aria-label="WebShop: LLM only and LLM + Jev run side by side; Jev-assisted purchase completes in 7.83 seconds versus 18.54 seconds" poster="../assets/media/docs/jev-decision-webshop-v2.webp"><source src="../assets/media/docs/jev-decision-webshop-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-webshop-v2.mp4" type="video/mp4">Your browser does not support video.</video>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>1. <a href="../files/docs/demos/jev-agent-harness-traces.json">WebShop</a></strong><br>
-      Jev selects the requested color and size from LLM-generated menus before the
-      LLM buys the product. Actions fall from 9 to 5, LLM calls from 9 to 4,
-      tokens from 38,852 to 14,256, and time from 18.54 to 7.83 seconds.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="64%" valign="middle">
-      <video class="doc-video" controls playsinline preload="none" aria-label="FrozenLake: the LLM chooses every move on the left; one LLM plan and Jev decisions reach the same goal in 16.7 seconds versus 19.7 seconds on the right" poster="../assets/media/docs/jev-decision-frozen-lake-v2.webp"><source src="../assets/media/docs/jev-decision-frozen-lake-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-frozen-lake-v2.mp4" type="video/mp4">Your browser does not support video.</video>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>2. <a href="../files/docs/demos/jev-agent-harness-traces.json">FrozenLake</a></strong><br>
-      After one LLM plan, Jev checks each new state and chooses among four directions.
-      Both runs reach the goal in 4 moves; LLM decision calls fall from 4 to 1,
-      tokens from 2,338 to 663, and time from 19.7 to 16.7 seconds.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="64%" valign="middle">
-      <video class="doc-video" controls playsinline preload="none" aria-label="SQLite recovery: LLM only and LLM + Jev run side by side; both recover ten rows, finishing in 187.9 and 144.7 seconds respectively" poster="../assets/media/docs/jev-decision-terminal-v2.webp"><source src="../assets/media/docs/jev-decision-terminal-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-terminal-v2.mp4" type="video/mp4">Your browser does not support video.</video>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>3. <a href="reports-JevAny_Tech_Report_Agent_Harness_Appendix.html#h1-sqlite-recovery-a-meaningful-three-way-decision">Terminal-Bench</a></strong><br>
-      For <code>sqlite-db-truncate</code>, Jev selects raw-page inspection from three
-      commands, then the LLM recovers and verifies ten rows. Tool commands fall
-      from 13 to 7, LLM calls from 15 to 8, tokens from 202,050 to 121,293, and
-      time from 187.9 to 144.7 seconds.</p>
-    </td>
-  </tr>
-</table></div>
-
-<p>Watch all three in the <a href="../assets/media/docs/jev-agent-harness.mp4">nine-second overview</a>,
-or open the <a href="agent-harness.html">agent harness demos</a>.</p>
-<p>Broader paired evaluations show that gains vary by task. The <a href="reports-JevAny_Tech_Report_Agent_Harness_Appendix.html">full results</a>,
-<a href="experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html">delegation protocol</a>, and
-<a href="../files/reports/JevAny_Tech_Report.pdf">technical report</a> describe
-where Jev helps and when to return control to the LLM.</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="Documentation table"><table>
-<thead>
-<tr>
-<th>Task</th>
-<th style="text-align: right;">Success</th>
-<th style="text-align: right;">Efficiency</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>FrozenLake (GPT-5.6-sol, 10 pairs)</td>
-<td style="text-align: right;">100% → 100%</td>
-<td style="text-align: right;">LLM calls −64.4%, tokens −63.1%, time −37.6%</td>
-</tr>
-<tr>
-<td>WebShop (LLM-generated menus, 3 pairs)</td>
-<td style="text-align: right;">67% → 100%</td>
-<td style="text-align: right;">LLM calls −21.4%, tokens −14.3%, time −15.0%</td>
-</tr>
-<tr>
-<td>WebArena (6 pairs)</td>
-<td style="text-align: right;">50% → 50%</td>
-<td style="text-align: right;">LLM calls +5.6%, tokens +28.2%, time −0.4%</td>
-</tr>
-<tr>
-<td>Terminal-Bench (6 pairs)</td>
-<td style="text-align: right;">1/6 → 3/6</td>
-<td style="text-align: right;">LLM calls −9.0%</td>
-</tr>
-</tbody>
-</table></div>
+<p>The LLM plans, recovers and finishes the task; Jev picks the next action
+wherever the loop offers a bounded set of candidates. Each animation replays
+one recorded pair, LLM only on the left and LLM + Jev on the right, with the
+measured totals on the clocks and schematic step artwork.</p>
+<p><strong>1. <a href="../files/docs/demos/jev-agent-harness-traces.json">WebShop</a>.</strong>
+Jev picks the requested color and size from menus the LLM generated, and the
+LLM buys the product.</p>
+<p><video class="doc-video" controls playsinline preload="none" aria-label="WebShop: LLM only needs nine actions and 18.54 seconds; LLM + Jev buys the same blazer in five actions and 7.83 seconds" poster="../assets/media/docs/jev-decision-webshop-v2.webp"><source src="../assets/media/docs/jev-decision-webshop-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-webshop-v2.mp4" type="video/mp4">Your browser does not support video.</video></p>
+<p><strong>2. <a href="../files/docs/demos/jev-agent-harness-traces.json">FrozenLake</a>.</strong>
+One LLM plan, then Jev compares the four moves at each new state.</p>
+<p><video class="doc-video" controls playsinline preload="none" aria-label="FrozenLake: both runs reach the goal in four moves; LLM only spends four LLM calls and 19.7 seconds, LLM + Jev one call and 16.7 seconds" poster="../assets/media/docs/jev-decision-frozen-lake-v2.webp"><source src="../assets/media/docs/jev-decision-frozen-lake-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-frozen-lake-v2.mp4" type="video/mp4">Your browser does not support video.</video></p>
+<p><strong>3. <a href="reports-JevAny_Tech_Report_Agent_Harness_Appendix.html#h1-sqlite-recovery-a-meaningful-three-way-decision">Terminal-Bench</a>.</strong>
+On <code>sqlite-db-truncate</code>, Jev picks raw-page inspection out of three probes, and
+the LLM recovers and verifies ten rows.</p>
+<p><video class="doc-video" controls playsinline preload="none" aria-label="Terminal-Bench sqlite-db-truncate: both runs recover ten rows; LLM only needs thirteen commands and 187.9 seconds, LLM + Jev seven commands and 144.7 seconds" poster="../assets/media/docs/jev-decision-terminal-v2.webp"><source src="../assets/media/docs/jev-decision-terminal-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-terminal-v2.mp4" type="video/mp4">Your browser does not support video.</video></p>
+<p><a href="../assets/media/docs/jev-agent-harness.mp4">Overview</a> · <a href="agent-harness.html">All demos</a></p>
+<p><a href="reports-JevAny_Tech_Report_Agent_Harness_Appendix.html">Full results</a>,
+<a href="experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html">delegation protocol</a>
+and <a href="../files/reports/JevAny_Tech_Report.pdf">technical report</a>.</p>
 <h2 id="table-of-contents">📑 Table of Contents</h2>
 <ul>
 <li><a href="#results-and-demos">🎮 Results and Demos</a></li>
