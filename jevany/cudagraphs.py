@@ -15,7 +15,8 @@ Capture makes the attention-mask decisions of eager inference (``_eager_mask_dec
 ``is_causal`` path (FlashAttention) inside the graphs instead of reading a materialised causal mask.
 
 Results are not bit-identical to the eager path: padded shapes select different kernels. Replays reuse static
-buffers, so calls must not overlap; ``DecisionRuntime`` already serializes inference under its lock.
+buffers, so calls must not overlap; ``DecisionRuntime`` serializes inference under its lock (``model_lock`` when
+request batching is enabled). Batched requests always run the eager path.
 """
 import contextlib
 import threading
@@ -114,7 +115,8 @@ class RowGraphs:
         self.stats = {"buckets": list(self.lengths), "capture_seconds": None, "graph_calls": 0, "eager_calls": 0}
 
     def _forward(self, ids, pos):
-        return self.model.lm(input_ids=ids, position_ids=pos, use_cache=False).last_hidden_state
+        return self.model.adapter.forward(self.model.lm, input_ids=ids, position_ids=pos,
+                                          use_cache=False).last_hidden_state
 
     @torch.no_grad()   # not inference_mode: the static inputs are refilled in place on every replay
     def capture(self):

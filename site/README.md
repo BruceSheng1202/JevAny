@@ -25,7 +25,7 @@ released checkpoints and the supported-model catalog. Guides, the technical
 report and linked reference files are hosted on the site. GitHub remains an
 explicit source-code link; checkpoint download links point to Hugging Face.
 
-The README and `agent-harness.html` use the same paired comparisons from
+The README and `docs/agent-harness.html` use the same paired comparisons from
 `scripts/render_agent_decision_demos_v2.py`. Three individual GIFs show WebShop,
 FrozenLake, and SQLite recovery. `docs/demos/jev-agent-harness.gif` joins those
 replays in that order into a nine-second overview, preserving every frame and
@@ -51,7 +51,7 @@ These decorative animations do not represent measured inference time. Amber
 result symbols mark completion. Icons are drawn and antialiased locally with
 Pillow, so all three cases use the same artwork without external image assets.
 
-`agent-harness.html` leads with the overview, followed by the three individual
+`docs/agent-harness.html` leads with the overview, followed by the three individual
 replays and a short explanation of each delegation: choosing within LLM-provided
 menus, retaining one plan across local moves, and choosing useful evidence.
 It uses the same navy, blue, teal, and amber palette as the GIFs.
@@ -62,6 +62,7 @@ starts automatically; videos pause offscreen and when the tab is hidden, and
 only one plays at a time. Reduced-motion preferences disable automatic playback.
 A manual pause or selection takes precedence over automatic playback.
 
+The gallery and its CSS/JS live in `docs/`, which the existing Pages artifact includes.
 The gallery links to the recorded traces, delegation protocol, and full results.
 WebShop uses seed 3107 and Jev 4B from the D4 supplement; SQLite and FrozenLake
 keep their recorded cases. Savings describe one recorded pair, with the broader

@@ -97,7 +97,7 @@
 </table>
 
 三个案例也可在[九秒总览](https://simplejev.org/JevAny/assets/media/docs/jev-agent-harness.mp4)中连续观看，或打开
-[Agent harness 演示页](https://simplejev.org/JevAny/agent-harness.html)查看单独回放。
+[Agent harness 演示页](https://simplejev.org/JevAny/docs/agent-harness.html)查看单独回放。
 
 下表展示更多配对评测结果，收益随任务而变化。[完整结果](https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html)、
 [委托协议](https://simplejev.org/JevAny/docs/experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html)和

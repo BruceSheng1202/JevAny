@@ -271,8 +271,26 @@ device. Downloading 4B needs roughly 8 GB of cache and 27B roughly 54 GB; set
 <td><code>JEVANY_PREFIX_MIN_TOKENS</code></td>
 <td>384</td>
 </tr>
+<tr>
+<td><code>max_batch_size</code></td>
+<td><code>--max-batch-size</code></td>
+<td><code>JEVANY_MAX_BATCH_SIZE</code></td>
+<td>1</td>
+</tr>
 </tbody>
 </table></div>
+<p>With <code>max_batch_size</code> above 1, concurrent text requests that arrive while a
+forward pass is running share the next one. An idle server still scores each
+request alone, with no delay to collect a batch. Combining requests is limited
+to <code>max_packed_tokens</code> padded token slots; a single request keeps the existing
+context limits, including repeated state tokens in row mode. Multimodal
+checkpoints and requests served from the prefix cache run alone. FP32
+batches match unbatched scores within floating-point tolerance; BF16/FP16 GPU
+kernels round differently by batch shape, so keep the default of 1 when
+reproducing published metrics. On one H200 with 32 concurrent requests to a
+Qwen3.5-0.8B checkpoint, batching raised throughput 2.3x in FP32 (largest
+probability change 1.5e-5, no decision changed) and 4.6x in BF16, where 2 of 32
+requests changed at least one decision. <code>GET /v1/models</code> reports batch counts.</p>
 <p>A branch includes its shared state. State and branch limits are capped at the
 backbone's context window; the packed limit covers the complete request, including
 all branches. Oversized inputs are rejected without truncation. Set the cache size

@@ -106,7 +106,7 @@ is overhead.
 </table>
 
 Watch all three in the [nine-second overview](https://simplejev.org/JevAny/assets/media/docs/jev-agent-harness.mp4),
-or open the [agent harness demos](https://simplejev.org/JevAny/agent-harness.html).
+or open the [agent harness demos](https://simplejev.org/JevAny/docs/agent-harness.html).
 
 Broader paired evaluations show that gains vary by task. The [full results](https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html),
 [delegation protocol](https://simplejev.org/JevAny/docs/experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html), and
