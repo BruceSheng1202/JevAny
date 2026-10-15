@@ -114,7 +114,8 @@ class RowGraphs:
         self.stats = {"buckets": list(self.lengths), "capture_seconds": None, "graph_calls": 0, "eager_calls": 0}
 
     def _forward(self, ids, pos):
-        return self.model.lm(input_ids=ids, position_ids=pos, use_cache=False).last_hidden_state
+        return self.model.adapter.forward(self.model.lm, input_ids=ids, position_ids=pos,
+                                          use_cache=False).last_hidden_state
 
     @torch.no_grad()   # not inference_mode: the static inputs are refilled in place on every replay
     def capture(self):
