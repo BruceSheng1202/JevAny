@@ -25,6 +25,47 @@ released checkpoints and the supported-model catalog. Guides, the technical
 report and linked reference files are hosted on the site. GitHub remains an
 explicit source-code link; checkpoint download links point to Hugging Face.
 
+The README and `docs/agent-harness.html` use the same paired comparisons from
+`scripts/render_agent_decision_demos_v2.py`. Three individual GIFs show WebShop,
+FrozenLake, and SQLite recovery. `docs/demos/jev-agent-harness.gif` joins those
+replays in that order into a fifteen-second overview, preserving every frame and
+its timing. The gallery uses matching MP4/WebM videos and WebP posters.
+
+Each loop has four seconds of action and a one-second final hold. Both lanes
+retain the measured completion-time ratio, and a finished lane stays frozen.
+Light cards use slate for the LLM-only lane and purple for the assisted lane.
+The scene, current action and clock sit above one row of recorded steps,
+LLM calls and tokens. Typography uses the homepage's bundled DM Sans and
+IBM Plex Sans Condensed fonts; no system font installation is needed.
+
+`docs/agent-harness.html` leads with the overview, followed by the three individual
+replays and a short explanation of each delegation: choosing within LLM-provided
+menus, retaining one plan across local moves, and choosing useful evidence.
+Playback controls provide pause, seek, and fullscreen beneath the frame,
+keeping the comparison visible even when paused. Native controls remain available
+when JavaScript is disabled. Only the overview
+starts automatically; videos pause offscreen and when the tab is hidden, and
+only one plays at a time. Reduced-motion preferences disable automatic playback.
+A manual pause or selection takes precedence over automatic playback.
+
+The gallery and its CSS/JS live in `docs/`, which the existing Pages artifact includes.
+The gallery links to the recorded traces, delegation protocol, and full results.
+WebShop uses seed 3107 and Jev 4B from the D4 supplement; SQLite and FrozenLake
+keep their recorded cases. Savings describe one recorded pair, with the broader
+D2 matrix, separate D4 supplement, fallback cases, and uncertainty documented
+in the report. Rendering uses existing recordings and runs no model or environment.
+
+Regenerate all four GIFs and their site media from the repository root:
+
+```bash
+python3 -m pip install pillow av
+python3 scripts/render_agent_decision_demos_v2.py --site-media
+```
+
+Omit `--site-media` to export only GIFs. Video conversion uses PyAV's H.264 and
+VP9 encoders. The legacy command
+`python3 scripts/render_agent_harness_demo.py` also exports this presentation.
+
 Regenerate the homepage's data sections and documentation from the repository:
 
 ```bash

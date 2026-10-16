@@ -40,6 +40,12 @@ Video tests decode local clips with PyAV, which is included in the
 <p>Keep JSON request/response compatibility when changing inference. Add labels only
 to training records and keep them out of model-facing inputs. Data converters
 should record source revisions and preserve evaluation separation.</p>
+<p>For another model family, extend <code>BackboneAdapter</code> and select it with
+<code>--backbone-adapter module:Class</code>. Its <code>forward(model, **inputs)</code> hook serves text,
+native media and prefix reuse; return <code>last_hidden_state</code> in the native dtype and
+<code>past_key_values</code> when caching is explicitly requested. Ordinary scoring disables
+caching. Declare packed-mask and prefix-cache support separately, and validate
+training, checkpoint reload and serving before enabling either capability.</p>
 <p>The code is organized around user entry points:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Documentation table"><table>
 <thead>

@@ -159,6 +159,23 @@ def linear_attention_kernels() -> dict[str, bool]:
     return status
 
 
+def peft_expert_remapped_leaves(model_type: str) -> set[str]:
+    """Linear leaf names PEFT rewrites to fused-expert parameters for this model type.
+
+    PEFT's Transformers v5 MoE conversion redirects every target ending in these
+    names, including dense and shared-expert ``nn.Linear`` layers, to 3-D expert
+    parameters that reject LoRA dropout. Without these private names (a PEFT release
+    that dropped the conversion) nothing is excluded, matching earlier behaviour.
+    """
+    try:
+        from peft.utils.transformers_weight_conversion import (
+            _MODEL_TO_CONVERSION_PATTERN, _MOE_TARGET_MODULE_MAPPING,
+        )
+    except ImportError:
+        return set()
+    return set(_MOE_TARGET_MODULE_MAPPING.get(_MODEL_TO_CONVERSION_PATTERN.get(model_type), {}))
+
+
 class BackboneAdapter:
     """Transformers text backbone contract; override methods for other layouts.
 
@@ -191,10 +208,14 @@ class BackboneAdapter:
             return decoder, None
         causal = AutoModelForCausalLM.from_pretrained(name, revision=revision, dtype=dtype,
                                                      attn_implementation=attn, **kwargs)
-        if causal.base_model is causal:
-            raise ValueError("causal model does not expose its base_model; provide a custom backbone_adapter")
+        decoder = causal.base_model
+        if decoder is causal:
+            # Llama 4 declares a base_model_prefix that does not name its decoder attribute.
+            decoder = getattr(causal, "model", None)
+            if not isinstance(decoder, PreTrainedModel) or decoder is causal:
+                raise ValueError("causal model does not expose its base_model; provide a custom backbone_adapter")
         self._output_embeddings = causal.get_output_embeddings()
-        return causal.base_model, None
+        return decoder, None
 
     def output_embeddings(self, language_model, multimodal_model):
         """Return the base model's original frozen vocabulary projection."""
@@ -210,17 +231,23 @@ class BackboneAdapter:
             and not getattr(config, "sliding_window", None)
         )
 
-    def lora_modules(self, model: nn.Module, preset: str, explicit: str = "") -> str | list[str]:
+    def lora_modules(self, model: nn.Module, preset: str, explicit: str = "",
+                     lora_dropout: float = 0.05) -> str | list[str]:
         """Resolve a preset against actual modules, including fused projections."""
         if preset not in ("all", "dense", "attn", "qv"):
             raise ValueError("lora_targets must be all, dense, attn, or qv")
         linear = {name for name, module in model.named_modules() if isinstance(module, (nn.Linear, Conv1D))}
         # Mamba's fused kernel bypasses out_proj.forward. PEFT 0.21 remaps even
         # GLM's fully qualified dense MLP targets to incompatible fused experts.
+        # Llama 4's router subclasses nn.Linear but returns a tuple. Layers PEFT would
+        # remap to fused experts only fail with dropout; zero-dropout runs keep PEFT's remap.
         excluded_leaves = {
             "nemotron_h": {"out_proj"},
             "glm4_moe_lite": {"gate_proj", "up_proj", "down_proj"},
+            "llama4_text": {"router"},
         }.get(model.config.model_type, set())
+        if lora_dropout:
+            excluded_leaves = excluded_leaves | peft_expert_remapped_leaves(model.config.model_type)
         excluded = {name for name in linear if name.rsplit(".", 1)[-1] in excluded_leaves}
         if explicit:
             targets = [name.strip() for name in explicit.split(",")]
@@ -287,13 +314,23 @@ class BackboneAdapter:
         """Create a cache supporting deepcopy/reorder and, for packed mode, crop."""
         return DynamicCache(config=model.config)
 
+    def forward(self, model, **inputs):
+        """Return native hidden states and, only when requested, a reusable cache.
+
+        Override here to adapt a family's forward signature or output layout.
+        Ordinary decision scoring does not need a generation cache; prefix
+        methods explicitly request one with use_cache=True.
+        """
+        inputs.setdefault("use_cache", False)
+        return model(**inputs)
+
     def encode_media(self, processor, record, **kwargs) -> dict:
         raise ValueError("this backbone adapter does not support media")
 
     def forward_media(self, language_model, multimodal_model, inputs: dict) -> torch.Tensor:
         """Return token hidden states, retaining each processor's model inputs."""
         model = multimodal_model if multimodal_model is not None else language_model
-        return model(**inputs).last_hidden_state
+        return self.forward(model, **inputs).last_hidden_state
 
 
 def _video_inputs(processor, paths: list[str], *, num_frames: int) -> dict:

@@ -64,6 +64,8 @@ LLM 规划一次路线，之后由 Jev 在每个新状态比较四个方向。
 
 ![Terminal-Bench sqlite-db-truncate：两侧都恢复十行数据；纯 LLM 为 13 条命令、187.9 秒，LLM + Jev 为 7 条命令、144.7 秒](docs/demos/jev-decision-terminal-v2.gif)
 
+[总览](https://simplejev.org/JevAny/assets/media/docs/jev-agent-harness.mp4) · [演示页](https://simplejev.org/JevAny/docs/agent-harness.html)
+
 [完整结果](https://simplejev.org/JevAny/docs/reports-JevAny_Tech_Report_Agent_Harness_Appendix.html)、
 [委托协议](https://simplejev.org/JevAny/docs/experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html)、
 [技术报告](https://simplejev.org/JevAny/files/reports/JevAny_Tech_Report.pdf)。

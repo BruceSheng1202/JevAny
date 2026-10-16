@@ -14,7 +14,7 @@ from functools import lru_cache
 import json
 from pathlib import Path
 
-from PIL import Image, ImageColor, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageFont
 
 
 WIDTH, HEIGHT = 1120, 552
@@ -25,9 +25,9 @@ PAD = 28
 SCENE_Y, SCENE_H = 142, 278
 SCENE_W = CARD_W - 2 * PAD
 
-PLAY_MS = 6000
+PLAY_MS = 4000
 FRAME_MS = 80
-END_HOLD_MS = 1500
+END_HOLD_MS = 1000
 
 PAGE = "#f3f5fb"
 CARD = "#ffffff"
@@ -47,7 +47,7 @@ TERM_BG = "#1d2438"
 TERM_INK = "#e9edf8"
 TERM_DIM = "#8d99b2"
 
-FONT_DIRS = ("/usr/share/fonts/dejavu", "/usr/share/fonts/truetype/dejavu")
+FONT_DIR = Path(__file__).resolve().parents[1] / "site/assets/fonts"
 
 TITLES = {
     "webshop": ("WebShop", "buy the matching blazer"),
@@ -59,13 +59,12 @@ OUTCOMES = {"webshop": "purchased", "frozen_lake": "goal reached",
 
 
 @lru_cache
-def font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.FreeTypeFont:
-    name = f"{'DejaVuSansMono' if mono else 'DejaVuSans'}{'-Bold' if bold else ''}.ttf"
-    for directory in FONT_DIRS:
-        candidate = Path(directory, name)
-        if candidate.exists():
-            return ImageFont.truetype(str(candidate), size)
-    raise FileNotFoundError(f"{name} is not in any of {FONT_DIRS}")
+def font(size: int, bold: bool = False, display: bool = False) -> ImageFont.FreeTypeFont:
+    name = "ibm-plex-sans-condensed-medium.woff2" if display else "dm-sans-latin.woff2"
+    face = ImageFont.truetype(str(FONT_DIR / name), size)
+    if not display:
+        face.set_variation_by_axes([min(40, max(9, size)), 500 if bold else 400])
+    return face
 
 
 def blend(base: str, other: str, weight: float) -> tuple[int, int, int]:
@@ -74,12 +73,16 @@ def blend(base: str, other: str, weight: float) -> tuple[int, int, int]:
 
 
 def text(draw: ImageDraw.ImageDraw, xy: tuple[float, float], value: str, size: int = 24,
-         color=INK, bold: bool = False, mono: bool = False, anchor: str = "la") -> None:
-    draw.text(xy, value, font=font(size, bold, mono), fill=color, anchor=anchor)
+         color=INK, bold: bool = False, tabular: bool = False, anchor: str = "la",
+         display: bool = False) -> None:
+    draw.text(xy, value, font=font(size, bold, display), fill=color, anchor=anchor,
+              features=["tnum"] if tabular else None)
 
 
-def width_of(draw: ImageDraw.ImageDraw, value: str, size: int, bold: bool = False) -> float:
-    return draw.textlength(value, font=font(size, bold))
+def width_of(draw: ImageDraw.ImageDraw, value: str, size: int, bold: bool = False,
+             tabular: bool = False, display: bool = False) -> float:
+    return draw.textlength(value, font=font(size, bold, display),
+                           features=["tnum"] if tabular else None)
 
 
 def run(draw: ImageDraw.ImageDraw, x: float, y: float, parts, size: int = 24) -> float:
@@ -183,7 +186,7 @@ def webshop_scene(draw: ImageDraw.ImageDraw, x: int, y: int, state: int, color: 
     right = x + 216
     text(draw, (right, y + 4), "Women's blazer", 26)
     text(draw, (right, y + 40), "long sleeve, under $80", 21, MUTED)
-    text(draw, (right, y + 78), "COLOR", 19, DIM)
+    text(draw, (right, y + 70), "COLOR", 19, DIM)
     for index, swatch in enumerate(("#2f6b55", "#6f7a4c", "#c0ad88")):
         cx, cy = right + 22 + index * 64, y + 124
         draw.ellipse((cx - 20, cy - 20, cx + 20, cy + 20), fill=swatch)
@@ -255,7 +258,7 @@ def terminal_scene(draw: ImageDraw.ImageDraw, x: int, y: int, options: list[dict
     for index in range(3):
         cx = x + 30 + index * 20
         draw.ellipse((cx - 5, y + 25, cx + 5, y + 35), fill="#4a5572")
-    text(draw, (x + 104, y + 18), "trunc.db", 20, TERM_DIM, mono=True)
+    text(draw, (x + 104, y + 18), "trunc.db", 20, TERM_DIM, tabular=True)
     draw.line((x + 1, y + 50, x + SCENE_W - 1, y + 50), fill="#2b3350")
 
     if assisted and state <= 1:
@@ -271,7 +274,7 @@ def terminal_scene(draw: ImageDraw.ImageDraw, x: int, y: int, options: list[dict
             draw.ellipse((x + 30, top + 4, x + 48, top + 22), fill=mark if chosen else None,
                          outline=mark if chosen else TERM_DIM, width=2)
             text(draw, (x + 64, top + 1), label, 21,
-                 TERM_INK if chosen else TERM_DIM, mono=True)
+                 TERM_INK if chosen else TERM_DIM, tabular=True)
         return
 
     if assisted:
@@ -288,7 +291,7 @@ def terminal_scene(draw: ImageDraw.ImageDraw, x: int, y: int, options: list[dict
     for index, (line, shade) in enumerate(shown):
         last = index == len(shown) - 1
         text(draw, (x + 30, y + 74 + index * 42), line, 21,
-             shade if last else TERM_DIM, mono=True)
+             shade if last else TERM_DIM, tabular=True)
     if not finished and len(shown) < 4:
         top = y + 74 + len(shown) * 42
         draw.rectangle((x + 30, top + 4, x + 42, top + 24), fill=blend(TERM_DIM, TERM_BG, 0.35))
@@ -324,8 +327,8 @@ def render_frame(key: str, trace: dict, tick: int) -> Image.Image:
     image = Image.new("RGB", (WIDTH, HEIGHT), PAGE)
     draw = ImageDraw.Draw(image)
     name, subject = TITLES[key]
-    text(draw, (MARGIN, 18), name, 30, INK, True)
-    text(draw, (MARGIN + width_of(draw, name, 30, True) + 20, 24), subject, 24, MUTED)
+    text(draw, (MARGIN, 14), name, 34, INK, display=True)
+    text(draw, (MARGIN + width_of(draw, name, 34, display=True) + 20, 24), subject, 24, MUTED)
 
     for lane, item in enumerate((baseline, assisted)):
         card = MARGIN + lane * (CARD_W + 24)
@@ -343,9 +346,10 @@ def render_frame(key: str, trace: dict, tick: int) -> Image.Image:
         card_frame(draw, card, blend(color, CARD, 0.93))
         text(draw, (inner, CARD_Y + 14), "LLM + Jev" if lane else "LLM only", 26, color, True)
         clock = f"{elapsed:.2f} s" if key == "webshop" else f"{elapsed:.1f} s"
-        text(draw, (edge, CARD_Y + 12), clock, 32, INK, True, anchor="ra")
+        text(draw, (edge, CARD_Y + 12), clock, 32, INK, True, tabular=True, anchor="ra")
         if finished:
-            tick_mark(draw, edge - width_of(draw, clock, 32, True) - 24, CARD_Y + 32, 11, color)
+            tick_mark(draw, edge - width_of(draw, clock, 32, True, tabular=True) - 24,
+                      CARD_Y + 32, 11, color)
 
         if key == "webshop":
             webshop_scene(draw, inner, SCENE_Y, step.state, color)
@@ -411,17 +415,91 @@ def save(path: str, key: str, trace: dict) -> None:
           f"{output.stat().st_size / 1024:.0f} KiB")
 
 
+def save_overview(path: str, sources: list[str]) -> None:
+    """Join the three approved loops without changing their pixels or timing."""
+    frames = []
+    durations = []
+    for source in sources:
+        with Image.open(source) as clip:
+            if clip.size != (WIDTH, HEIGHT):
+                raise ValueError(f"{source}: expected a {WIDTH}×{HEIGHT} replay")
+            for index in range(clip.n_frames):
+                clip.seek(index)
+                original = clip.convert("RGB")
+                frame = original.quantize(colors=256, dither=Image.Dither.NONE)
+                if ImageChops.difference(original, frame.convert("RGB")).getbbox():
+                    raise ValueError(f"{source}: frame {index} cannot be preserved exactly")
+                frames.append(frame)
+                durations.append(clip.info["duration"])
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frames[0].save(output, save_all=True, append_images=frames[1:], duration=durations,
+                   loop=0, optimize=False, disposal=1)
+    print(f"{output}: {len(frames)} frames, {sum(durations) / 1000:.1f}s, "
+          f"{output.stat().st_size / 1024:.0f} KiB")
+
+
+def save_site_media(sources: list[str]) -> None:
+    """Export only this presentation's videos and posters at native resolution."""
+    try:
+        import av
+    except ImportError as error:
+        raise SystemExit("Install av to export site media: python -m pip install av") from error
+
+    directory = Path(__file__).resolve().parents[1] / "site/assets/media/docs"
+    directory.mkdir(parents=True, exist_ok=True)
+    for source in sources:
+        name = Path(source).stem
+        timeline = []
+        duration = 0
+        with Image.open(source) as image:
+            for index in range(image.n_frames):
+                image.seek(index)
+                timeline.append((duration, image.convert("RGB")))
+                duration += image.info["duration"]
+        for suffix, codec, options in (
+            ("mp4", "libx264", {"crf": "26", "preset": "fast"}),
+            ("webm", "libvpx-vp9", {"crf": "36", "b:v": "0", "cpu-used": "3", "row-mt": "1"}),
+        ):
+            container_options = {"movflags": "+faststart"} if suffix == "mp4" else {}
+            with av.open(str(directory / f"{name}.{suffix}"), "w", options=container_options) as output:
+                stream = output.add_stream(codec, rate=25)
+                stream.width, stream.height = timeline[0][1].size
+                stream.pix_fmt = "yuv420p"
+                stream.thread_count = 2
+                stream.options = options
+                cursor = 0
+                for tick in range(0, duration, 40):
+                    while cursor + 1 < len(timeline) and timeline[cursor + 1][0] <= tick:
+                        cursor += 1
+                    for packet in stream.encode(av.VideoFrame.from_image(timeline[cursor][1])):
+                        output.mux(packet)
+                for packet in stream.encode():
+                    output.mux(packet)
+        timeline[min(12, len(timeline) - 1)][1].save(
+            directory / f"{name}.webp", quality=88, method=6,
+        )
+        print(f"Prepared site media: {name}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--trace", default="docs/demos/jev-agent-harness-traces.json")
-    parser.add_argument("--terminal-out", default="docs/demos/jev-decision-terminal-v2.gif")
+    parser.add_argument("--terminal-out", "--sqlite-out", default="docs/demos/jev-decision-terminal-v2.gif")
     parser.add_argument("--frozen-lake-out", default="docs/demos/jev-decision-frozen-lake-v2.gif")
     parser.add_argument("--webshop-out", default="docs/demos/jev-decision-webshop-v2.gif")
+    parser.add_argument("--overview-out", "--out", default="docs/demos/jev-agent-harness.gif")
+    parser.add_argument("--site-media", action="store_true",
+                        help="Also export MP4, WebM, and WebP for these four GIFs")
     args = parser.parse_args()
     trace = json.loads(Path(args.trace).read_text(encoding="utf-8"))
     for key, output in (("webshop", args.webshop_out), ("frozen_lake", args.frozen_lake_out),
                         ("sqlite", args.terminal_out)):
         save(output, key, trace[key])
+    clips = [args.webshop_out, args.frozen_lake_out, args.terminal_out]
+    save_overview(args.overview_out, clips)
+    if args.site_media:
+        save_site_media([args.overview_out, *clips])
 
 
 if __name__ == "__main__":

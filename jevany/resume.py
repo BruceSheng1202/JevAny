@@ -120,6 +120,14 @@ def load_trainer_state(directory: str | Path, args: dict, dataset_sha256: str,
                          "(record content/order, media paths or local media contents)")
     if state["world_size"] != world_size or state["device"] != device:
         raise ValueError("--resume requires the original world size and device type")
+    required_rng = {"shuffle", "python", "numpy", "torch"}
+    if device in ("cuda", "mps"):
+        required_rng.add("device")
+    rank_rng = state.get("rank_rng")
+    if (not isinstance(rank_rng, list) or len(rank_rng) != world_size
+            or any(not isinstance(rng, dict) or not required_rng <= rng.keys() for rng in rank_rng)):
+        raise ValueError(f"{directory}: incomplete checkpoint RNG state; use a complete checkpoint "
+                         "or --init-from for a weights-only warm start")
     for name, expected in state["checkpoint_sha256"].items():
         if digest(directory / name) != expected:
             raise ValueError(f"{directory}: {name} differs from the saved trainer state")

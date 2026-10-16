@@ -237,6 +237,20 @@ Python and HTTP use `InferenceOptions`. Both `jevany serve` and local
 | `max_packed_tokens` | `--max-packed-tokens` | `JEVANY_MAX_PACKED_TOKENS` | 8192 |
 | `prefix_cache_size` | `--prefix-cache-size` | `JEVANY_PREFIX_CACHE` | 4 |
 | `prefix_min_tokens` | `--prefix-min-tokens` | `JEVANY_PREFIX_MIN_TOKENS` | 384 |
+| `max_batch_size` | `--max-batch-size` | `JEVANY_MAX_BATCH_SIZE` | 1 |
+
+With `max_batch_size` above 1, concurrent text requests that arrive while a
+forward pass is running share the next one. An idle server still scores each
+request alone, with no delay to collect a batch. Combining requests is limited
+to `max_packed_tokens` padded token slots; a single request keeps the existing
+context limits, including repeated state tokens in row mode. Multimodal
+checkpoints and requests served from the prefix cache run alone. FP32
+batches match unbatched scores within floating-point tolerance; BF16/FP16 GPU
+kernels round differently by batch shape, so keep the default of 1 when
+reproducing published metrics. On one H200 with 32 concurrent requests to a
+Qwen3.5-0.8B checkpoint, batching raised throughput 2.3x in FP32 (largest
+probability change 1.5e-5, no decision changed) and 4.6x in BF16, where 2 of 32
+requests changed at least one decision. `GET /v1/models` reports batch counts.
 
 A branch includes its shared state. State and branch limits are capped at the
 backbone's context window; the packed limit covers the complete request, including
@@ -356,6 +370,17 @@ because their PEFT embedding adapter allocates tensors during each forward.
 `describe()` reports the lengths, capture time and how many calls replayed or ran
 eagerly under `acceleration.cuda_graphs`. Direct graphs cannot be combined with
 `JEVANY_COMPILE`.
+
+Transformers counts CUDA stream capture as tracing. Left alone, it materialises
+the causal mask inside every captured graph, so SDPA runs its memory-efficient
+kernel there instead of the FlashAttention kernel that eager inference uses.
+During capture JevAny therefore makes the eager mask decisions for an unpadded
+single row; rows whose positions do not rise by one run eagerly. On an
+A100-40GB with BF16 merged JevAny-Qwen3.5-4B, this made captured public-JevBench
+requests of 513 to 2,048 tokens 3–5% faster and left shorter ones unchanged.
+With a 4,096-token limit, requests of 2,049 to 4,096 tokens became 6–10% faster
+in graphs, but they were still no faster than eager inference, so the default
+limit stays at 2,048 tokens.
 
 Padded shapes select different kernels, so probabilities are close to, not
 identical with, the eager path. On an A100-40GB with FLA and causal-conv1d

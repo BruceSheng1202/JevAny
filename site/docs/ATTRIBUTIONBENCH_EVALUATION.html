@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0a1114">
+<title>AttributionBench Evaluation — JevAny</title><link rel="stylesheet" href="../styles.css"><link rel="icon" href="../assets/favicon.svg" type="image/svg+xml"></head>
+<body class="docs-page"><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header wrap"><a class="brand" href="../index.html"><img src="../assets/favicon.svg" width="30" height="30" alt=""><span>JevAny<span class="brand-period">.</span></span></a>
+<nav aria-label="Main navigation"><a href="../index.html#benchmarks">Benchmarks</a><a href="../index.html#models">Models</a><a href="../index.html#get-started">Get started</a></nav></header>
+<div class="docs-layout wrap"><aside class="docs-sidebar"><a class="text-link" href="../index.html">← Project homepage</a><nav aria-label="Documentation"><a href="quickstart.html">Quickstart</a><a href="TRAINING.html">Training</a><a href="DATA.html">Data</a><a href="DEPLOYMENT.html">Deployment</a><a href="API.html">API reference</a><a href="examples.html">Examples</a><a href="CASES.html">Cases</a><a href="EVALUATION.html">Evaluation</a><a href="ALGORITHM.html">Method</a><a href="INTEGRATIONS.html">Integrations</a><a href="zh.html">中文文档</a></nav>
+<details class="doc-toc"><summary>On this page</summary><div class="toc">
+<ul>
+<li><a href="#task">Task</a></li>
+<li><a href="#source-and-license">Source And License</a></li>
+<li><a href="#convert-a-local-export">Convert A Local Export</a></li>
+<li><a href="#validate-and-evaluate">Validate And Evaluate</a></li>
+<li><a href="#limits">Limits</a></li>
+</ul>
+</div>
+</details></aside>
+<main id="content" class="doc-content"><p class="eyebrow">JEVANY / DOCUMENTATION</p><h1>AttributionBench Evaluation</h1><p>This standalone converter makes <a href="https://huggingface.co/datasets/osunlp/AttributionBench">AttributionBench</a>
+usable with JevAny's existing evaluation interfaces. It does not train a model,
+change default benchmarks, or run inference during conversion.</p>
+<h2 id="task">Task</h2>
+<p>Each original row becomes one <code>noul</code> question: is the entire <code>claim</code> supported
+by its complete <code>references</code> bundle? The model receives those two fields and
+an instruction to judge only the supplied evidence.</p>
+<p>The original labels map exactly as follows:</p>
+<ul>
+<li><code>attributable</code> becomes <code>true</code>.</li>
+<li><code>not attributable</code> becomes <code>false</code>.</li>
+</ul>
+<p>Claim and reference strings, reference order, and repeated references are
+preserved. Empty reference lists retain their original annotations; the
+converter does not repair labels. Original responses, labels, raw claims, and
+citation links are not added to model evidence. The task is not per-reference
+ranking, full-response correctness, or end-to-end retrieval.</p>
+<h2 id="source-and-license">Source And License</h2>
+<p>The documented source is <code>osunlp/AttributionBench</code>, pinned to revision
+<code>62569e644f4186606f54f742178a4517431b42e1</code>. Its dataset card declares
+Apache-2.0. Review and retain the notices and terms of constituent sources;
+this converter does not grant additional rights to those texts.</p>
+<p>Download original exports separately. Conversion itself needs no network,
+Hugging Face libraries, tokenizer, or model. Do not commit downloaded corpora
+or generated suites. For example, after creating a local export directory:</p>
+<pre tabindex="0" role="region" aria-label="Code example"><code class="language-bash">curl --fail --location \
+  https://huggingface.co/datasets/osunlp/AttributionBench/resolve/62569e644f4186606f54f742178a4517431b42e1/dev_all_subset_balanced.jsonl \
+  --output /path/to/exports/attributionbench/dev_all_subset_balanced.jsonl
+</code></pre>
+<p>All balancing configurations share the same evaluation files. They are not
+independent evaluation panels and must not be counted multiple times.</p>
+<h2 id="convert-a-local-export">Convert A Local Export</h2>
+<p>Use a base JevAny installation with Python 3.12 or newer. Run the module from
+the checkout root; paths below are placeholders for local absolute paths:</p>
+<pre tabindex="0" role="region" aria-label="Code example"><code class="language-bash">cd /path/to/JevAny
+python -m scripts.convert_attributionbench \
+  /path/to/exports/attributionbench/dev_all_subset_balanced.jsonl \
+  --out /path/to/suites/attributionbench-dev \
+  --revision 62569e644f4186606f54f742178a4517431b42e1 \
+  --split dev
+</code></pre>
+<p>The required original fields are <code>id</code>, <code>src_dataset</code>, <code>claim</code>, <code>references</code>,
+and <code>attribution_label</code>. The first three must be non-empty strings;
+<code>references</code> must be a list of strings. An optional <code>question</code> must be a
+string or null. Unknown labels, malformed rows, duplicate IDs, and empty
+exports are rejected with physical input line numbers. All rows are validated
+before creating output. Existing output directories are never overwritten.</p>
+<p>Original <code>dev</code> maps to <code>development</code>. Original <code>test</code> and <code>test_ood</code> each map
+to the locked <code>test</code> partition in a separate output directory. Supply the
+matching original export and <code>--split</code> value; the converter does not infer or
+verify an export's upstream split from its contents. It does not accept
+training splits or resplit, shuffle, truncate, or relabel records.</p>
+<p>The output is one JSONL partition and a manifest, for example
+<code>/path/to/suites/attributionbench-dev/development.jsonl</code> and
+<code>/path/to/suites/attributionbench-dev/manifest.json</code>. The manifest records the
+input revision/checksum, original split, output checksum/counts, and an
+evaluation-only source policy. Record metadata retains original IDs, source
+datasets, original splits, revision, and physical input lines. Model requests
+exclude labels and provenance.</p>
+<h2 id="validate-and-evaluate">Validate And Evaluate</h2>
+<p>Development data can be checked and scored with the existing commands:</p>
+<pre tabindex="0" role="region" aria-label="Code example"><code class="language-bash">jevany data check-suite /path/to/suites/attributionbench-dev
+jevany eval --run /path/to/checkpoint \
+  --suite /path/to/suites/attributionbench-dev \
+  --out /path/to/evaluations/attributionbench-dev
+</code></pre>
+<p>For a separately converted original <code>test</code> or <code>test_ood</code> export, explicitly
+unlock its test partition:</p>
+<pre tabindex="0" role="region" aria-label="Code example"><code class="language-bash">jevany data check-suite /path/to/suites/attributionbench-test --allow-test
+jevany eval --run /path/to/checkpoint \
+  --suite /path/to/suites/attributionbench-test --allow-test \
+  --out /path/to/evaluations/attributionbench-test
+</code></pre>
+<p>Evaluation output directories must also be new. Freeze the checkpoint,
+readout, prompt, source revision, and partition before comparing models.
+The task names retain each original <code>src_dataset</code> for per-source reporting.</p>
+<h2 id="limits">Limits</h2>
+<p>Related records are grouped by source dataset and original question when it
+is nonblank. Without a question, the grouping uses that source dataset and
+an exact reference-bundle hash. Group IDs do not depend on the output split.
+This is a conservative grouping convention, not a complete semantic
+contamination audit. It does not detect paraphrases or every shared document.</p>
+<p><code>check-suite</code> compares only partitions in the same manifest. It does not
+compare separate conversion directories. Creating independent development,
+test, or OOD suites does not establish that they are disjoint. Audit overlap
+before using any data for selection or training, and keep test data locked.
+The evaluation-only manifest policy is not a security boundary against
+someone deliberately loading raw records into a separate training workflow.</p>
+<p>Conversion validates schema and provenance, not model token limits. Frozen
+suite scoring aborts on overlong inputs rather than silently dropping them.
+For custom-data scoring that records context rejections and coverage, use
+<code>--data /path/to/suites/attributionbench-dev/development.jsonl</code> instead of
+<code>--suite</code>; report requested/evaluated counts and count rejected questions as
+wrong in any all-request headline accuracy. Do not claim complete coverage
+from answered-only accuracy.</p>
+<p>The public release training corpus is not fully disclosed. These results
+would measure external attribution performance, not prove contamination-free
+generalization or improved end-to-end RAG quality.</p></main></div>
+<footer class="site-footer wrap"><a href="../index.html">← Back to JevAny</a><a href="license.html">Apache-2.0 code</a></footer></body></html>
