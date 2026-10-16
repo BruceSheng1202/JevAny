@@ -58,89 +58,21 @@
 或<a href="#本地体验">在本地运行模型</a>，输入自己的任务，查看模型的选择和各选项概率。</p>
 <p><a href="../zh.html#case-library">查看全部 30 个应用回放 →</a></p>
 <h3 id="jev-llm-agent">⚡ Jev 加入 LLM Agent 循环</h3>
-<p>候选动作由环境提供或由 LLM 生成；Jev 做局部选择，规划、失败恢复和最终完成仍由 LLM 负责。
-下方动图对比左侧纯 LLM 与右侧 LLM + Jev，两侧 reward 相同；步骤为示意，
-加速播放保留各组记录的实测耗时比例，点击可放大查看。</p>
-<p><strong>快速判断原则</strong></p>
-<p><strong>委托“选择瓶颈”，而不是委托整个任务。</strong> Jev 要么替代重复的 LLM 推理，
-要么修正已经测出的局部排序错误；两者都做不到时，它就只是额外开销。</p>
-<ul>
-<li>给 Jev <strong>2–4 个有效分支</strong>，各分支结果不同且可观察，并包含正确动作。</li>
-<li>让一次 LLM 计划在多个可回退的选择间复用；遇到新状态、候选失效、
-  延迟反馈、失败恢复或任务完成时交回控制权。</li>
-<li>只凭配对的 reward/成本证据提升自治层级：D0 纯 LLM → D1 shadow →
-  D2 单步 → D3 常规决策默认委托 → D4 有界子任务。覆盖率不等于成功。</li>
-</ul>
-<div class="table-scroll" tabindex="0" role="region" aria-label="文档表格"><table>
-  <tr>
-    <td width="64%" valign="middle">
-      <video class="doc-video" controls playsinline preload="none" aria-label="WebShop：左侧纯 LLM 与右侧 LLM + Jev 并排执行，分别在 18.54 秒和 7.83 秒完成购买" poster="../assets/media/docs/jev-decision-webshop-v2.webp"><source src="../assets/media/docs/jev-decision-webshop-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-webshop-v2.mp4" type="video/mp4">你的浏览器不支持视频播放。</video>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>1. <a href="../files/docs/demos/jev-agent-harness-traces.json">WebShop</a></strong><br>
-      Jev 从 LLM 生成的候选中选中所需颜色和尺寸，LLM 随后完成购买。
-      动作从 9 步降至 5 步，LLM 调用从 9 次降至 4 次，tokens 从 38,852
-      降至 14,256，用时从 18.54 秒降至 7.83 秒。</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="64%" valign="middle">
-      <video class="doc-video" controls playsinline preload="none" aria-label="FrozenLake：左侧 LLM 逐步决策，右侧 LLM 规划后由 Jev 比较四个方向，分别在 19.7 秒和 16.7 秒到达同一目标" poster="../assets/media/docs/jev-decision-frozen-lake-v2.webp"><source src="../assets/media/docs/jev-decision-frozen-lake-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-frozen-lake-v2.mp4" type="video/mp4">你的浏览器不支持视频播放。</video>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>2. <a href="../files/docs/demos/jev-agent-harness-traces.json">FrozenLake</a></strong><br>
-      LLM 规划一次路线，Jev 在每个新状态下从四个方向中选择下一步。
-      两侧均用 4 步到达目标；LLM 决策调用从 4 次降至 1 次，tokens 从
-      2,338 降至 663，用时从 19.7 秒降至 16.7 秒。</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="64%" valign="middle">
-      <video class="doc-video" controls playsinline preload="none" aria-label="SQLite 恢复：左侧纯 LLM 与右侧 LLM + Jev 都恢复十行数据，分别在 187.9 秒和 144.7 秒完成" poster="../assets/media/docs/jev-decision-terminal-v2.webp"><source src="../assets/media/docs/jev-decision-terminal-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-terminal-v2.mp4" type="video/mp4">你的浏览器不支持视频播放。</video>
-    </td>
-    <td width="36%" valign="middle">
-      <p><strong>3. <a href="reports-JevAny_Tech_Report_Agent_Harness_Appendix.html#h1-sqlite-recovery-a-meaningful-three-way-decision">Terminal-Bench</a></strong><br>
-      在 <code>sqlite-db-truncate</code> 任务中，Jev 从三个命令中选择原始页面检查，
-      LLM 随后恢复并验证十行数据。工具命令从 13 步降至 7 步，LLM 调用从
-      15 次降至 8 次，tokens 从 202,050 降至 121,293，用时从 187.9 秒降至 144.7 秒。</p>
-    </td>
-  </tr>
-</table></div>
-
-<p>下表展示更多配对评测结果，收益随任务而变化。<a href="reports-JevAny_Tech_Report_Agent_Harness_Appendix.html">完整结果</a>、
-<a href="experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html">委托协议</a>和
-<a href="../files/reports/JevAny_Tech_Report.pdf">技术报告</a>说明了 Jev 适合处理哪些选择，以及何时交回 LLM。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="文档表格"><table>
-<thead>
-<tr>
-<th>任务</th>
-<th style="text-align: right;">成功率</th>
-<th style="text-align: right;">效率</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>FrozenLake（GPT-5.6-sol，10 组配对）</td>
-<td style="text-align: right;">100% → 100%</td>
-<td style="text-align: right;">LLM 调用 −64.4%，tokens −63.1%，用时 −37.6%</td>
-</tr>
-<tr>
-<td>WebShop（LLM 生成候选，3 组配对）</td>
-<td style="text-align: right;">67% → 100%</td>
-<td style="text-align: right;">LLM 调用 −21.4%，tokens −14.3%，用时 −15.0%</td>
-</tr>
-<tr>
-<td>WebArena（6 组配对）</td>
-<td style="text-align: right;">50% → 50%</td>
-<td style="text-align: right;">LLM 调用 +5.6%，tokens +28.2%，用时 −0.4%</td>
-</tr>
-<tr>
-<td>Terminal-Bench（6 组配对）</td>
-<td style="text-align: right;">1/6 → 3/6</td>
-<td style="text-align: right;">LLM 调用 −9.0%</td>
-</tr>
-</tbody>
-</table></div>
+<p>规划、失败恢复和最终完成由 LLM 负责；当循环中出现有界候选动作时，由 Jev 选择下一步。
+每张动图回放一组实测配对，左侧纯 LLM，右侧 LLM + Jev，计时为实测总耗时的加速回放，
+步骤画面为示意。</p>
+<p><strong>1. <a href="../files/docs/demos/jev-agent-harness-traces.json">WebShop</a>。</strong>
+Jev 从 LLM 生成的候选中选出所需颜色和尺寸，LLM 随后完成购买。</p>
+<p><video class="doc-video" controls playsinline preload="none" aria-label="WebShop：纯 LLM 用 9 个动作、18.54 秒；LLM + Jev 用 5 个动作、7.83 秒买到同一件外套" poster="../assets/media/docs/jev-decision-webshop-v2.webp"><source src="../assets/media/docs/jev-decision-webshop-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-webshop-v2.mp4" type="video/mp4">你的浏览器不支持视频播放。</video></p>
+<p><strong>2. <a href="../files/docs/demos/jev-agent-harness-traces.json">FrozenLake</a>。</strong>
+LLM 规划一次路线，之后由 Jev 在每个新状态比较四个方向。</p>
+<p><video class="doc-video" controls playsinline preload="none" aria-label="FrozenLake：两侧都用 4 步到达目标；纯 LLM 为 4 次 LLM 调用、19.7 秒，LLM + Jev 为 1 次调用、16.7 秒" poster="../assets/media/docs/jev-decision-frozen-lake-v2.webp"><source src="../assets/media/docs/jev-decision-frozen-lake-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-frozen-lake-v2.mp4" type="video/mp4">你的浏览器不支持视频播放。</video></p>
+<p><strong>3. <a href="reports-JevAny_Tech_Report_Agent_Harness_Appendix.html#h1-sqlite-recovery-a-meaningful-three-way-decision">Terminal-Bench</a>。</strong>
+在 <code>sqlite-db-truncate</code> 任务中，Jev 从三条探查命令里选择原始页面检查，LLM 随后恢复并验证十行数据。</p>
+<p><video class="doc-video" controls playsinline preload="none" aria-label="Terminal-Bench sqlite-db-truncate：两侧都恢复十行数据；纯 LLM 为 13 条命令、187.9 秒，LLM + Jev 为 7 条命令、144.7 秒" poster="../assets/media/docs/jev-decision-terminal-v2.webp"><source src="../assets/media/docs/jev-decision-terminal-v2.webm" type="video/webm"><source src="../assets/media/docs/jev-decision-terminal-v2.mp4" type="video/mp4">你的浏览器不支持视频播放。</video></p>
+<p><a href="reports-JevAny_Tech_Report_Agent_Harness_Appendix.html">完整结果</a>、
+<a href="experiments-AGENT_HARNESS_FRONTIER_PROTOCOL.html">委托协议</a>、
+<a href="../files/reports/JevAny_Tech_Report.pdf">技术报告</a>。</p>
 <h2 id="_2">📑 目录</h2>
 <ul>
 <li><a href="#结果与演示">🎮 结果与演示</a></li>
