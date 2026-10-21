@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from jevany.data import load_records
-from jevany.suite import digest, load_split, read_jsonl, semantic_hash, validate_suite, write_json, write_jsonl
+from jevany.suite import digest, load_split, read_jsonl, read_manifest, semantic_hash, validate_suite, write_json, write_jsonl
 
 
 TEXT_HASH = "15504894a79f9615b2dfc9f0a2b0fb3db86d11f24ea0c9cae874bf781bb11abb"
@@ -258,3 +258,25 @@ def test_sft_generated_media_uses_the_output_directory(tmp_path, monkeypatch, of
         assert len(raw) == count
         assert all(not Path(item["uri"]).is_absolute() for row in raw for item in row["media"])
         assert all(Path(item["uri"]).is_file() for row in load_split(output, split) for item in row["media"])
+
+
+def test_sft_generated_partitions_are_reproducible_across_output_roots(tmp_path, monkeypatch, offline_sft):
+    from PIL import Image
+
+    source_row = {"image": Image.new("RGB", (1, 1)), "question": "Which object?",
+                  "choices": ["A", "B"], "answer": 0}
+    monkeypatch.setattr(offline_sft, "load_source",
+                        lambda source, split: ([source_row] * (1 if split == "train" else 2)
+                                                if source == "scienceqa" else []))
+    outputs = [tmp_path / name for name in ("first", "second")]
+    for output in outputs:
+        offline_sft.main(sft_args(output) + ["--scienceqa", "1", "--eval-per-source", "1"])
+
+    for split in ("train", "calibration", "development"):
+        filename = f"{split}.jsonl"
+        assert (outputs[0] / filename).read_bytes() == (outputs[1] / filename).read_bytes()
+        for output in outputs:
+            rows = read_jsonl(output / filename)
+            assert len(rows) == 1
+            assert rows[0]["_meta"]["text_sha256"] == semantic_hash(rows[0])
+        assert read_manifest(outputs[0])["files"][filename] == read_manifest(outputs[1])["files"][filename]

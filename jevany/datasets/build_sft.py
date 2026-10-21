@@ -416,6 +416,8 @@ def main(argv=None):
             for media in row.get("media", []):
                 if "://" not in media["uri"]:
                     media["uri"] = os.path.relpath(media["uri"], media_directory)
+            if row.get("media"):
+                row["_meta"]["text_sha256"] = content_hash(row)
         write_jsonl(root / f"{split}.jsonl", rows)
     files = {name: {"records": len(rows), "questions": sum(len(row["questions"]) for row in rows),
                     "sha256": digest(root / name)} for name, rows in
