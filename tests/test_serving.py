@@ -1,6 +1,8 @@
 """Serving contracts with real, offline Transformers checkpoints."""
 import argparse
+import io
 import json
+import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from types import SimpleNamespace
@@ -12,7 +14,7 @@ from fastapi.testclient import TestClient
 from jevany import Choice, InferenceOptions, JevModel, Noul, Score, SystemOneRequest
 from jevany.api import to_record
 from jevany.backbones import BackboneAdapter, InferenceCapabilities
-from jevany.checkpoint import Meta, write_meta
+from jevany.checkpoint import LoadOptions, Meta, write_meta
 from jevany.inference import add_inference_arguments, inference_options_from_args
 from jevany.model import ContextLengthError, DecisionModel, load_tokenizer
 from jevany.serve import create_app
@@ -150,6 +152,110 @@ def test_environment_settings_and_cli_overrides(monkeypatch):
         InferenceOptions.from_env({"JEVANY_PREFIX_CACHE": "bad"})
     with pytest.raises(ValueError, match="prefix_cache_size"):
         InferenceOptions.from_env({"JEVANY_PREFIX_CACHE": "-1"})
+
+
+@pytest.fixture
+def clean_options_environment(monkeypatch):
+    for variable in tuple(os.environ):
+        if variable.startswith("JEVANY_"):
+            monkeypatch.delenv(variable)
+
+
+@pytest.fixture
+def inference_parser(clean_options_environment):
+    parser = argparse.ArgumentParser()
+    add_inference_arguments(parser)
+    return parser
+
+
+@pytest.mark.parametrize("name,variable,value", [
+    ("max_state_tokens", "JEVANY_MAX_STATE_TOKENS", 1),
+    ("max_branch_tokens", "JEVANY_MAX_BRANCH_TOKENS", 1),
+    ("max_packed_tokens", "JEVANY_MAX_PACKED_TOKENS", 1),
+    ("prefix_cache_size", "JEVANY_PREFIX_CACHE", 0),
+    ("prefix_min_tokens", "JEVANY_PREFIX_MIN_TOKENS", 0),
+    ("max_batch_size", "JEVANY_MAX_BATCH_SIZE", 1),
+])
+@pytest.mark.parametrize("bad", ["bad", "-1"])
+def test_inference_flags_override_invalid_environment(inference_parser, monkeypatch, name, variable, value, bad):
+    monkeypatch.setenv(variable, bad)
+    args = inference_parser.parse_args(["--" + name.replace("_", "-"), str(value)])
+    assert inference_options_from_args(args) == InferenceOptions(**{name: value})
+    assert os.environ[variable] == bad
+    with pytest.raises(ValueError):
+        InferenceOptions.from_env({variable: bad})
+
+
+@pytest.mark.parametrize("bad,message", [
+    ("bad", "JEVANY_PREFIX_CACHE must be an integer"),
+    ("-1", "prefix_cache_size must be an integer >= 0"),
+])
+def test_inference_flags_reject_unoverridden_environment(inference_parser, monkeypatch, bad, message):
+    monkeypatch.setenv("JEVANY_PREFIX_CACHE", bad)
+    with pytest.raises(ValueError, match=message):
+        inference_options_from_args(inference_parser.parse_args(["--max-batch-size", "3"]))
+
+
+@pytest.mark.parametrize("name,bad", [
+    ("max_state_tokens", 0), ("max_branch_tokens", 0), ("max_packed_tokens", 0),
+    ("prefix_cache_size", -1), ("prefix_min_tokens", -1), ("max_batch_size", 0),
+])
+def test_inference_flags_reject_invalid_final_values(inference_parser, name, bad):
+    args = inference_parser.parse_args(["--" + name.replace("_", "-"), str(bad)])
+    with pytest.raises(ValueError, match=name + " must be an integer"):
+        inference_options_from_args(args)
+
+
+def test_inference_flags_reject_malformed_numbers(inference_parser):
+    with pytest.raises(SystemExit):
+        inference_parser.parse_args(["--prefix-cache-size", "bad"])
+
+
+def test_inference_flags_preserve_defaults_and_environment(inference_parser, monkeypatch):
+    args = inference_parser.parse_args([])
+    assert inference_options_from_args(args) == InferenceOptions()
+    monkeypatch.setenv("JEVANY_PREFIX_CACHE", "0")
+    monkeypatch.setenv("JEVANY_PREFIX_MIN_TOKENS", "0")
+    monkeypatch.setenv("JEVANY_MAX_STATE_TOKENS", "128")
+    assert inference_options_from_args(args) == InferenceOptions(
+        max_state_tokens=128, prefix_cache_size=0, prefix_min_tokens=0)
+
+
+@pytest.mark.parametrize("command", ["decide", "serve"])
+@pytest.mark.parametrize("memory", ["10", "bad"])
+def test_cli_config_precedence_before_loading(clean_options_environment, monkeypatch, capsys, command, memory):
+    from jevany.cli import main
+
+    class LoaderReached(Exception):
+        pass
+
+    seen = {}
+
+    def load(*args, **kwargs):
+        seen.update(kwargs)
+        raise LoaderReached
+
+    monkeypatch.setenv("JEVANY_PREFIX_CACHE", "bad")
+    monkeypatch.setenv("JEVANY_MAX_MEMORY_GIB", memory)
+    flags = ["--checkpoint", "owner/checkpoint", "--device-map", "auto", "--prefix-cache-size", "0"]
+    if command == "decide":
+        monkeypatch.setattr(JevModel, "from_pretrained", load)
+        monkeypatch.setattr("sys.stdin", io.StringIO(SystemOneRequest(state="state", questions={
+            "choice": Choice(criteria={"a": None, "b": None})}).model_dump_json()))
+        flags.insert(0, "-")
+    else:
+        monkeypatch.setattr("jevany.serve.create_app", load)
+    if memory == "bad":
+        with pytest.raises(SystemExit) as error:
+            main([command, *flags])
+        assert error.value.code == 2
+        assert "could not convert string to float" in capsys.readouterr().err
+        assert not seen
+    else:
+        with pytest.raises(LoaderReached):
+            main([command, *flags])
+        assert seen["options"] == LoadOptions(device_map="auto", max_memory_gib=10.0)
+        assert seen["inference_options"] == InferenceOptions(prefix_cache_size=0)
 
 
 def test_load_options_and_empty_model_fail_before_loading(tmp_path, monkeypatch):

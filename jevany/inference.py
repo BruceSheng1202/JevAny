@@ -1,8 +1,12 @@
 """Inference limits shared by Python, the CLI and HTTP deployments."""
 import argparse
 import os
-from dataclasses import dataclass, fields, replace
+from dataclasses import dataclass, fields
 from typing import Mapping
+
+
+def _env_name(field_name: str) -> str:
+    return "JEVANY_PREFIX_CACHE" if field_name == "prefix_cache_size" else "JEVANY_" + field_name.upper()
 
 
 @dataclass(frozen=True)
@@ -34,8 +38,7 @@ class InferenceOptions:
     def from_env(cls, env: Mapping[str, str] | None = None) -> "InferenceOptions":
         """Read JEVANY_MAX_* and the existing JEVANY_PREFIX_* settings."""
         env = os.environ if env is None else env
-        names = {item.name: "JEVANY_" + item.name.upper() for item in fields(cls)}
-        names["prefix_cache_size"] = "JEVANY_PREFIX_CACHE"
+        names = {item.name: _env_name(item.name) for item in fields(cls)}
         settings = {}
         for field_name, variable in names.items():
             if variable in env:
@@ -55,6 +58,6 @@ def add_inference_arguments(parser: argparse.ArgumentParser) -> None:
 
 def inference_options_from_args(args: argparse.Namespace) -> InferenceOptions:
     """CLI overrides take precedence over environment settings."""
-    overrides = {item.name: getattr(args, item.name) for item in fields(InferenceOptions)
+    overrides = {_env_name(item.name): str(getattr(args, item.name)) for item in fields(InferenceOptions)
                  if getattr(args, item.name) is not None}
-    return replace(InferenceOptions.from_env(), **overrides)
+    return InferenceOptions.from_env({**os.environ, **overrides})

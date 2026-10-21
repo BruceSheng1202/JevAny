@@ -1,6 +1,7 @@
 """Multi-GPU placement: option plumbing on any machine, sharded parity on two or more CUDA devices."""
 import argparse
 import json
+from types import MappingProxyType
 
 import pytest
 import torch
@@ -33,6 +34,77 @@ def test_placement_flags_override_environment():
     assert (options.device_map, options.max_memory_gib, options.dtype) == ("balanced", 31.0, torch.bfloat16)
     with pytest.raises(SystemExit):
         parser.parse_args(["--device-map", "cuda:0"])
+
+
+@pytest.mark.parametrize("env,flags,device_map,memory", [
+    ({"JEVANY_MAX_MEMORY_GIB": "10"}, ["--device-map", "auto"], "auto", 10.0),
+    ({"JEVANY_DEVICE_MAP": "auto"}, ["--max-memory-gib", "31"], "auto", 31.0),
+    ({"JEVANY_DEVICE_MAP": "invalid", "JEVANY_MAX_MEMORY_GIB": "10"},
+     ["--device-map", "balanced"], "balanced", 10.0),
+    ({"JEVANY_DEVICE_MAP": "invalid", "JEVANY_MAX_MEMORY_GIB": "bad"},
+     ["--device-map", "auto", "--max-memory-gib", "31"], "auto", 31.0),
+])
+def test_placement_flags_merge_before_validation(env, flags, device_map, memory):
+    parser = argparse.ArgumentParser()
+    add_placement_arguments(parser)
+    env = {**env, "JEVANY_DTYPE": "bf16", "JEVANY_MERGE": "0"}
+    before = dict(env)
+    options = load_options_from_args(parser.parse_args(flags), MappingProxyType(env))
+    assert options == LoadOptions(dtype=torch.bfloat16, merge=False, device_map=device_map, max_memory_gib=memory)
+    assert env == before
+
+
+@pytest.mark.parametrize("bad", ["bad", "-1", "0", "inf", "nan"])
+def test_placement_flags_override_invalid_environment_memory(bad):
+    parser = argparse.ArgumentParser()
+    add_placement_arguments(parser)
+    env = {"JEVANY_DEVICE_MAP": "auto", "JEVANY_MAX_MEMORY_GIB": bad}
+    options = load_options_from_args(parser.parse_args(["--max-memory-gib", "31"]), env)
+    assert options == LoadOptions(device_map="auto", max_memory_gib=31.0)
+    assert env == {"JEVANY_DEVICE_MAP": "auto", "JEVANY_MAX_MEMORY_GIB": bad}
+    with pytest.raises(ValueError):
+        LoadOptions.from_env(env)
+
+
+@pytest.mark.parametrize("env,flags,message", [
+    ({}, ["--max-memory-gib", "31"], "max_memory_gib requires device_map"),
+    ({"JEVANY_DEVICE_MAP": "invalid"}, ["--max-memory-gib", "31"], "device_map must be one of"),
+    ({"JEVANY_MAX_MEMORY_GIB": "bad"}, ["--device-map", "auto"], "could not convert string to float"),
+    ({"JEVANY_MAX_MEMORY_GIB": "-1"}, ["--device-map", "auto"], "max_memory_gib must be finite and positive"),
+    ({"JEVANY_LORA_SCALE": "bad"}, ["--device-map", "auto"], "could not convert string to float"),
+    ({"JEVANY_COMPILE": "fastest"}, ["--device-map", "auto"], "JEVANY_COMPILE"),
+    ({"JEVANY_CUDA_GRAPHS": "1"}, ["--device-map", "auto"], "cuda_graphs require the whole model on one GPU"),
+    ({"JEVANY_FUSED_KERNELS": "1"}, ["--device-map", "auto"], "fused_kernels require the whole model on one GPU"),
+])
+def test_placement_flags_reject_invalid_final_settings(env, flags, message):
+    parser = argparse.ArgumentParser()
+    add_placement_arguments(parser)
+    with pytest.raises(ValueError, match=message):
+        load_options_from_args(parser.parse_args(flags), env)
+
+
+@pytest.mark.parametrize("bad", ["0", "-1", "inf", "nan"])
+def test_placement_flags_reject_invalid_cli_memory(bad):
+    parser = argparse.ArgumentParser()
+    add_placement_arguments(parser)
+    env = {"JEVANY_DEVICE_MAP": "auto", "JEVANY_MAX_MEMORY_GIB": "10"}
+    with pytest.raises(ValueError, match="max_memory_gib must be finite and positive"):
+        load_options_from_args(parser.parse_args(["--max-memory-gib", bad]), env)
+
+
+def test_placement_flags_reject_malformed_cli_memory():
+    parser = argparse.ArgumentParser()
+    add_placement_arguments(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--max-memory-gib", "bad"])
+
+
+@pytest.mark.parametrize("env", [{}, {"JEVANY_DEVICE_MAP": "auto"}, {"JEVANY_MAX_MEMORY_GIB": "bad"}])
+def test_placement_flags_preserve_no_override_sentinel(env):
+    parser = argparse.ArgumentParser()
+    add_placement_arguments(parser)
+    assert load_options_from_args(parser.parse_args([]), env) is None
+    assert load_options_from_args(argparse.Namespace(), env) is None
 
 
 def test_remote_decide_rejects_placement(tmp_path, capsys):

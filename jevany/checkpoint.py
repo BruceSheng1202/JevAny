@@ -9,13 +9,15 @@ This is the one place that knows the layout of `head.pt` and how a checkpoint be
     tok, model = ck.load("mps", LoadOptions.from_env())
     ck.meta.temperature                             # the calibration the checkpoint carries
 """
+import argparse
 import json
 import math
 import os
 import re
 from importlib import metadata as importlib_metadata
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Mapping
 
 import torch
 
@@ -210,11 +212,11 @@ class LoadOptions:
                    fused_kernels=env.get("JEVANY_FUSED_KERNELS", "0") == "1")
 
 
-def load_options_from_args(args, env=os.environ):
+def load_options_from_args(args: argparse.Namespace, env: Mapping[str, str] = os.environ) -> LoadOptions | None:
     """LoadOptions from the environment with explicit placement flags applied; None when neither is set."""
-    overrides = {name: getattr(args, name) for name in ("device_map", "max_memory_gib")
+    overrides = {"JEVANY_" + name.upper(): str(getattr(args, name)) for name in ("device_map", "max_memory_gib")
                  if getattr(args, name, None) is not None}
-    return replace(LoadOptions.from_env(env), **overrides) if overrides else None
+    return LoadOptions.from_env({**env, **overrides}) if overrides else None
 
 
 class Checkpoint:
