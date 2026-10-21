@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 import random
 import re
 import urllib.request
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from datasets import load_dataset
 
-from jevany.data import materialize
+from jevany.data import materialize, resolve_media
 from jevany.datasets.convert import answer_key, choice_parts, metadata, record, text_choice_record
 from jevany.model import MAX_BRANCH, MAX_PACKED, MAX_STATE, encode, load_tokenizer
 from jevany.suite import digest, read_jsonl, semantic_hash as content_hash, write_json, write_jsonl
@@ -309,8 +310,9 @@ def main(argv=None):
         import datasets
         datasets.config.HF_DATASETS_CACHE = args.cache
 
-    excluded = {content_hash(row) for path in args.exclude for row in read_jsonl(path)}
-    train = [row for path in args.include_train for row in read_jsonl(path)]
+    excluded = {content_hash(resolve_media(row, Path(path).parent))
+                for path in args.exclude for row in read_jsonl(path)}
+    train = [resolve_media(row, Path(path).parent) for path in args.include_train for row in read_jsonl(path)]
     evaluation = []
 
     if args.helpsteer or args.eval_per_source:
@@ -397,8 +399,10 @@ def main(argv=None):
             for converted in pool.map(lambda row: download_video(row, "evaluation", root), video_evaluation):
                 evaluation.extend(converted or [])
 
-    train = unique(train, excluded)
-    evaluation = unique(evaluation, excluded | {content_hash(row) for row in train})
+    media_directory = root.resolve()
+    train = unique((resolve_media(row, media_directory) for row in train), excluded)
+    evaluation = unique((resolve_media(row, media_directory) for row in evaluation),
+                        excluded | {content_hash(row) for row in train})
     tokenizer = load_tokenizer(args.tokenizer, revision=args.tokenizer_revision or None)
     before = len(train)
     train = [row for row in train if admitted(row, tokenizer)]
@@ -407,9 +411,12 @@ def main(argv=None):
     dropped = {"train": before - len(train), "evaluation": before_evaluation - len(evaluation)}
     calibration, development = eval_split(evaluation, args.eval_per_source, args.seed)
     random.Random(args.seed).shuffle(train)
-    write_jsonl(root / "train.jsonl", train)
-    write_jsonl(root / "calibration.jsonl", calibration)
-    write_jsonl(root / "development.jsonl", development)
+    for split, rows in (("train", train), ("calibration", calibration), ("development", development)):
+        for row in rows:
+            for media in row.get("media", []):
+                if "://" not in media["uri"]:
+                    media["uri"] = os.path.relpath(media["uri"], media_directory)
+        write_jsonl(root / f"{split}.jsonl", rows)
     files = {name: {"records": len(rows), "questions": sum(len(row["questions"]) for row in rows),
                     "sha256": digest(root / name)} for name, rows in
              (("train.jsonl", train), ("calibration.jsonl", calibration), ("development.jsonl", development))}

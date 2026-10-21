@@ -1,10 +1,12 @@
 """Media identity is shared by dataset deduplication and overlap checks."""
 import copy
+import json
+from pathlib import Path
 
 import pytest
 
 from jevany.data import load_records
-from jevany.suite import digest, load_split, semantic_hash, validate_suite, write_json, write_jsonl
+from jevany.suite import digest, load_split, read_jsonl, semantic_hash, validate_suite, write_json, write_jsonl
 
 
 TEXT_HASH = "15504894a79f9615b2dfc9f0a2b0fb3db86d11f24ea0c9cae874bf781bb11abb"
@@ -142,3 +144,117 @@ def test_invalid_media_still_fails_record_validation(tmp_path, media):
     with pytest.raises(ValueError, match=r"invalid\.jsonl:1:") as error:
         load_records(path)
     assert "media" in str(error.value)
+
+
+@pytest.mark.parametrize("media_type", ["image", "video", None])
+def test_rlcr_can_exclude_its_own_parent_partition(tmp_path, media_type):
+    from jevany.datasets import build_rlcr
+
+    media = [{"type": media_type, "uri": "asset"}] if media_type else []
+    root = make_suite(tmp_path, {"train": [record("train", media)]})
+    (root / "asset").write_bytes(b"fixture")
+    output = tmp_path / "rlcr"
+    quotas = {**dict.fromkeys(build_rlcr.QUOTAS, 0), "core": 1}
+    with pytest.raises(ValueError, match="core: requested 1 records but only 0 are available"):
+        build_rlcr.main(["--suite", str(root), "--out", str(output),
+                         "--exclude", str(root / "train.jsonl"), "--quotas", json.dumps(quotas)])
+    assert not output.exists()
+
+
+@pytest.fixture
+def offline_sft(monkeypatch):
+    from jevany.datasets import build_sft
+
+    monkeypatch.setattr(build_sft, "load_tokenizer", lambda *args, **kwargs: object())
+    monkeypatch.setattr(build_sft, "admitted", lambda *args: True)
+    monkeypatch.setattr(build_sft, "load_source",
+                        lambda *args: pytest.fail("unexpected dataset load"))
+    return build_sft
+
+
+def sft_args(output):
+    return ["--out", str(output)] + [
+        arg for flag in ("helpsteer", "agent", "hard-text", "scienceqa", "aokvqa", "video", "eval-per-source")
+        for arg in (f"--{flag}", "0")
+    ]
+
+
+def test_sft_included_files_keep_their_own_relative_media(tmp_path, offline_sft):
+    output = tmp_path / "output"
+    args = sft_args(output)
+    expected = set()
+    for name in ("one", "two"):
+        directory = tmp_path / name
+        directory.mkdir()
+        asset = directory / "asset.png"
+        asset.write_bytes(b"fixture")
+        path = directory / "train.jsonl"
+        write_jsonl(path, [record(name, [{"type": "image", "uri": "asset.png"}])])
+        args += ["--include-train", str(path)]
+        expected.add(str(asset))
+
+    offline_sft.main(args)
+
+    rows = load_split(output, "train")
+    assert {row["media"][0]["uri"] for row in rows} == expected
+    assert all(not Path(row["media"][0]["uri"]).is_absolute()
+               for row in read_jsonl(output / "train.jsonl"))
+
+
+@pytest.mark.parametrize("same_file", [False, True])
+def test_sft_exclusions_resolve_media_against_the_exclusion_file(tmp_path, offline_sft, same_file):
+    included = tmp_path / "included"
+    excluded = tmp_path / "excluded"
+    included.mkdir()
+    excluded.mkdir()
+    for directory in (included, excluded):
+        (directory / "asset.png").write_bytes(b"fixture")
+    train = record("train", [{"type": "image", "uri": "asset.png"}])
+    write_jsonl(included / "train.jsonl", [train])
+    exclusion = copy.deepcopy(train)
+    exclusion["media"][0]["uri"] = "../included/asset.png" if same_file else "asset.png"
+    del exclusion["questions"]["q"]["label"]
+    del exclusion["_meta"]
+    write_jsonl(excluded / "exclude.jsonl", [exclusion])
+    output = tmp_path / "output"
+
+    offline_sft.main(sft_args(output) + ["--include-train", str(included / "train.jsonl"),
+                                       "--exclude", str(excluded / "exclude.jsonl")])
+
+    assert len(read_jsonl(output / "train.jsonl")) == (0 if same_file else 1)
+
+
+@pytest.mark.parametrize("extra_input", ["none", "exclude", "include"])
+def test_sft_generated_media_uses_the_output_directory(tmp_path, monkeypatch, offline_sft, extra_input):
+    from PIL import Image
+
+    source_row = {"image": Image.new("RGB", (1, 1)), "question": "Which object?",
+                  "choices": ["A", "B"], "answer": 0}
+    output = tmp_path / "output"
+    generated = offline_sft.visual_record(source_row, "scienceqa", 0, "train", output)
+    monkeypatch.setattr(offline_sft, "load_source",
+                        lambda source, split: ([source_row] * (1 if split == "train" else 2)
+                                                if source == "scienceqa" else []))
+    args = sft_args(output) + ["--scienceqa", "1", "--eval-per-source", "1", "--resume"]
+    if extra_input == "exclude":
+        excluded = copy.deepcopy(generated)
+        excluded["media"][0]["uri"] = str(Path("output") / excluded["media"][0]["uri"])
+        path = tmp_path / "exclude.jsonl"
+        write_jsonl(path, [excluded])
+        args += ["--exclude", str(path)]
+    elif extra_input == "include":
+        included = tmp_path / "included"
+        imported = offline_sft.visual_record(source_row, "scienceqa", 0, "train", included)
+        path = included / "train.jsonl"
+        write_jsonl(path, [imported])
+        args += ["--include-train", str(path)]
+
+    offline_sft.main(args)
+
+    counts = {"train": {"none": 1, "exclude": 0, "include": 2}[extra_input],
+              "calibration": 1, "development": 1}
+    for split, count in counts.items():
+        raw = read_jsonl(output / f"{split}.jsonl")
+        assert len(raw) == count
+        assert all(not Path(item["uri"]).is_absolute() for row in raw for item in row["media"])
+        assert all(Path(item["uri"]).is_file() for row in load_split(output, split) for item in row["media"])

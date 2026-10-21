@@ -176,6 +176,11 @@ public experiments and custom training. They do not reconstruct the current
 release corpus. Review upstream licenses before downloading, training on, or
 redistributing any converted data.
 
+Media paths in `--include-train` and `--exclude` files are resolved against each
+input JSONL directory. SFT output keeps local media URIs relative to its output
+directory, including references to imported media. Keep those referenced files
+with the suite when moving it.
+
 ## Evaluation Separation
 
 For a frozen suite with a `manifest.json`, run `jevany data check-suite PATH`.
@@ -190,9 +195,9 @@ Decision hashes combine normalized state and questions with ordered media
 `type` and `uri` descriptors. URI case and whitespace remain significant; the hash
 does not read media bytes. Suite and training checks resolve relative URIs before
 hashing. Pure-text hashes retain their previous values. Stored `_meta.text_sha256`
-may contain historical text-only hashes; checks recompute identity from records,
-so existing suites need no rewrite. Rebuild external media hash indexes when
-adopting this behavior.
+values are producer-specific and may hash only text, including in newly converted
+media records. Checks recompute identity from records, so existing suites need no
+rewrite. Rebuild external media hash indexes when adopting this behavior.
 
 Keep training, calibration, and evaluation records separate. Fit calibration
 parameters only on the calibration partition, preserve group identifiers for
