@@ -145,7 +145,7 @@ When creating data:
 - keep option keys stable and descriptions specific;
 - include cases where information is genuinely missing;
 - distinguish ambiguity from label noise;
-- keep train and evaluation sources separate, then check normalized text hashes;
+- keep train and evaluation sources separate, then check for duplicate decision content;
 - preserve source, generator, prompt, verifier, and license metadata outside the model-facing fields;
 - audit generated labels and counterfactual pairs before training.
 
@@ -180,15 +180,23 @@ redistributing any converted data.
 
 For a frozen suite with a `manifest.json`, run `jevany data check-suite PATH`.
 It checks declared partitions' checksums and counts, labelled question validity,
-source restrictions, and overlap in normalized decision text or group IDs across
+source restrictions, and overlap in decision content or group IDs across
 partitions. It reports the partitions checked and any skipped partition.
 The locked test partition is not read unless you pass `--allow-test`, so
 train/test overlap is checked only with that flag.
 A suite containing only the locked test partition requires that flag.
 
+Decision hashes combine normalized state and questions with ordered media
+`type` and `uri` descriptors. URI case and whitespace remain significant; the hash
+does not read media bytes. Suite and training checks resolve relative URIs before
+hashing. Pure-text hashes retain their previous values. Stored `_meta.text_sha256`
+may contain historical text-only hashes; checks recompute identity from records,
+so existing suites need no rewrite. Rebuild external media hash indexes when
+adopting this behavior.
+
 Keep training, calibration, and evaluation records separate. Fit calibration
 parameters only on the calibration partition, preserve group identifiers for
-related questions, and check normalized text hashes before evaluation. Current
+related questions, and check decision hashes before evaluation. Current
 release metrics and suite hashes are recorded in
 [`results/model-family-v2.json`](../results/model-family-v2.json); protocol notes
 are in [EVALUATION.md](EVALUATION.md).

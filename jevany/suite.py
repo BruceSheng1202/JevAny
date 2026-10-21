@@ -25,15 +25,20 @@ def record_digest(record):
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def semantic_hash(record):
-    """Hash decision content without labels or provenance metadata."""
+def semantic_hash(record: dict) -> str:
+    """Hash normalized decision text and ordered media type/URI, excluding labels and metadata."""
     questions = {
         question_id: {key: value for key, value in question.items()
                       if key in ("type", "instructions", "criteria")}
         for question_id, question in record["questions"].items()
     }
     payload = json.dumps({"state": record["state"], "questions": questions}, sort_keys=True, ensure_ascii=False)
-    return hashlib.sha256(" ".join(payload.casefold().split()).encode()).hexdigest()
+    payload = " ".join(payload.casefold().split())
+    if record.get("media"):
+        media = [{"type": item["type"], "uri": item["uri"]} for item in record["media"]]
+        # URI case and whitespace identify media; only decision text is normalized.
+        payload = json.dumps({"text": payload, "media": media}, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode()).hexdigest()
 
 
 def read_json(path):
@@ -91,8 +96,8 @@ def validate_training(records, manifest):
 def validate_suite(directory: str | Path, *, allow_test: bool = False) -> dict:
     """Check declared partitions, labelled records, source restrictions and split overlap.
 
-    The locked test partition is skipped unless explicitly requested. Text
-    overlap uses the same label-free semantic hash as the public data builders;
+    The locked test partition is skipped unless explicitly requested. Content
+    overlap uses the same label-free, media-aware hash as the public data builders;
     related records also stay together by source and group_id.
     """
     directory = Path(directory)
