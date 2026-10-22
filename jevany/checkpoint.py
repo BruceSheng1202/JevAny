@@ -213,9 +213,14 @@ class LoadOptions:
 
 
 def load_options_from_args(args: argparse.Namespace, env: Mapping[str, str] = os.environ) -> LoadOptions | None:
-    """LoadOptions from the environment with explicit placement flags applied; None when neither is set."""
-    overrides = {"JEVANY_" + name.upper(): str(getattr(args, name)) for name in ("device_map", "max_memory_gib")
+    """Apply explicit placement and acceleration flags before parsing; None when no loading flags are set."""
+    overrides = {"JEVANY_" + name.upper(): str(getattr(args, name))
+                 for name in ("device_map", "max_memory_gib", "cuda_graph_max_tokens")
                  if getattr(args, name, None) is not None}
+    if getattr(args, "cuda_graphs", False) or getattr(args, "cuda_graph_max_tokens", None) is not None:
+        overrides["JEVANY_CUDA_GRAPHS"] = "1"
+    if getattr(args, "fused_kernels", False):
+        overrides["JEVANY_FUSED_KERNELS"] = "1"
     return LoadOptions.from_env({**env, **overrides}) if overrides else None
 
 

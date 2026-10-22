@@ -10,13 +10,12 @@ import os
 import platform
 import random
 import time
-from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import torch
 
-from jevany.checkpoint import LoadOptions
+from jevany.checkpoint import LoadOptions, load_options_from_args
 from jevany.device import sync
 from jevany.predictors import LocalPredictor
 from jevany.readout import add_readout_arguments, letter_options_from_args
@@ -130,14 +129,7 @@ def main(argv=None):
     identities = [row["_meta"]["id"] for row in records]
     if len(set(identities)) != len(identities):
         parser.error("latency panel contains duplicate record IDs")
-    options = LoadOptions.from_env()
-    if args.cuda_graphs or args.cuda_graph_max_tokens is not None:
-        options = replace(options, cuda_graphs=True,
-                          cuda_graph_max_tokens=(args.cuda_graph_max_tokens
-                                                 if args.cuda_graph_max_tokens is not None
-                                                 else options.cuda_graph_max_tokens))
-    if args.fused_kernels:
-        options = replace(options, fused_kernels=True)
+    options = load_options_from_args(args) or LoadOptions.from_env()
     if letter_options is None:
         predictor = LocalPredictor(args.run, args.device, options, max_packed=args.max_packed,
                                    exact_kernels=not args.serving_kernels)

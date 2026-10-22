@@ -72,8 +72,7 @@ def decide_main(argv: list[str]) -> None:
     from .api import SystemOneRequest
     request = SystemOneRequest.model_validate_json(content)
     if args.checkpoint:
-        from dataclasses import replace
-        from .checkpoint import LoadOptions, load_options_from_args
+        from .checkpoint import load_options_from_args
         from .runtime import JevModel
         if choice_options is not None and (
             args.cuda_graphs or args.cuda_graph_max_tokens is not None
@@ -84,14 +83,6 @@ def decide_main(argv: list[str]) -> None:
         if choice_options is not None and args.fused_kernels:
             parser.error("--fused-kernels applies only to native readout")
         options = load_options_from_args(args)
-        if args.cuda_graphs or args.cuda_graph_max_tokens is not None:
-            options = options or LoadOptions.from_env()
-            options = replace(options, cuda_graphs=True,
-                              cuda_graph_max_tokens=(args.cuda_graph_max_tokens
-                                                     if args.cuda_graph_max_tokens is not None
-                                                     else options.cuda_graph_max_tokens))
-        if args.fused_kernels:
-            options = replace(options or LoadOptions.from_env(), fused_kernels=True)
         settings = ({
             "readout": "choice",
             "choice_temperature": choice_options.temperature,

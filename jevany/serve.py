@@ -10,7 +10,7 @@ JEVANY_PREFIX_MIN_TOKENS size the state-prefix cache; JEVANY_DATE_FACTS=1 enable
 """
 import argparse, math, os
 from contextlib import asynccontextmanager
-from dataclasses import fields, replace
+from dataclasses import fields
 from pathlib import Path
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
@@ -262,13 +262,6 @@ def main(argv=None):
     if choice_options is not None and a.fused_kernels:
         ap.error("--fused-kernels applies only to native readout")
     options = load_options_from_args(a)
-    if a.cuda_graphs or a.cuda_graph_max_tokens is not None:
-        options = options or LoadOptions.from_env()
-        options = replace(options, cuda_graphs=True,
-                          cuda_graph_max_tokens=(a.cuda_graph_max_tokens if a.cuda_graph_max_tokens is not None
-                                                 else options.cuda_graph_max_tokens))
-    if a.fused_kernels:
-        options = replace(options or LoadOptions.from_env(), fused_kernels=True)
     application = create_app(a.run, device=a.device, dtype=a.dtype, model_name=a.model_name,
                              options=options,
                              inference_options=(inference_options_from_args(a)
