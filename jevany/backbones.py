@@ -6,6 +6,7 @@ in both the training recipe and the saved checkpoint.
 """
 import functools
 import importlib
+import os
 from dataclasses import dataclass
 
 import torch
@@ -333,8 +334,24 @@ class BackboneAdapter:
         return self.forward(model, **inputs).last_hidden_state
 
 
-def _video_inputs(processor, paths: list[str], *, num_frames: int) -> dict:
-    """Decode with the declared PyAV dependency and retain native frame sampling."""
+MEDIA_BUDGETS = ("capped", "full")
+
+
+def media_budget() -> str:
+    """Media encoding for Qwen vision backbones, from JEVANY_MEDIA (``jevany serve/decide --media``).
+
+    ``capped`` (default) keeps the released encoding: the images of a request share a 512x512 pixel budget and a
+    video is 8 frames within 512x512 pixels. ``full`` gives images the processor's native resolution and keeps every
+    frame of a video at its native resolution, the protocol used for the JevAny-Robotics evaluations.
+    """
+    value = os.environ.get("JEVANY_MEDIA", "capped").strip().lower()
+    if value not in MEDIA_BUDGETS:
+        raise ValueError(f"JEVANY_MEDIA must be one of {', '.join(MEDIA_BUDGETS)}, got {value!r}")
+    return value
+
+
+def _video_inputs(processor, paths: list[str], *, num_frames: int | None) -> dict:
+    """Decode with the declared PyAV dependency and retain native frame sampling (num_frames=None keeps every frame)."""
     if not paths:
         return {"videos": None}
     import numpy as np
@@ -347,10 +364,13 @@ def _video_inputs(processor, paths: list[str], *, num_frames: int) -> dict:
 
         def sample(metadata, **kwargs):
             nonlocal indices, inverse
-            indices = np.asarray(video_processor.sample_frames(
-                metadata=metadata, num_frames=num_frames, fps=None,
-                temporal_patch_size=getattr(video_processor, "temporal_patch_size", None),
-            ))
+            if num_frames is None:
+                indices = np.arange(metadata.total_num_frames)
+            else:
+                indices = np.asarray(video_processor.sample_frames(
+                    metadata=metadata, num_frames=num_frames, fps=None,
+                    temporal_patch_size=getattr(video_processor, "temporal_patch_size", None),
+                ))
             # PyAV decodes each selected frame once; restore repetitions for short clips.
             unique, inverse = np.unique(indices, return_inverse=True)
             return unique
@@ -432,6 +452,12 @@ class QwenVisionAdapter(VisionAdapter):
             prefix.append(processor.vision_start_token + token + processor.vision_end_token)
             (images if item["type"] == "image" else videos).append(item["uri"])
         kwargs = {"return_tensors": "pt"}
+        if media_budget() == "full":
+            # Processor defaults for images; every video frame at native resolution (no per-frame pixel cap).
+            if videos:
+                kwargs["cap_pixels_per_frame"] = False
+            return processor(text=["".join(prefix) + text], images=images or None,
+                             **_video_inputs(processor, videos, num_frames=None), **kwargs)
         if images:
             kwargs["size"] = {"shortest_edge": 32 * 32,
                               "longest_edge": max(128 * 128, (512 * 512) // len(images))}

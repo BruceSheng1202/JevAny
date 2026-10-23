@@ -61,3 +61,18 @@ def inference_options_from_args(args: argparse.Namespace) -> InferenceOptions:
     overrides = {_env_name(item.name): str(getattr(args, item.name)) for item in fields(InferenceOptions)
                  if getattr(args, item.name) is not None}
     return InferenceOptions.from_env({**os.environ, **overrides})
+
+
+def add_media_argument(parser: argparse.ArgumentParser) -> None:
+    """--media for serve and local decide; same as JEVANY_MEDIA (see jevany.backbones.media_budget)."""
+    parser.add_argument("--media", choices=["capped", "full"], default=None,
+                        help="Qwen vision media encoding: capped (default, 512x512 budget, 8 video frames) or full "
+                             "(native resolution, every video frame); same as JEVANY_MEDIA")
+
+
+def apply_media_argument(args: argparse.Namespace) -> str:
+    """Export --media before weights load and validate the effective setting."""
+    from .backbones import media_budget
+    if getattr(args, "media", None) is not None:
+        os.environ["JEVANY_MEDIA"] = args.media
+    return media_budget()

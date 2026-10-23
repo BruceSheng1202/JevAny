@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 
 from .api import SystemOneRequest, output_tokens, to_answers, to_record, validate_response
-from .backbones import linear_attention_kernels
+from .backbones import linear_attention_kernels, media_budget
 from .checkpoint import Checkpoint, LoadOptions
 from .client import DecisionClient
 from .device import default_device, sync
@@ -111,6 +111,7 @@ class DecisionRuntime:
                                                  if getattr(self.model, "hybrid", False) else None),
                 },
                 "capabilities": {**asdict(capabilities), "media_types": list(capabilities.media_types)},
+                "media_budget": media_budget() if capabilities.media_types else None,
                 "limits": self.limits,
                 "prefix_cache": {
                     "enabled": self.inference_options.prefix_cache_size > 0 and capabilities.prefix_cache,
