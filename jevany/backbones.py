@@ -6,7 +6,6 @@ in both the training recipe and the saved checkpoint.
 """
 import functools
 import importlib
-import os
 from dataclasses import dataclass
 
 import torch
@@ -16,6 +15,8 @@ from transformers import (
     DynamicCache, PretrainedConfig, PreTrainedModel, PreTrainedTokenizerBase,
 )
 from transformers.pytorch_utils import Conv1D
+
+from .inference import MEDIA_BUDGETS, media_budget  # noqa: F401  (re-exported)
 
 
 LEGACY_TOKENS = ["<|fim_prefix|>", "<|fim_middle|>", "<|box_start|>", "<|box_end|>", "<|fim_suffix|>"]
@@ -332,22 +333,6 @@ class BackboneAdapter:
         """Return token hidden states, retaining each processor's model inputs."""
         model = multimodal_model if multimodal_model is not None else language_model
         return self.forward(model, **inputs).last_hidden_state
-
-
-MEDIA_BUDGETS = ("capped", "full")
-
-
-def media_budget() -> str:
-    """Media encoding for Qwen vision backbones, from JEVANY_MEDIA (``jevany serve/decide --media``).
-
-    ``capped`` (default) keeps the released encoding: the images of a request share a 512x512 pixel budget and a
-    video is 8 frames within 512x512 pixels. ``full`` gives images the processor's native resolution and keeps every
-    frame of a video at its native resolution, the protocol used for the JevAny-Robotics evaluations.
-    """
-    value = os.environ.get("JEVANY_MEDIA", "capped").strip().lower()
-    if value not in MEDIA_BUDGETS:
-        raise ValueError(f"JEVANY_MEDIA must be one of {', '.join(MEDIA_BUDGETS)}, got {value!r}")
-    return value
 
 
 def _video_inputs(processor, paths: list[str], *, num_frames: int | None) -> dict:

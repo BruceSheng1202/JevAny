@@ -12,11 +12,11 @@ import torch
 import torch.nn.functional as F
 
 from .api import SystemOneRequest, output_tokens, to_answers, to_record, validate_response
-from .backbones import linear_attention_kernels, media_budget
+from .backbones import linear_attention_kernels
 from .checkpoint import Checkpoint, LoadOptions
 from .client import DecisionClient
 from .device import default_device, sync
-from .inference import InferenceOptions
+from .inference import InferenceOptions, media_budget
 from .model import ContextLengthError, DecisionModel
 from .readout import resolve_readout_options
 

@@ -66,8 +66,11 @@ def decide_main(argv: list[str]) -> None:
     add_inference_arguments(parser)
     add_media_argument(parser)
     args = parser.parse_args(argv)
+    if args.media is not None and not args.checkpoint:
+        parser.error("--media applies to a local --checkpoint; a server uses its own --media")
     try:
-        apply_media_argument(args)
+        if args.checkpoint:
+            apply_media_argument(args)
         choice_options = choice_options_from_args(args)
     except ValueError as error:
         parser.error(str(error))
