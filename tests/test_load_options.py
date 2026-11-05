@@ -196,3 +196,43 @@ def test_entrypoint_choice_readout_rejects_acceleration(loading_entrypoint, caps
     assert error.value.code == 2
     assert "native" in capsys.readouterr().err
     assert not loading_entrypoint.seen
+
+
+@pytest.mark.parametrize("flags,expected", [
+    (["--media-cuda-graphs"], LoadOptions(media_cuda_graphs=True)),
+    (["--media-cuda-graph-max-tokens", "1024"], LoadOptions(media_cuda_graphs=True, media_cuda_graph_max_tokens=1024)),
+    (["--media-cuda-graphs", "--fused-kernels"], LoadOptions(media_cuda_graphs=True, fused_kernels=True)),
+])
+def test_entrypoint_media_graph_flags_reach_loader(loading_entrypoint, flags, expected):
+    if loading_entrypoint.command == "benchmark":
+        pytest.skip("the latency benchmark has no media requests")
+    with pytest.raises(LoaderReached):
+        loading_entrypoint.run(flags)
+    assert loading_entrypoint.seen["options"] == expected
+
+
+@pytest.mark.parametrize("flags,message", [
+    (["--media-cuda-graph-max-tokens", "64"], "at least 128"),
+    (["--readout", "choice", "--media-cuda-graphs"], "native"),
+    (["--readout", "choice", "--media-cuda-graph-max-tokens", "512"], "native"),
+])
+def test_entrypoint_rejects_media_graph_settings(loading_entrypoint, capsys, flags, message):
+    if loading_entrypoint.command == "benchmark":
+        pytest.skip("the latency benchmark has no media requests")
+    with pytest.raises(SystemExit) as error:
+        loading_entrypoint.run(flags)
+    assert error.value.code == 2
+    assert message in capsys.readouterr().err
+    assert not loading_entrypoint.seen
+
+
+@pytest.mark.parametrize("flags", [["--media-cuda-graphs"], ["--media-cuda-graph-max-tokens", "512"]])
+def test_remote_decide_rejects_media_graph_flags(monkeypatch, capsys, flags):
+    from jevany.cli import main
+
+    body = SystemOneRequest(state="state", questions={"q": Choice(criteria={"a": None, "b": None})})
+    monkeypatch.setattr("sys.stdin", io.StringIO(body.model_dump_json()))
+    with pytest.raises(SystemExit) as error:
+        main(["decide", "-", *flags])
+    assert error.value.code == 2
+    assert "require --checkpoint" in capsys.readouterr().err

@@ -159,6 +159,13 @@ class LoadOptions:
                  Gated DeltaNet gate inside FLA's kernel and transposed weight storage. Needs the LoRA merged, one
                  CUDA device and flash-linear-attention; the gain comes inside CUDA graphs. Probabilities are close
                  to, not identical with, the unfused path.
+    media_cuda_graphs
+                 capture the decoder of single-request image and video inputs once per padded length, lazily, and
+                 replay it (jevany.media_graphs); the vision tower stays eager. Multimodal checkpoints on one CUDA
+                 device; probabilities are close to, not identical with, the eager path.
+    media_cuda_graph_max_tokens
+                 largest captured media request (at least 128). Longer requests run eagerly; padding them into a
+                 graph was slower than eager inference above 2,048 tokens on an A100.
     """
     dtype: torch.dtype | None = None
     merge: bool = True
@@ -173,6 +180,8 @@ class LoadOptions:
     cuda_graphs: bool = False
     cuda_graph_max_tokens: int = 2048
     fused_kernels: bool = False
+    media_cuda_graphs: bool = False
+    media_cuda_graph_max_tokens: int = 2048
 
     def __post_init__(self):
         if self.compile_mode not in (None, *COMPILE_MODES):
@@ -194,6 +203,12 @@ class LoadOptions:
             raise ValueError("fused_kernels and compile_mode cannot be combined")
         if self.fused_kernels and self.device_map is not None:
             raise ValueError("fused_kernels require the whole model on one GPU; disable device_map")
+        if self.media_cuda_graphs and self.compile_mode:
+            raise ValueError("media_cuda_graphs and compile_mode are alternative graph captures; enable one")
+        if self.media_cuda_graphs and self.device_map is not None:
+            raise ValueError("media_cuda_graphs require the whole model on one GPU; disable device_map")
+        if type(self.media_cuda_graph_max_tokens) is not int or self.media_cuda_graph_max_tokens < 128:
+            raise ValueError("media_cuda_graph_max_tokens must be an integer of at least 128")
 
     @classmethod
     def from_env(cls, env=os.environ):
@@ -209,19 +224,44 @@ class LoadOptions:
                    max_memory_gib=float(env["JEVANY_MAX_MEMORY_GIB"]) if env.get("JEVANY_MAX_MEMORY_GIB") else None,
                    cuda_graphs=env.get("JEVANY_CUDA_GRAPHS", "0") == "1",
                    cuda_graph_max_tokens=int(env.get("JEVANY_CUDA_GRAPH_MAX_TOKENS", "2048")),
-                   fused_kernels=env.get("JEVANY_FUSED_KERNELS", "0") == "1")
+                   fused_kernels=env.get("JEVANY_FUSED_KERNELS", "0") == "1",
+                   media_cuda_graphs=env.get("JEVANY_MEDIA_CUDA_GRAPHS", "0") == "1",
+                   media_cuda_graph_max_tokens=int(env.get("JEVANY_MEDIA_CUDA_GRAPH_MAX_TOKENS", "2048")))
 
 
 def load_options_from_args(args: argparse.Namespace, env: Mapping[str, str] = os.environ) -> LoadOptions | None:
     """Apply explicit placement and acceleration flags before parsing; None when no loading flags are set."""
     overrides = {"JEVANY_" + name.upper(): str(getattr(args, name))
-                 for name in ("device_map", "max_memory_gib", "cuda_graph_max_tokens")
+                 for name in ("device_map", "max_memory_gib", "cuda_graph_max_tokens", "media_cuda_graph_max_tokens")
                  if getattr(args, name, None) is not None}
     if getattr(args, "cuda_graphs", False) or getattr(args, "cuda_graph_max_tokens", None) is not None:
         overrides["JEVANY_CUDA_GRAPHS"] = "1"
     if getattr(args, "fused_kernels", False):
         overrides["JEVANY_FUSED_KERNELS"] = "1"
+    if getattr(args, "media_cuda_graphs", False) or getattr(args, "media_cuda_graph_max_tokens", None) is not None:
+        overrides["JEVANY_MEDIA_CUDA_GRAPHS"] = "1"
     return LoadOptions.from_env({**env, **overrides}) if overrides else None
+
+
+def cast_media_modules(model, dtype: torch.dtype) -> list[str]:
+    """Cast a multimodal parent's modules outside the decoder (vision tower, projector) to ``dtype``; return their names.
+
+    A merged load builds the backbone in fp32 and casts only the decoder, which left the vision tower in fp32: about
+    2.7x slower vision forwards on an A100 for a Qwen3.5-4B video model, while the unmerged path loads it in ``dtype``.
+    """
+    parent = getattr(model, "mm", None)
+    if parent is None:
+        return []
+    decoder = {id(parameter) for parameter in model.lm.parameters()}
+    cast = []
+    for name, child in parent.named_children():
+        parameters = list(child.parameters())
+        if not parameters or any(id(parameter) in decoder for parameter in parameters):
+            continue
+        if any(parameter.is_floating_point() and parameter.dtype != dtype for parameter in parameters):
+            child.to(dtype)
+            cast.append(name)
+    return cast
 
 
 class Checkpoint:
@@ -242,6 +282,11 @@ class Checkpoint:
             if not str(device).startswith("cuda"):
                 raise ValueError("torch.compile acceleration is supported only on CUDA")
             _check_compile_runtime()
+        if opts.media_cuda_graphs:
+            if not str(device).startswith("cuda"):
+                raise ValueError("media_cuda_graphs run on CUDA only")
+            if not self.meta.multimodal:
+                raise ValueError("media_cuda_graphs apply to multimodal checkpoints; text rows use cuda_graphs")
         meta = self.meta
         default_dtype = torch.bfloat16 if meta.weights_dtype == "bf16" else torch.float32
         dtype = opts.dtype if opts.dtype is not None else default_dtype
@@ -304,6 +349,7 @@ class Checkpoint:
             m.set_language_model(m.lm.merge_and_unload())
             if dtype != torch.float32:
                 m.set_language_model(m.lm.to(dtype))
+                cast_media_modules(m, dtype)
         if m.head is not None:
             m.head.load_state_dict(meta.head)
         m.eval()
@@ -326,6 +372,11 @@ class Checkpoint:
             from .cudagraphs import RowGraphs
             graphs = m.cuda_graphs = RowGraphs(m, max_tokens=opts.cuda_graph_max_tokens).capture()
         m.inference_acceleration["cuda_graphs"] = graphs.stats if graphs is not None else None
+        media_graphs = None
+        if opts.media_cuda_graphs:
+            from .media_graphs import attach
+            media_graphs = m.media_cuda_graphs = attach(m.lm, max_tokens=opts.media_cuda_graph_max_tokens)
+        m.inference_acceleration["media_cuda_graphs"] = media_graphs.stats if media_graphs is not None else None
         return tok, m
 
     COMPAT_FIELDS = ("base", "base_revision", "lora", "head_dim", "head_residual_dim", "head_type",

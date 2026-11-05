@@ -278,6 +278,7 @@ evaluation.
 `full` is the protocol of the JevAny-Robotics evaluations; checkpoints evaluated that way should be served with
 `--media full` and context limits that fit the media (for example `--max-state-tokens 16384 --max-packed-tokens 32768`).
 It costs more visual tokens and latency. `describe()` and `GET /v1/models` report the effective `media_budget`.
+With `full`, each video is decoded once with PyAV frame threads; the frames are the same as with an unthreaded decode.
 
 ### Optional CUDA acceleration
 
@@ -293,6 +294,8 @@ exact checkpoint path unless their report says otherwise.
 | `JEVANY_CUDA_GRAPHS` / `--cuda-graphs` | `0`, `1` | `1` for single-question serving | `1` for single-question serving | Replays whole-backbone CUDA graphs on one GPU |
 | `JEVANY_CUDA_GRAPH_MAX_TOKENS` / `--cuda-graph-max-tokens` | positive integer | `2048` | `2048` | Longer rows stay on eager inference instead of being padded into a slower graph |
 | `JEVANY_FUSED_KERNELS` / `--fused-kernels` | `0`, `1` | `1` with merged BF16 LoRA and direct graphs | `0` until measured | Fused Qwen3.5 kernels: one-kernel norms, merged projections and transposed weights |
+| `JEVANY_MEDIA_CUDA_GRAPHS` / `--media-cuda-graphs` | `0`, `1` | `1` for single-request image and video serving | `0` until measured | Replays CUDA graphs of the decoder for image and video requests on one GPU |
+| `JEVANY_MEDIA_CUDA_GRAPH_MAX_TOKENS` / `--media-cuda-graph-max-tokens` | integer ≥ 128 | `2048` | `2048` | Longer media requests stay on eager inference |
 
 Qwen3.5 and Qwen3.8 mix full-attention layers with Gated DeltaNet layers.
 `JEVANY_ATTN` controls only the full-attention layers. Install
@@ -436,6 +439,37 @@ faster as well. On the Transfer-v9 development suite with the same serving
 settings, clean accuracy moved from 78.68% to 78.78% and NLL from 0.587 to
 0.588; 5 of 1,264 argmax decisions changed and the largest probability change
 was 0.044. The option has not been measured on 27B.
+
+`--media-cuda-graphs` (`JEVANY_MEDIA_CUDA_GRAPHS=1`, `LoadOptions(media_cuda_graphs=True)`)
+brings direct graphs to the image and video requests of multimodal checkpoints;
+see `jevany/media_graphs.py`. The vision tower and the M-RoPE position index run
+eagerly. The language decoder is captured the first time a request of each
+padded length arrives, in one shared memory pool, and replayed afterwards.
+Inputs are right-padded with zero embeddings and continuing positions; every
+decoder layer is causal, so padding never reaches a real token. Requests above
+`--media-cuda-graph-max-tokens` (2,048 by default), batches, padding masks and
+requests for a cache run eagerly. `describe()` reports the captured lengths, the
+capture time, graph and eager calls and the reasons for eager calls under
+`acceleration.media_cuda_graphs`. The option needs a multimodal checkpoint on one
+CUDA device and cannot be combined with `JEVANY_COMPILE`, a device map or choice
+readout.
+
+On an A100-40GB with JevAny-Robotics-4B-LoRA v0.4 (BF16 merged LoRA, fused
+kernels, FLA and causal-conv1d, `--media full`), media graphs reduced median
+end-to-end latency over the 2,831 RoboRewardBench videos from 176 to
+165 ms (137 to 91 ms on its short OXE clips). Lazy capture
+took 8.5 seconds in total over the run. Measured per request, the
+graphs saved 33–38 ms of decoder time below 768 tokens and 10–21 ms from 768 to
+1,280 tokens, and hardly changed requests of 1,280 to 2,048 tokens; from 2,048 to
+4,096 tokens the forward is compute-bound and padding made it 13–17 ms slower,
+which sets the default limit. Against eager inference on the same runs,
+99.8–99.96% of the top-score decisions were unchanged.
+
+Merged loading also casts the vision tower and the other modules of a
+multimodal parent to the serving dtype. They used to stay in fp32 after the LoRA
+merge (`JEVANY_MERGE_BF16=1`, or an fp32 checkpoint served with `--dtype bf16`),
+which made the vision forward of a Qwen3.5-4B video checkpoint about 2.7×
+slower on an A100; the unmerged path already loads them in the serving dtype.
 
 `scripts/benchmark_latency.py` accepts `--cuda-graphs`,
 `--cuda-graph-max-tokens`, `--fused-kernels`, `--max-packed` and

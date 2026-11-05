@@ -246,6 +246,11 @@ def main(argv=None):
     ap.add_argument("--fused-kernels", action="store_true",
                     help="fused Qwen3.5 inference kernels (merged LoRA, one GPU, flash-linear-attention); "
                          "same as JEVANY_FUSED_KERNELS=1")
+    ap.add_argument("--media-cuda-graphs", action="store_true",
+                    help="CUDA graphs for the decoder of image and video requests (multimodal checkpoints on one "
+                         "GPU); same as JEVANY_MEDIA_CUDA_GRAPHS=1")
+    ap.add_argument("--media-cuda-graph-max-tokens", type=int,
+                    help="largest captured media request; longer ones run eagerly (default 2048)")
     add_inference_arguments(ap)
     add_media_argument(ap)
     ap.add_argument("--host", default="127.0.0.1")
@@ -258,6 +263,7 @@ def main(argv=None):
         ap.error(str(error))
     if choice_options is not None and (
         a.cuda_graphs or a.cuda_graph_max_tokens is not None
+        or a.media_cuda_graphs or a.media_cuda_graph_max_tokens is not None
         or any(getattr(a, item.name) is not None for item in fields(InferenceOptions))
     ):
         ap.error("CUDA graph and native inference-limit flags cannot be used with --readout choice; "

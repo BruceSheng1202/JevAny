@@ -63,6 +63,10 @@ def decide_main(argv: list[str]) -> None:
                         help="largest captured row; longer rows run eagerly (default 2048)")
     parser.add_argument("--fused-kernels", action="store_true",
                         help="fused Qwen3.5 inference kernels for the local checkpoint (JEVANY_FUSED_KERNELS=1)")
+    parser.add_argument("--media-cuda-graphs", action="store_true",
+                        help="CUDA graphs for the decoder of image and video requests (JEVANY_MEDIA_CUDA_GRAPHS=1)")
+    parser.add_argument("--media-cuda-graph-max-tokens", type=int,
+                        help="largest captured media request; longer ones run eagerly (default 2048)")
     add_inference_arguments(parser)
     add_media_argument(parser)
     args = parser.parse_args(argv)
@@ -82,6 +86,7 @@ def decide_main(argv: list[str]) -> None:
         from .runtime import JevModel
         if choice_options is not None and (
             args.cuda_graphs or args.cuda_graph_max_tokens is not None
+            or args.media_cuda_graphs or args.media_cuda_graph_max_tokens is not None
             or any(getattr(args, item.name) is not None for item in fields(InferenceOptions))
         ):
             parser.error("CUDA graph and native inference-limit flags cannot be used with --readout choice; "
@@ -105,9 +110,10 @@ def decide_main(argv: list[str]) -> None:
         if (args.device or args.dtype or args.model_name is not None or args.readout != "native"
                 or args.device_map is not None or args.max_memory_gib is not None or args.cuda_graphs
                 or args.cuda_graph_max_tokens is not None or args.fused_kernels
+                or args.media_cuda_graphs or args.media_cuda_graph_max_tokens is not None
                 or any(getattr(args, item.name) is not None for item in fields(InferenceOptions))):
-            parser.error("device, dtype, placement, model-name, readout, cuda-graphs, fused-kernels and inference "
-                         "limit options require --checkpoint")
+            parser.error("device, dtype, placement, model-name, readout, cuda-graphs, fused-kernels, "
+                         "media-cuda-graphs and inference limit options require --checkpoint")
         from .client import JevClient
         client = JevClient(args.base_url)
     print(json.dumps(client(request), indent=2, ensure_ascii=False))

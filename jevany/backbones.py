@@ -335,6 +335,29 @@ class BackboneAdapter:
         return self.forward(model, **inputs).last_hidden_state
 
 
+def _every_frame(path: str):
+    """Decode every frame of a clip with PyAV frame threads; return the frames and ``load_video``-style metadata.
+
+    Threads change decode time only, not the frames. The frame count is the number decoded, not the container's
+    estimate, and the rate falls back to the guessed rate when the stream declares no average rate."""
+    import av
+    import numpy as np
+    from transformers.video_utils import VideoMetadata
+
+    with av.open(str(path)) as container:
+        stream = container.streams.video[0]
+        stream.thread_type = "AUTO"
+        fps = float(stream.average_rate or stream.guessed_rate or 1)
+        frames = [frame.to_ndarray(format="rgb24") for frame in container.decode(stream)]
+        height, width = stream.height, stream.width
+    if not frames:
+        raise ValueError(f"{path}: no decodable video frames")
+    count = len(frames)
+    return np.stack(frames), VideoMetadata(total_num_frames=count, fps=fps, duration=count / fps,
+                                           video_backend="pyav", height=height, width=width,
+                                           frames_indices=np.arange(count))
+
+
 def _video_inputs(processor, paths: list[str], *, num_frames: int | None) -> dict:
     """Decode with the declared PyAV dependency and retain native frame sampling (num_frames=None keeps every frame)."""
     if not paths:
@@ -345,17 +368,19 @@ def _video_inputs(processor, paths: list[str], *, num_frames: int | None) -> dic
     video_processor = processor.video_processor
     videos, metadata = [], []
     for path in paths:
+        if num_frames is None:
+            frames, info = _every_frame(path)
+            videos.append(frames)
+            metadata.append(info)
+            continue
         indices = inverse = None
 
         def sample(metadata, **kwargs):
             nonlocal indices, inverse
-            if num_frames is None:
-                indices = np.arange(metadata.total_num_frames)
-            else:
-                indices = np.asarray(video_processor.sample_frames(
-                    metadata=metadata, num_frames=num_frames, fps=None,
-                    temporal_patch_size=getattr(video_processor, "temporal_patch_size", None),
-                ))
+            indices = np.asarray(video_processor.sample_frames(
+                metadata=metadata, num_frames=num_frames, fps=None,
+                temporal_patch_size=getattr(video_processor, "temporal_patch_size", None),
+            ))
             # PyAV decodes each selected frame once; restore repetitions for short clips.
             unique, inverse = np.unique(indices, return_inverse=True)
             return unique

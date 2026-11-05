@@ -544,3 +544,42 @@ def test_qwen_media_budget(monkeypatch):
     monkeypatch.setenv("JEVANY_MEDIA", "native")
     with pytest.raises(ValueError):
         media_budget()
+
+
+def test_every_frame_decode_matches_plain_decode(tmp_path):
+    import av
+    import numpy as np
+    from types import SimpleNamespace
+
+    video = tmp_path / "threads.mp4"
+    with av.open(str(video), "w") as output:
+        stream = output.add_stream("libx264", rate=5)
+        stream.width = stream.height = 32
+        stream.pix_fmt = "yuv420p"
+        for i in range(23):
+            image = Image.new("RGB", (32, 32), (i * 10, 255 - i * 10, 40))
+            for packet in stream.encode(av.VideoFrame.from_image(image)):
+                output.mux(packet)
+        for packet in stream.encode():
+            output.mux(packet)
+    with av.open(str(video)) as source:
+        plain = np.stack([frame.to_ndarray(format="rgb24") for frame in source.decode(video=0)])
+    processor = SimpleNamespace(video_processor=hf.Qwen3VLVideoProcessor())
+    inputs = _video_inputs(processor, [str(video)], num_frames=None)
+    assert inputs["do_sample_frames"] is False
+    np.testing.assert_array_equal(inputs["videos"][0], plain)
+    metadata = inputs["video_metadata"][0]
+    assert (metadata.total_num_frames, metadata.fps, metadata.duration) == (23, 5, 23 / 5)
+    assert (metadata.height, metadata.width) == (32, 32)
+    np.testing.assert_array_equal(metadata.frames_indices, np.arange(23))
+
+
+def test_every_frame_decode_rejects_invalid_file(tmp_path):
+    import av
+    from types import SimpleNamespace
+
+    video = tmp_path / "broken.mp4"
+    video.write_bytes(b"not a video")
+    processor = SimpleNamespace(video_processor=hf.Qwen3VLVideoProcessor())
+    with pytest.raises(av.error.InvalidDataError):
+        _video_inputs(processor, [str(video)], num_frames=None)
